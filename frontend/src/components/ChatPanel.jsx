@@ -22,7 +22,11 @@ function suggestions(res) {
   return out.slice(0, 8);
 }
 
-const TONE = { "위험": "bad", "주의": "warn", "비교적 안전": "ok" };
+// the small local model sometimes writes LaTeX arrows ('$\rightarrow$') that plain markdown cannot show
+const LATEX = { rightarrow: "→", to: "→", leftarrow: "←", times: "×", geq: "≥", leq: "≤", approx: "≈" };
+const clean = (t) => t.replace(/\$\s*\\([a-z]+)\s*\$/g, (m, w) => LATEX[w] || m);
+
+const TONE ={ "위험": "bad", "주의": "warn", "비교적 안전": "ok" };
 const tone = (v) => TONE[Object.keys(TONE).find((k) => (v || "").startsWith(k))] || "";
 
 export default function ChatPanel({ res, open, onClose, patientPayload, drugNames = [] }) {
@@ -88,7 +92,7 @@ export default function ChatPanel({ res, open, onClose, patientPayload, drugName
               </div>
             )}
             {m.role === "assistant"
-              ? <Markdown text={m.content || "…"} cursor={busy && i === msgs.length - 1} />
+              ? <Markdown text={clean(m.content) || "…"} cursor={busy && i === msgs.length - 1} />
               : <p>{m.content}</p>}
           </div>
         ))}
