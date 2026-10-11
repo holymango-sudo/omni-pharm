@@ -1,4 +1,4 @@
-# OMNI-PHARM v2.9 — 개인화 다중 약물 상호작용 분석 시스템
+# OMNI-PHARM v2.10 — 개인화 다중 약물 상호작용 분석 시스템
 
 함께 복용하는 약들이 **이 환자에게** 얼마나 위험한지를 환자 상태(나이·키·몸무게·신장/간 기능·기저질환·임신)와
 약물의 **분자 구조**를 함께 분석해 판정합니다. 근거(식약처 DUR·허가 문서·임상 규칙·실제 부작용 보고·AI 예측)를 구분해 보여주는
@@ -136,6 +136,12 @@ ollama pull gemma4:12b                                        # 선택: AI 소�
   해외 서방형 1,196개 제품)하고 — 서방형 라벨의 Tmax(81개 성분) 또는 제형별 성인 참고치로 시간축·농도 곡선을 그리며,
   서방형 1일 최대량·1회량(메트포르민 XR 2,000mg, 트라마돌 ER 300mg, 졸피뎀 CR 12.5mg, 타이레놀 8시간 ER 1회 1,300mg 등)과
   복용 횟수(서방형 하루 1~2회, 8시간 ER 3회)를 따로 점검하고, "쪼개거나 씹지 말고 통째로 삼키세요"를 안내합니다. 약 칩에 '서방형' 표시.
+- **💬 AI 복약 상담(v2.10)**: 분석 후 자유 질문 → 로컬 LLM(gemma4:12b)이 그 분석의 사실(판정 이유·권고·DUR·라벨·규칙·약동학·
+  이 환자 기준 1일 최대량)만 근거로 스트리밍 답변(`POST /api/v1/chat`). 근거 출처는 실제 있는 종류만 쓰도록 제한, 응급 표현(숨참·과량 복용·
+  검은 변·자해 등)은 규칙으로 감지해 119 안내를 먼저 출력, 진단·처방·임의 중단 금지, LLM이 없으면 사실 기반 대체 답변. 대화는 저장하지 않음.
+- **🤒 증상으로 약 찾기(v2.10)**: 17개 증상 → 1차/대안 일반의약품 성분(`src/omnipharm/recommend.py`) → 이미 넣은 약과의 DUR·라벨·규칙
+  상호작용, 성분·계열 중복, 질환·고령(Beers)·임신·신기능으로 '적합/주의/피하세요' 선별 → 국내 시판 제품(주사제 제외) 원클릭 추가.
+  증상별 '병원에 가야 할 때' 안내(`POST /api/v1/recommend`).
 - **반복 복용 그래프(v2.9)**: 농도 곡선 패널의 '1회 복용 / 반복 복용' 전환. 약마다 라벨 Tmax·반감기로 맞춘 1구획 모델을 복용 간격마다 더해
   정상상태까지 쌓이는 농도, 상호작용·신기능으로 늘어난 축적, '복용 중단' 후 배출을 그립니다(입력한 하루 횟수·일수, 없으면 반감기로 추정한 간격).
   화면은 판정과 **같은 근거만** 씁니다(FDA CYP 지표표·ChEMBL·임상 규칙·DUR·AI 신호·질환·용량·신기능 — `src/omnipharm/journey.py`):
@@ -238,7 +244,7 @@ $py = ".\.venv\Scripts\python.exe"
 & $py scripts\pipeline.py labelsearch       # openFDA 라벨 전체 8.4만 건 전문 검색 DB (labels.db, 1분)
 & $py scripts\pipeline.py pk                # 라벨의 약동학 항목 → 성분별 Tmax·반감기 (pk.json, 1분)
 #   또는 한 번에:  & $py scripts\pipeline.py all   (위 순서 그대로)
-& $py -m pytest                             # 테스트 262개
+& $py -m pytest                             # 테스트 267개
 & $py scripts\audit_combos.py [--holdout|--patients|--foods]   # 임상 조합 감사
 & $py scripts\sweep_random.py 3000          # 무작위 대량 점검
 & $py scripts\validate_external.py          # 식약처 DUR 외부 검증
@@ -254,7 +260,7 @@ src/omnipharm/   api.py, engine.py, clinical.py, knowledge.py, journey.py (몸�
 frontend/        React + R3F 화면 (dist/ = 빌드 결과, 서버가 제공)
 scripts/         pipeline.py (데이터·학습), users.py (계정), audit_combos.py · sweep_random.py · validate_external.py ·
                  review_sheet.py · score_review.py (검증), bench_engine.py · bench_llm.py (성능), coverage_audit.py
-tests/           단위·API·보안·견고성·엔진·임상 시나리오·조합 감사·몸속 이동·서방형 테스트 (262개)
+tests/           단위·API·보안·견고성·엔진·임상 시나리오·조합 감사·몸속 이동·서방형·상담 테스트 (267개)
 runtime/         Python·Ollama·Node 실행 파일과 AI 모델 (폴더째 이동 가능)
 config/          users.json (사용자 계정, 비밀번호 해시)
 data/            raw / interim / processed / cache
