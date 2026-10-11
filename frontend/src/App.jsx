@@ -303,11 +303,12 @@ export default function App() {
       {drawer && <DetailDrawer res={res} initial={drawer} onClose={() => setDrawer(null)} />}
       {!chatOpen && (
         <button className={`chat-fab ${res ? "ready" : ""}`} onClick={() => setChatOpen(true)}
-          title={res ? "방금 분석한 약에 대해 물어보세요" : "예측 후 질문할 수 있습니다"}>
-          💬 AI 복약 상담{res && <small>질문하기</small>}
+          title={res ? "방금 분석한 약에 대해 물어보세요" : "약·건강에 대해 무엇이든 물어보세요"}>
+          💬 AI 복약 상담<small>{res ? "분석 결과로 상담" : "무엇이든 질문"}</small>
         </button>
       )}
-      <ChatPanel res={res} open={chatOpen} onClose={() => setChatOpen(false)} />
+      <ChatPanel res={res} open={chatOpen} onClose={() => setChatOpen(false)} patientPayload={payload}
+        drugNames={drugs.filter((d) => d.status === "ok").map((d) => d.name)} />
       {help && !needPin && !needLogin && <HelpModal onClose={closeHelp} />}
       {needLogin && <LoginModal onLogin={doLogin} />}
       {needPin && <PinModal onSubmit={(p) => { setPin(p); setNeedPin(false); loadAll(); }} />}

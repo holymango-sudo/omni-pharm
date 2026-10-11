@@ -1377,8 +1377,8 @@ class Engine:
                         + (" (사용 금지)" if one else " (치료상 유익성이 클 때만)"), "식약처 DUR")
             if patient.age is not None and patient.age >= 65:
                 for r in self.dur_by.get("elderly", {}).get(b, [])[:1]:
-                    add("고령(65세 이상)", g, "주의", f"식약처 DUR 노인주의 — {(r.get('content') or '').strip()[:160]}",
-                        "식약처 DUR")
+                    why = (r.get("content") or "").strip()[:160] or "고령자는 부작용이 더 잘 나타날 수 있어 신중히 사용"
+                    add("고령(65세 이상)", g, "주의", f"식약처 DUR 노인주의 — {why}", "식약처 DUR")
         return sorted(found.values(), key=lambda d: -rank[d["severity"]])
 
     def _summary(self, overall, duplicates, class_dups, disease_alerts, pair_rows, events, pa,

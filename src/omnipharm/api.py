@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from omnipharm import fhir, recommend, security
+from omnipharm import assistant, fhir, recommend, security
 from omnipharm.clinical import Patient, assess
 from omnipharm.config import VERSION, settings
 from omnipharm.dosing import Dose
@@ -295,7 +295,9 @@ async def _predict(req: PredictRequest) -> dict:
     res["version"] = VERSION
     rid = uuid.uuid4().hex[:12]
     REPORTS[rid] = llm.fact_sheet(res, req.patient.model_dump())
-    CHATS[rid] = llm.chat_context(res, req.patient.model_dump())
+    # the chat re-checks medicines named in a question together with these products, for this patient
+    CHATS[rid] = {"ctx": llm.chat_context(res, req.patient.model_dump()), "products": products,
+                  "patient": req.patient, "verdict": res["summary"]["verdict"]}
     while len(REPORTS) > 200:
         REPORTS.popitem(last=False)
     while len(CHATS) > 200:
@@ -326,22 +328,45 @@ class ChatTurn(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    report_id: str = Field(..., min_length=6, max_length=40)
+    report_id: str | None = Field(None, min_length=6, max_length=40, description="분석 결과 (없으면 일반 상담)")
     question: str = Field(..., min_length=1, max_length=600)
     history: list[ChatTurn] = Field(default_factory=list, max_length=20)
+    drugs: list[str] = Field(default_factory=list, max_length=15, description="분석 전: 입력해 둔 약 이름")
+    patient: Patient = Field(default_factory=Patient, description="분석 전: 환자 정보")
 
 
 @app.post("/api/v1/chat")
 async def chat(req: ChatRequest, request: Request):
-    """AI 복약 상담: questions about one analysis, answered from its facts by the local LLM (streamed).
+    """AI 복약 상담 (streamed). With a report_id the answer rests on that analysis; medicines / foods named in the
+    question are checked together with it by the engine first (assistant.lookups). Without one: general consultation
+    for this patient and the medicines typed so far.
     The question is not logged (it may contain health details) - only that a question was asked."""
-    ctx = CHATS.get(req.report_id)
-    if ctx is None:
+    c = CHATS.get(req.report_id) if req.report_id else None
+    if req.report_id and c is None:
         raise HTTPException(404, {"message": "분석 결과를 찾을 수 없습니다 (서버가 재시작되었을 수 있습니다). 다시 예측하세요."})
-    security.audit("chat", _who(request), _client(request), report_id=req.report_id, chars=len(req.question))
+    eng: Engine = E["engine"]
+    if c:
+        ctx, base, patient, verdict = c["ctx"], c["products"], c["patient"], c["verdict"]
+    else:
+        base, patient, verdict = [], req.patient, None
+        for name in req.drugs:
+            ings, info, err = await _resolve(name[:200])
+            if not err:
+                base.append({"input": name, "ingredients": ings, "product": info["product"],
+                             "strength": info.get("strength"), "release": info.get("release")})
+        ctx = llm.general_context(assess(patient), patient.model_dump())
+        if base:
+            ctx["입력한 약(아직 조합 분석 전)"] = [f"{p['input']} = {', '.join(eng.ko(g) for g in p['ingredients'])}"
+                                         for p in base]
+    found = await asyncio.to_thread(assistant.lookups, eng, req.question, base, patient, verdict)
+    security.audit("chat", _who(request), _client(request), report_id=req.report_id, chars=len(req.question),
+                   checked=[f["확인한 제품"].split(" = ")[0][:60] for f in found])
 
     async def gen():
-        async for tok in llm.stream_chat(ctx, [h.model_dump() for h in req.history], req.question):
+        if found:  # tell the UI which products were checked (shown as chips above the answer)
+            chips = [{"name": f["확인한 제품"].split(" = ")[0], "verdict": f["함께 먹을 때 판정"]} for f in found]
+            yield f"event: checked\ndata: {json.dumps(chips, ensure_ascii=False)}\n\n"
+        async for tok in llm.stream_chat(ctx, [h.model_dump() for h in req.history], req.question, found):
             yield f"data: {json.dumps({'t': tok}, ensure_ascii=False)}\n\n"
         yield "event: done\ndata: {}\n\n"
 

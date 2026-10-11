@@ -73,6 +73,54 @@ def test_suggestions_are_screened_for_the_patient(eng):
     assert o["ibuprofen"]["status"] == "avoid" and o["acetaminophen"]["status"] == "ok"
 
 
+def test_fallback_shows_the_quick_checks_first():
+    found = [{"확인한 제품": "박카스디액 = 카페인(caffeine)", "함께 먹을 때 판정": "주의",
+              "이 제품 관련 이유": ["와파린(warfarin)과(와) 카페인(caffeine)은(는) 서로 영향을 주는 조합"]}]
+    a = llm.chat_fallback({"판정이유": ["다른 이유"]}, "박카스 먹어도 돼요?", found)
+    assert "박카스디액" in a and "주의" in a and "카페인" in a and "다른 이유" not in a
+    assert "[방금 확인한 결과]" in llm.lookup_block(found) and llm.lookup_block([]) == ""
+
+
+def test_general_chat_needs_no_analysis():
+    ctx = llm.general_context({"diseases": ["고혈압"]}, {"age": 70})
+    assert "분석하지 않았" in ctx["상태"] and ctx["환자"]["age"] == 70
+
+
+@needs_models
+@pytest.mark.slow
+def test_items_named_in_a_question_are_found(eng):
+    from omnipharm import assistant
+
+    f = assistant.find_items
+    assert f(eng, "박카스 먹어도 되나요?")[0].startswith("박카스")
+    assert f(eng, "박카스랑 같이 마셔도 돼요?")[0].startswith("박카스")
+    assert f(eng, "술 한잔은 괜찮아요?") == ["술"]
+    assert f(eng, "자몽주스 마셔도 돼요?") == ["자몽주스"]
+    assert f(eng, "와파린 먹는데 아스피린 먹어도 돼요?") == ["와파린", "아스피린"]
+    for q in ("감기약 먹어도 되나요?", "비타민 먹어도 돼요?", "언제 먹어야 해요?", "부작용이 뭐예요?", "오늘 날씨 어때?"):
+        assert f(eng, q) == [], q
+
+
+@needs_models
+@pytest.mark.slow
+def test_quick_check_runs_the_engine_with_the_analysis(eng):
+    from omnipharm import assistant
+
+    base = [{"input": n, "ingredients": eng.resolve(n)} for n in ("warfarin", "acetaminophen")]
+    old = Patient(**{**ADULT, "age": 70})
+    c = assistant.quick_check(eng, base, "아스피린", old, "주의")
+    assert c["함께 먹을 때 판정"].startswith(("주의", "위험"))
+    assert any("출혈" in x for x in c["이 제품 관련 이유"])
+    assert all("아스피린" in x for x in c["이 제품 관련 이유"])  # only findings that involve the new item
+    assert "노인주의 — ." not in " ".join(c["이 제품 관련 이유"])  # empty DUR content gets a sentence
+    alc = assistant.quick_check(eng, base, "술", old, "주의")
+    assert any("와파린" in x for x in alc["상호작용"]) and "임상 규칙" in alc["근거종류"]
+    assert assistant.quick_check(eng, base, "타이레놀", old) is None  # already in the analysis
+    alone = assistant.quick_check(eng, [], "박카스", Patient(**ADULT))
+    assert alone["확인한 제품"].startswith("박카스") and "하나만" in alone["함께 먹을 때 판정"]
+    assert assistant.lookups(eng, "오늘 날씨 어때?", base, old) == []
+
+
 @needs_models
 @pytest.mark.slow
 def test_chat_context_is_grounded(eng):

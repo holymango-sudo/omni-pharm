@@ -52,7 +52,7 @@ export const api = {
   symptoms: () => req("symptoms"),
   recommend: (symptoms, drugs, patient) => req("recommend", { method: "POST", body: JSON.stringify({ symptoms, drugs, patient }) }),
   /** AI 복약 상담: POST + streamed server-sent events; returns a function that stops the answer */
-  chat(body, onToken, onDone) {
+  chat(body, onToken, onDone, onChecked) {
     const ctrl = new AbortController();
     const token = getToken();
     (async () => {
@@ -80,6 +80,7 @@ export const api = {
             buf = buf.slice(i + 2);
             const data = evt.split("\n").find((l) => l.startsWith("data: "));
             if (evt.startsWith("event: done")) continue;
+            if (evt.startsWith("event: checked")) { if (data) onChecked?.(JSON.parse(data.slice(6))); continue; }
             if (data) onToken(JSON.parse(data.slice(6)).t || "");
           }
         }

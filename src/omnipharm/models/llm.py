@@ -51,9 +51,8 @@ def ratio(x: float) -> str:
     return "50배 이상" if x >= 50 else f"{x:.1f}배"
 
 
-def fact_sheet(res: dict, patient: dict) -> dict:
-    """Compact, LLM-sized summary of an engine result."""
-    p = res["patient"]
+def patient_facts(p: dict, patient: dict) -> dict:
+    """The patient part of the fact sheet. p = clinical.assess() of the patient, patient = the raw input."""
     pt = {k: patient.get(k) for k in ("age", "sex", "weight_kg", "height_cm", "ast", "alt", "total_bilirubin",
                                       "diagnosis", "symptoms") if patient.get(k) not in (None, "")}
     if p.get("body") and p["body"].get("bmi"):
@@ -66,6 +65,12 @@ def fact_sheet(res: dict, patient: dict) -> dict:
     if p.get("capacity"):
         pt["약물처리능력"] = f"{p['capacity']['level']} ({', '.join(p['capacity']['factors']) or '특이사항 없음'})"
     pt["기저질환"] = p.get("diseases", [])
+    return pt
+
+
+def fact_sheet(res: dict, patient: dict) -> dict:
+    """Compact, LLM-sized summary of an engine result."""
+    pt = patient_facts(res["patient"], patient)
     top = [{"이상반응": e["ko"], "환자맞춤확률": f"{e['prob']:.1%}", "일반보고대비": ratio(e["lift"]),
             "표준환자대비": ratio(e["patient_factor"]), "주요기여약물": e.get("driver")}
            for e in res["events"][:6] if e["lift"] >= 1.2]
@@ -194,22 +199,35 @@ async def stream_report(facts: dict) -> AsyncIterator[str]:
 
 
 # --------------------------------------------------------------------------- AI 복약 상담 (questions about one analysis)
-CHAT_SYSTEM = """당신은 'AI 복약 상담'입니다. 환자나 보호자가 방금 분석한 약 조합에 대해 묻는 질문에 한국어로 답합니다.
-당신은 의사·약사가 아니며 진단·처방을 하지 않습니다. 아래 [분석 결과]가 이 시스템의 결론이고, 당신의 답은 이와 어긋나면 안 됩니다.
-규칙 (반드시 지킬 것):
-- [분석 결과]에 있는 사실을 우선 근거로 쓰세요. 일반적으로 잘 알려진 약 상식(식후 복용, 물과 함께 등)은 써도 되지만 '일반적으로'라고 밝히세요.
-- [분석 결과]에 없는 용량(mg)·횟수·검사 수치를 새로 만들지 마세요. 용량은 '정해진 용법' 또는 결과에 있는 최대량만 말하세요.
-- 처방약을 끊거나 바꾸라고 하지 마세요. '의사·약사와 상의'로 안내하세요. 다른 약 이름을 새로 추천하지 마세요
-  (단, [분석 결과]의 '증상추천'에 있는 성분은 언급 가능).
-- 위험 판정(병용금기·DUR·피해야 함)은 그대로 전하세요. 괜찮다고 안심시키지 마세요.
+CHAT_SYSTEM = """당신은 OMNI-PHARM의 'AI 복약 상담'입니다. 친절하고 유능한 동네 약사처럼 한국어로 자연스럽게 대화합니다.
+약·건강·증상·음식과 술·생활 습관·이 프로그램 사용법은 물론 가벼운 일상 대화까지 무엇이든 성의 있게 답하세요.
+'답할 수 없다'며 거절하지 마세요. 약과 무관한 질문도 짧게 답한 뒤, 필요하면 복약 이야기로 자연스럽게 이어 가세요.
+당신은 의사·약사가 아니며 진단·처방을 하지 않습니다.
+
+근거 쓰는 법:
+- [분석 결과]는 이 사람이 입력한 약 조합에 대해 이 시스템이 내린 결론입니다. 이 사람의 약에 대한 판단은 이와 어긋나면 안 됩니다.
+- 질문 아래의 [방금 확인한 결과]는 질문에 나온 약·음식을 이 사람의 약(과 몸 상태)과 함께 방금 상호작용 엔진으로 검사한 것입니다.
+  '○○ 먹어도 되나요?' 같은 질문은 이 결과의 판정·이유·할 일을 중심으로 분명하게 답하세요:
+  위험 → 함께 먹지 말라고, 주의 → 무엇을 왜 조심할지, 비교적 안전 → 괜찮지만 지킬 점과 함께.
+  확인한 제품이 질문한 이름과 다르면(예: 박카스 → 박카스디액) 어느 제품 기준인지 밝히세요.
+- 질문에 나온 약이 [방금 확인한 결과]에 없으면 일반 지식으로 설명하되 이 사람에게 괜찮다고 단정하지 말고,
+  약 목록에 추가해 '예측 시작'으로 확인해 보라고 권하세요.
+- 작용 원리, 흔한 부작용, 복용 요령, 질환·증상 설명, 생활 습관 같은 일반 지식은 자유롭게 설명하되 일반 정보임을 드러내세요.
+
+안전 규칙 (반드시):
 - 숨이 차거나 의식이 흐림, 경련, 가슴 통증, 피를 토함·검은 변, 심한 알레르기(입술·혀 부음), 과량 복용, 자해 생각
-  → 즉시 119 또는 응급실을 먼저 안내하세요.
-- 질문이 약·건강과 무관하면 정중히 이 분석에 대한 질문을 해 달라고 하세요.
-- 쉬운 말로, 핵심부터, 200단어 이내. 필요하면 짧은 불릿('- ')을 쓰세요.
-- 마지막 줄에 '근거: ...'를 적되, [분석 결과]의 '근거종류(이것만 출처로 쓸 것)'에 있는 이름만 쓰세요(없는 출처를 지어내지 마세요).
-  일반 상식으로 답한 부분은 '일반 복약 상식'이라고 쓰세요.
-- 하루 최대량 질문은 '1일최대량(허가기준·이 환자)'의 숫자를 그대로 쓰고, 여러 제품의 같은 성분은 합쳐서 계산한다고 알려 주세요.
-- 모르는 것은 모른다고 하고 약사·의사에게 확인하라고 하세요."""
+  → 무엇보다 먼저 119 또는 응급실을 안내하세요.
+- 처방약을 끊거나 바꾸라고 하지 마세요. '의사·약사와 상의'로 안내하세요.
+- 위험 판정(병용금기·DUR·피해야 함)은 그대로 전하세요. 괜찮다고 안심시키지 마세요.
+- 근거에 없는 구체적 용량(mg·알 수)·검사 수치를 지어내지 마세요. 용량은 '1일최대량(허가기준·이 환자)'의 숫자나
+  '제품 설명서의 용법'으로 말하고, 여러 제품의 같은 성분은 합쳐서 계산한다고 알려 주세요.
+- 증상에 맞는 약을 고르려는 질문에는 성분 계열 정도만 일반적으로 설명하고, 화면의 '🤒 증상으로 약 찾기'로
+  이 사람에게 맞는 후보를 확인하라고 안내하세요.
+- 모르는 것은 모른다고 하고 약사·의사에게 확인하라고 하세요.
+
+형식: 쉬운 말로 핵심부터. 짧은 질문에는 짧게, 보통 250단어 이내. 필요하면 짧은 불릿('- ').
+약·건강에 대한 답이면 마지막 줄에 '근거: ...'를 적되, '근거종류' 목록에 있는 이름만 쓰고(없는 출처를 지어내지 말 것)
+일반 지식으로 답한 부분은 '일반 복약 상식'이라고 쓰세요. 일상 대화에는 근거 줄을 쓰지 마세요."""
 EMERGENCY = re.compile(r"숨[이을]? ?(차|막|못)|호흡곤란|의식|정신을 잃|경련|발작|가슴[이 ]*(아프|통증|조여)|흉통|피를 토|토혈|"
                        r"검은 ?변|혈변|입술.*부|혀.*부|목이 붓|과다 ?복용|많이 먹었|한꺼번에.*먹|통째로.*먹었|죽고 싶|자살|자해")
 EMERGENCY_TEXT = ("**⚠ 응급 신호일 수 있습니다.** 지금 숨이 차거나, 의식이 흐리거나, 경련·가슴 통증·피를 토하거나 검은 변, "
@@ -275,32 +293,54 @@ def chat_context(res: dict, patient: dict) -> dict:
     return _prune(facts)
 
 
-def chat_fallback(ctx: dict, question: str) -> str:
+def general_context(assessed: dict, patient: dict) -> dict:
+    """Chat before any analysis: only who the person is (age, kidney, liver, diseases)."""
+    return _prune({"상태": "아직 약 조합을 분석하지 않았습니다 (약을 입력하고 '예측 시작'을 누르면 조합 분석이 생깁니다).",
+                   "환자": patient_facts(assessed, patient), "근거종류(이것만 출처로 쓸 것)": []})
+
+
+def lookup_block(found: list[dict]) -> str:
+    """The quick checks of the medicines / foods named in the question, attached to that question."""
+    if not found:
+        return ""
+    return "\n\n[방금 확인한 결과]\n```json\n" + json.dumps(found, ensure_ascii=False, indent=1) + "\n```"
+
+
+def chat_fallback(ctx: dict, question: str, found: list[dict] | None = None) -> str:
     """No local LLM: answer from the facts with simple keyword routing (no free text)."""
     q = question
     lines = []
-    if re.search(r"언제|몇 ?시간|간격|시간|얼마나|오래", q):
-        lines += [f"- {x}" for x in ctx.get("약동학(복용 후 시간)", [])[:4]]
-    if re.search(r"술|자몽|우유|커피|담배|흡연|음식", q):
-        lines += [f"- {x}" for x in ctx.get("판정이유", []) if re.search(r"술|자몽|우유|커피|흡연|녹색", x)][:4]
-    if not lines:
-        lines += [f"- {x}" for x in ctx.get("판정이유", [])[:4]]
+    for f in found or []:
+        lines.append(f"- **{f['확인한 제품']}** → 함께 먹을 때: **{f['함께 먹을 때 판정']}**")
+        lines += [f"  - {x}" for x in (f.get("이 제품 관련 이유") or f.get("이 제품 관련 참고") or [])[:3]]
+    if not found:
+        if re.search(r"언제|몇 ?시간|간격|시간|얼마나|오래", q):
+            lines += [f"- {x}" for x in ctx.get("약동학(복용 후 시간)", [])[:4]]
+        if re.search(r"술|자몽|우유|커피|담배|흡연|음식", q):
+            lines += [f"- {x}" for x in ctx.get("판정이유", []) if re.search(r"술|자몽|우유|커피|흡연|녹색", x)][:4]
+        if not lines:
+            lines += [f"- {x}" for x in ctx.get("판정이유", [])[:4]]
     lines += [f"- 할 일: {a}" for a in ctx.get("권고", [])[:3]]
     return ("로컬 AI가 실행 중이 아니어서 분석 결과에서 관련 내용을 찾아 보여 드립니다.\n\n" + "\n".join(lines or ["- 관련 정보가 없습니다."])
             + "\n\n자세한 내용은 약사·의사와 상의하세요.")
 
 
-async def stream_chat(ctx: dict, history: list[dict], question: str) -> AsyncIterator[str]:
+async def stream_chat(ctx: dict, history: list[dict], question: str,
+                      found: list[dict] | None = None) -> AsyncIterator[str]:
+    """found = quick checks of the medicines / foods the question names (assistant.lookups)."""
     if EMERGENCY.search(question):
         yield EMERGENCY_TEXT
+    if found:  # the evidence kinds of the quick checks may be cited too
+        ctx = {**ctx, "근거종류(이것만 출처로 쓸 것)": sorted({*ctx.get("근거종류(이것만 출처로 쓸 것)", []),
+                                                         *(s for f in found for s in f.get("근거종류", []))})}
     system = CHAT_SYSTEM + "\n\n[분석 결과]\n```json\n" + json.dumps(ctx, ensure_ascii=False, indent=1) + "\n```"
     msgs = [{"role": "system", "content": system}]
     for h in history[-8:]:
         if h.get("role") in ("user", "assistant") and h.get("content"):
             msgs.append({"role": h["role"], "content": str(h["content"])[:2000]})
-    msgs.append({"role": "user", "content": question})
+    msgs.append({"role": "user", "content": question + lookup_block(found or [])})
     body = {"model": settings.llm_model, "stream": True, "keep_alive": "30m", "messages": msgs,
-            "options": {"temperature": 0.3, "num_ctx": 8192, "num_predict": 700}}
+            "options": {"temperature": 0.4, "num_ctx": 8192, "num_predict": 800}}
     if await _thinks(settings.llm_model):
         body["think"] = False
     sent = False
@@ -322,7 +362,7 @@ async def stream_chat(ctx: dict, history: list[dict], question: str) -> AsyncIte
     except Exception as e:
         log.warning(f"chat LLM unavailable ({e}); fact-based answer")
         if not sent:
-            yield chat_fallback(ctx, question)
+            yield chat_fallback(ctx, question, found)
 
 
 async def llm_available() -> bool:
