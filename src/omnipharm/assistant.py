@@ -48,8 +48,8 @@ def _lookup(eng, w: str) -> str | None:
     exact = next((h["name"] for h in hits if h["name"].replace(" ", "").lower() == w.lower()), None)
     if exact:
         return exact
-    if len(w) >= 3:
-        return next((h["name"] for h in hits if h["name"].startswith(w) and len(h["name"]) <= len(w) + 12), None)
+    if len(w) >= 3 and any(h["name"].startswith(w) and len(h["name"]) <= len(w) + 12 for h in hits):
+        return w  # resolved later like the drug bar does ('게보린' -> 게보린정, not the first search hit)
     return None
 
 
@@ -72,37 +72,44 @@ def find_items(eng, question: str) -> list[str]:
 
 def lookups(eng, question: str, base: list[dict], patient: Patient, base_verdict: str | None = None) -> list[dict]:
     """Quick checks of every medicine / food the question names (never raises: the chat must still answer)."""
-    out = []
+    out, also = [], []
     for name in find_items(eng, question):
-        try:
-            c = quick_check(eng, base, name, patient, base_verdict)
+        try:  # '박카스랑 타이레놀 같이?': the second item is checked together with the first one too
+            c = quick_check(eng, base, name, patient, base_verdict, also)
         except Exception:
             log.exception("chat quick check failed")
             continue
         if c:
+            also.append(c.pop("_product"))
             out.append(c)
     return out
 
 
-def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict: str | None = None) -> dict | None:
-    """Analyse the analysis' medicines + this one; -> compact facts for the chat (None: unknown or already analysed).
-    Only the findings that involve the new item are passed on - the rest is already in the analysis."""
+def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict: str | None = None,
+                also: list[dict] | None = None) -> dict | None:
+    """Analyse the analysis' medicines (+ items named earlier in the same question) + this one; -> compact facts for
+    the chat (None: unknown or already analysed). Only findings that involve the new item are passed on - the rest
+    is already in the analysis. '_product' is the resolved product (lookups() passes it on to the next item)."""
+    also = also or []
     try:
         ings, info = eng.resolve_full(name)
     except ResolveError as e:  # several products of that name (박카스디액 / 박카스에프액 ...): the first candidate
         if not e.candidates:
             return None
-        name = e.candidates[0]["name"]
+        cands = [c["name"] for c in e.candidates]
+        # the one the search box lists first (active, OTC, shortest name: 박카스 -> 박카스디액)
+        name = next((h["name"] for h in eng.search(name, 15) if h["name"] in cands), cands[0])
         try:
             ings, info = eng.resolve_full(name)
         except ResolveError:
             return None
+    name = info.get("product") or name
     keys = {g.key for g in ings}
     if not keys or keys <= {g.key for p in base for g in p["ingredients"]}:
         return None  # already in the analysis ('타이레놀' asked about while 타이레놀정500 is analysed)
-    products = [*base, {"input": name, "ingredients": ings, "product": info.get("product"),
-                        "release": info.get("release"), "strength": info.get("strength")}]
-    r = eng.predict(products, patient)
+    new = {"input": name, "ingredients": ings, "product": info.get("product"), "release": info.get("release"),
+           "strength": info.get("strength")}
+    r = eng.predict([*base, *also, new], patient)
     s = r["summary"]
     names = [eng.ko(g) for g in ings]
 
@@ -112,12 +119,16 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     pairs = [f"{p['a']} + {p['b']}: {p['level']}" + (f" — {p['mechanism'][0]['text']}" if p.get("mechanism") else "")
              + (" (식약처 DUR 병용금기)" if p.get("dur") else "")
              for p in r["pairs"] if (p["a_key"] in keys or p["b_key"] in keys) and p["level"] != "낮음"][:5]
+    together = " + ".join(p["input"] for p in also)
     if not base:
-        verdict = f"{s['verdict']} (이 약 하나만 확인 — 아직 분석한 약 조합 없음)"
+        verdict = (f"{s['verdict']} ({together} + {name} 함께 확인)" if also
+                   else f"{s['verdict']} (이 약 하나만 확인 — 아직 분석한 약 조합 없음)")
     elif base_verdict and base_verdict != s["verdict"]:
         verdict = f"{s['verdict']} (추가 전 '{base_verdict}' → 추가 후 '{s['verdict']}')"
     else:
         verdict = f"{s['verdict']} (추가해도 판정 변화 없음)" if base_verdict else s["verdict"]
+    if base and also:
+        verdict += f" — 질문의 {together}도 함께 넣어 확인"
     shown = ", ".join(names[:5]) + (f" 외 {len(names) - 5}개" if len(names) > 5 else "")
     # how much is in one unit and the labelled daily maximum for this patient: '하루 몇 병?' gets a grounded answer
     st = info.get("strength") or {}
@@ -140,7 +151,8 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
             "이 제품 관련 이유": [x["text"] for x in s["reasons"] if x["sev"] != "low" and mine(x["text"])][:5],
             "이 제품 관련 참고": [x["text"] for x in s["reasons"] if x["sev"] == "low" and mine(x["text"])][:2],
             "할 일": s["advice"][:3], "상호작용": pairs,
-            "근거종류": sorted(_sources(r, keys, names) | ({"허가 용량 기준"} if limits else set()))}
+            "근거종류": sorted(_sources(r, keys, names) | ({"허가 용량 기준"} if limits else set())),
+            "_product": new}
 
 
 def _sources(r: dict, keys: set[str], names: list[str]) -> set[str]:

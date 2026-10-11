@@ -120,6 +120,10 @@ def test_quick_check_runs_the_engine_with_the_analysis(eng):
     assert alone["확인한 제품"].startswith("박카스") and "하나만" in alone["함께 먹을 때 판정"]
     assert any("카페인" in x and "400mg" in x for x in alone["1일최대량(허가기준·이 환자)"])  # '하루 몇 병?' is grounded
     assert assistant.lookups(eng, "오늘 날씨 어때?", base, old) == []
+    # two items in one question are checked together: 타이레놀 + 게보린 = acetaminophen twice
+    two = assistant.lookups(eng, "타이레놀이랑 게보린 같이 먹어도 되나요?", [], Patient(**ADULT))
+    assert len(two) == 2 and "함께 확인" in two[1]["함께 먹을 때 판정"] and two[1]["함께 먹을 때 판정"].startswith("위험")
+    assert all("_product" not in x for x in two)
 
 
 @needs_models
