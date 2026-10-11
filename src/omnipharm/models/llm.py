@@ -202,9 +202,13 @@ CHAT_SYSTEM = """당신은 'AI 복약 상담'입니다. 환자나 보호자가 �
 - 처방약을 끊거나 바꾸라고 하지 마세요. '의사·약사와 상의'로 안내하세요. 다른 약 이름을 새로 추천하지 마세요
   (단, [분석 결과]의 '증상추천'에 있는 성분은 언급 가능).
 - 위험 판정(병용금기·DUR·피해야 함)은 그대로 전하세요. 괜찮다고 안심시키지 마세요.
-- 숨이 차거나 의식이 흐림, 경련, 가슴 통증, 피를 토함·검은 변, 심한 알레르기(입술·혀 부음), 과량 복용, 자해 생각 → 즉시 119 또는 응급실을 먼저 안내하세요.
+- 숨이 차거나 의식이 흐림, 경련, 가슴 통증, 피를 토함·검은 변, 심한 알레르기(입술·혀 부음), 과량 복용, 자해 생각
+  → 즉시 119 또는 응급실을 먼저 안내하세요.
 - 질문이 약·건강과 무관하면 정중히 이 분석에 대한 질문을 해 달라고 하세요.
-- 쉬운 말로, 핵심부터, 200단어 이내. 필요하면 짧은 불릿('- ')을 쓰세요. 마지막 줄에 근거 출처를 짧게 적으세요(예: '근거: 식약처 DUR, FDA 라벨').
+- 쉬운 말로, 핵심부터, 200단어 이내. 필요하면 짧은 불릿('- ')을 쓰세요.
+- 마지막 줄에 '근거: ...'를 적되, [분석 결과]의 '근거종류(이것만 출처로 쓸 것)'에 있는 이름만 쓰세요(없는 출처를 지어내지 마세요).
+  일반 상식으로 답한 부분은 '일반 복약 상식'이라고 쓰세요.
+- 하루 최대량 질문은 '1일최대량(허가기준·이 환자)'의 숫자를 그대로 쓰고, 여러 제품의 같은 성분은 합쳐서 계산한다고 알려 주세요.
 - 모르는 것은 모른다고 하고 약사·의사에게 확인하라고 하세요."""
 EMERGENCY = re.compile(r"숨[이을]? ?(차|막|못)|호흡곤란|의식|정신을 잃|경련|발작|가슴[이 ]*(아프|통증|조여)|흉통|피를 토|토혈|"
                        r"검은 ?변|혈변|입술.*부|혀.*부|목이 붓|과다 ?복용|많이 먹었|한꺼번에.*먹|통째로.*먹었|죽고 싶|자살|자해")
@@ -232,6 +236,42 @@ def chat_context(res: dict, patient: dict) -> dict:
         facts["시간축기준"] = (f"{c.get('name')} 기준, 반감기 {c.get('t_half_h')}시간"
                           + (f" → 이 조합에서 {c.get('t_half_eff_h')}시간" if abs((c.get('fold') or 1) - 1) > 0.15 else ""))
     facts["복용제품"] = [f"{p['input']} = {', '.join(p['ingredients'])}" for p in res.get("products", [])]
+    # labelled daily maximum for THIS patient (kidney / liver / age adjusted), so 'how many a day?' has a grounded answer
+    from omnipharm.dosing import effective_limit, fmt_mg
+
+    pa = res.get("patient") or {}
+    ctx = {"crcl": (pa.get("kidney") or {}).get("clearance"), "age": patient.get("age"),
+           "sex": (patient.get("sex") or "").upper()[:1] or None, "weight": patient.get("weight_kg"),
+           "hepatic": bool((pa.get("flags") or {}).get("hepatic"))}
+    form = {d["key"]: d.get("release") for d in j.get("drugs", [])}
+    limits = []
+    for ing in res.get("ingredients", []):
+        lim = effective_limit(ing["key"], ctx, er=form.get(ing["key"]) == "ER")
+        if lim:
+            mx, warn, single, why = lim
+            limits.append(f"{ing['display']}: 1일 최대 {fmt_mg(mx)}" + (f"(일반약 자가복용 기준 {fmt_mg(warn)})" if warn else "")
+                          + (f", 1회 최대 {fmt_mg(single)}" if single else "") + (f" — {', '.join(why)} 반영" if why else ""))
+    facts["1일최대량(허가기준·이 환자)"] = limits
+    # which kinds of evidence this analysis actually has: the answer may cite only these
+    src = set()
+    for p in res.get("pairs", []):
+        if p["level"] == "낮음":
+            continue
+        if p.get("dur"):
+            src.add("식약처 DUR")
+        if any(e.get("context") != "co_therapy" for e in p.get("label_evidence", [])):
+            src.add("FDA 허가 라벨")
+        for m in p.get("mechanism", []):
+            src.add("임상 규칙" if m["kind"] == "규칙" else "FDA CYP 지표표" if m["kind"] == "CYP-FDA" else "약리 기전(ChEMBL)")
+    if res.get("disease_alerts"):
+        src.add("질환별 금기 기준(Beers·허가사항·DUR)")
+    if (res.get("dosing") or {}).get("alerts") or limits:
+        src.add("허가 용량 기준")
+    if any(e.get("drives_verdict") for e in res.get("events", [])):
+        src.add("AI 예측(부작용 보고 학습)")
+    if j.get("drugs"):
+        src.add("FDA 라벨 약동학(Tmax·반감기)")
+    facts["근거종류(이것만 출처로 쓸 것)"] = sorted(src)
     return _prune(facts)
 
 
