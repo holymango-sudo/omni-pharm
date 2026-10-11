@@ -94,6 +94,19 @@ def _kr_basis(total: str) -> tuple[str, str, float] | None:
     return u, "unit", n
 
 
+GRANULE = re.compile(r"과립|코팅|직타|\bDC\b|90%|95%")
+
+
+def _kr_weight(total: str) -> float | None:
+    """'1정615.04밀리그램' / '1정 (약 787.95 밀리그램) 중-속방층' -> mg weight of ONE unit (None if not stated)."""
+    t = total.replace(" ", "")
+    m = re.match(rf"^(\d+(?:\.\d+)?)({KR_UNITS})\(?약?(\d+(?:\.\d+)?)(밀리그램|mg|그램|g)", t)
+    if not m or m.group(2) in ("밀리리터", "mL", "ml", "g", "그램"):
+        return None
+    w = float(m.group(3)) * (1000 if m.group(4) in ("그램", "g") else 1)
+    return w / float(m.group(1))
+
+
 def _kr(products: pd.DataFrame, mapper: Mapper) -> list[dict]:
     mats = _kr_download()
     if not mats:
@@ -149,19 +162,33 @@ def _kr(products: pd.DataFrame, mapper: Mapper) -> list[dict]:
         return None
 
     out = []
+    names = products.set_index("item_seq")["name"].to_dict()
     for seq, items in parsed.items():
         basis = _kr_basis(items[0][2])
         if not basis:
             continue
         unit, per, n = basis
         s: dict[str, float] = {}
+        top: dict[str, float] = {}
         left = []
         for ko, mg, _ in items:
             key = ko_key(ko)
             if key:
-                s[key] = s.get(key, 0) + mg / n  # amount per ONE unit / per mL / per g
+                s[key] = s.get(key, 0) + mg / n  # amount per ONE unit / per mL / per g (bilayer tablets: layers add up)
+                top[key] = max(top.get(key, 0), mg / n)
             else:
                 left.append(mg / n)
+        # ... unless the layers cannot add up: '1정(약 787.95밀리그램) 중-속방층 650 ; 서방층 325' lists the total and one
+        # layer (650 + 325 = 975 mg would not fit in a 788 mg tablet)
+        weight = _kr_weight(items[0][2])
+        if weight and per == "unit" and sum(s.values()) > weight * 1.001:
+            s = {k: top[k] if s[k] > top[k] else s[k] for k in s}
+        # '아세트아미노펜 과립 555.556 mg' is the weight of the coated granules; the product name states the drug amount
+        if len(s) == 1 and len(items) == 1 and GRANULE.search(items[0][0]):
+            m = re.search(r"(\d+(?:\.\d+)?)\s*(밀리그램|밀리그람|mg)", str(names.get(seq, "")))
+            k0 = next(iter(s))
+            if per == "unit" and m and float(m.group(1)) <= s[k0] <= float(m.group(1)) * 1.35:
+                s[k0] = float(m.group(1))  # the name states the amount per tablet / sachet
         # exactly one Korean name and one product ingredient left unmatched: they are the same ingredient
         en = [mapping.get(x.strip()) for x in str(eng.get(seq, "")).split("/") if x.strip()]
         rest = [k for k in dict.fromkeys(k for k in en if k) if k not in s]

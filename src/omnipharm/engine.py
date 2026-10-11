@@ -59,6 +59,7 @@ from omnipharm.knowledge import (
 )
 from omnipharm.models.gnn import FingerprintEncoder, OmniPharmModel, RegimenPatientModel
 from omnipharm.models.patient import MAX_DRUGS, PATIENT_DIM, patient_vector
+from omnipharm.release import RELEASE_KO, release_of
 
 log = logging.getLogger(__name__)
 KO_NAME: dict[str, str] = {}
@@ -501,7 +502,7 @@ class Engine:
             row = self._product_lookup(text)  # raises ResolveError with candidates if ambiguous
             if row is not None:
                 ings = [self._ext_ingredient(k) for k in row["ingredients"]]
-                return ings, {"product": row["name"], "country": row["country"],
+                return ings, {"product": row["name"], "country": row["country"], "release": release_of(row["name"]),
                               "unresolved": list(row["unresolved"]),
                               "strength": self.strengths.get((row["country"], str(row["item_seq"])))}
             b = bio_key(text)  # peptide / protein product (위고비프리필드펜, 보톡스주 ...)
@@ -568,7 +569,17 @@ class Engine:
             rows = rows[rows["active"]]
         comps = rows["ingredients"].map(lambda v: tuple(sorted(v)))
         if comps.nunique() == 1:
-            return rows.sort_values(["otc", "name"], ascending=[False, True]).iloc[0]
+            # same composition, different products (타이레놀정500 / 타이레놀산500 / 타이레놀8시간이알서방정): the one whose
+            # name is closest to what was typed - its strength per unit and release form are what the dose refers to
+            import difflib
+
+            rel = release_of(text)
+
+            def score(r) -> float:
+                k = r["key"]
+                return ((k == key) * 100 + k.startswith(key) * 40 + (key in k) * 20 + (release_of(r["name"]) == rel) * 15
+                        + difflib.SequenceMatcher(None, key, k).ratio() * 10 + bool(r["otc"]))
+            return rows.loc[max(rows.index, key=lambda i: score(rows.loc[i]))]
         raise ResolveError(f"'{text}'에 해당하는 제품이 {len(rows)}개이며 성분이 서로 다릅니다 — 정확한 제품을 선택하세요.",
                            self._candidates(rows))
 
@@ -950,6 +961,8 @@ class Engine:
     def _predict(self, products: list[dict], patient: Patient) -> dict:
         cm = self.cm
         pa = assess(patient)
+        # extended / delayed release from the product name (or the typed name: 'metformin XR')
+        products = [{**p, "release": p.get("release") or release_of(p.get("product") or p["input"])} for p in products]
         seen: dict[str, Ingredient] = {}
         duplicates = []
         owner: dict[str, str] = {}
@@ -1205,7 +1218,7 @@ class Engine:
                "weight": patient.weight_kg, "scr": patient.scr, "hepatic": bool(pa["flags"].get("hepatic")),
                "all_keys": [g.key for g in U]}
         dose_items = [{"input": p["input"], "keys": [g.key for g in p["ingredients"]], "dose": p.get("dose"),
-                       "strength": p.get("strength")} for p in products]
+                       "strength": p.get("strength"), "release": p["release"]} for p in products]
         dosing = check_doses(dose_items, ctx, drug_groups, lambda k: self.ko(self._ext_ingredient(k))
                              if (k in self.name_idx or k in self.ext_ing or k.startswith(("bio:", "lab:")))
                              else k.removeprefix("ing:"))
@@ -1249,10 +1262,14 @@ class Engine:
         events = sorted(events, key=lambda e: -e["lift"] * np.sqrt(e["prob"]) * (1.5 if e["serious"] else 1))
         summary = self._summary(overall, duplicates, class_dups, disease_alerts, pair_rows, events, pa,
                                 dosing, prn_keys)
+        special = [p["input"] for p in products if p["release"] in ("ER", "DR")]
+        if special:  # crushing / chewing an extended-release tablet releases the whole dose at once (dose dumping)
+            forms = "/".join(sorted({RELEASE_KO[p["release"]] for p in products if p["input"] in special}))
+            summary["advice"].append(f"{', '.join(special)}은(는) {forms} 제제입니다 — 쪼개거나 씹거나 부수지 말고 통째로 삼키세요.")
         try:  # the animated body view: same evidence as above, laid out along the drug's path through the body
             pathway = build_journey(self, U, pair_rows, _about, CYP_INHIBITION_P, prods_of=prods_of, events=events,
                                     disease_alerts=disease_alerts, class_dups=class_dups, duplicates=duplicates,
-                                    dosing=dosing, pa=pa, overall=overall, patient=patient)
+                                    dosing=dosing, pa=pa, overall=overall, patient=patient, products=products)
         except Exception:  # a display aid must never break the analysis itself
             log.exception("journey")
             pathway = None

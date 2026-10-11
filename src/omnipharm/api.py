@@ -33,6 +33,7 @@ from omnipharm.dosing import Dose
 from omnipharm.engine import Engine, ResolveError
 from omnipharm.knowledge import DISEASES
 from omnipharm.models import llm
+from omnipharm.release import release_of
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("omnipharm.api")
@@ -236,6 +237,7 @@ async def molecule(d: DrugInput):
     dose_info = {"unit": st["unit"], "per": st["per"],
                  "per_unit": [{"name": eng.ko(g), "mg": st["mg"][g.key]} for g in ings if g.key in st["mg"]]} if st else None
     return {"input": d.name, "molecules": mols, "product": info["product"], "country": info["country"],
+            "release": info.get("release") or release_of(info["product"] or d.name),
             "unresolved": info["unresolved"], "dose_info": dose_info, "single": len(ings) == 1}
 
 
@@ -274,7 +276,7 @@ async def _predict(req: PredictRequest) -> dict:
             unsupported.append({"input": d.name, "reason": err["message"], "candidates": err["candidates"]})
             continue
         products.append({"input": d.name, "ingredients": ings, "product": info["product"], "dose": d.dose,
-                         "strength": info.get("strength")})
+                         "strength": info.get("strength"), "release": info.get("release")})
         if info["unresolved"]:
             unsupported.append({"input": d.name, "reason": "분석 불가 성분: " + ", ".join(info["unresolved"]),
                                 "candidates": []})

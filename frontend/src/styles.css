@@ -373,6 +373,21 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .bj-cdots button { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--cyan); background: transparent; padding: 0; }
 .bj-cdots button.on { background: var(--cyan); }
 .bj-empty { padding: 16px; color: var(--muted); text-align: center; font-size: 12px; }
+.bj-ptabs { display: inline-flex; gap: 2px; }
+.bj-ptabs button { font-family: var(--ko); font-size: 11px; font-weight: 700; border: 1px solid rgba(0, 229, 255, 0.35); background: transparent;
+  color: #8fb0bc; border-radius: 3px; padding: 0 7px; line-height: 18px; }
+.bj-ptabs button.on { background: rgba(0, 229, 255, 0.22); color: #fff; border-color: var(--cyan); }
+.bj-side { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+.bj-side > .bj-ptabs { align-self: flex-end; }
+.bj-side > .bj-panel { flex: 1; }
+.pk-mark { stroke: rgba(255, 224, 138, 0.7); stroke-width: 0.9; stroke-dasharray: 2 2; }
+.pk-mark.stop { stroke: rgba(159, 216, 230, 0.8); }
+.pk-note.stop { fill: #9fd8e6; }
+.bj-plegend small { color: #9db5bf; font-size: 10.5px; margin-left: 4px; }
+.bj-plegend em.rel { font-style: normal; font-size: 10px; color: #c4b5fd; border: 1px solid rgba(196, 181, 253, 0.5); border-radius: 3px; padding: 0 3px; }
+.rel-tag { font-size: 10.5px; font-weight: 700; color: #d8ccff; border: 1px solid rgba(196, 181, 253, 0.6); border-radius: 4px;
+  padding: 0 4px; margin-left: 4px; background: rgba(139, 92, 246, 0.15); }
+.rel-tag.dr { color: #b5f5d8; border-color: rgba(110, 231, 183, 0.6); background: rgba(16, 185, 129, 0.12); }
 .drugstrip { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--panel); border: 1px solid var(--line);
   border-radius: 10px; padding: 6px 10px; backdrop-filter: blur(10px); flex-shrink: 0; }
 .drugstrip .chip.drug { font-size: 12px; padding: 2px 10px; }

@@ -429,24 +429,33 @@ function ChelationScene({ drug, color, name, ionLabelColor = "#d9f99d" }) {
   );
 }
 
-function DissolveScene({ items }) {
+/** an ordinary tablet falls apart at once; an extended-release tablet swells into a gel matrix and lets the drug
+    molecules seep out one after another */
+function DissolveScene({ items, slow }) {
   const tab = useRef();
+  const gel = useRef();
   const mols = useRef([]);
   const start = useMemo(now, []);
   const parts = useMemo(() => items.flatMap((it) => [0, 1, 2].map((k) => ({ it, dir: V(Math.cos(k * 2.1 + it.color.length), Math.sin(k * 1.7) * 0.8, Math.sin(k * 2.3)).normalize() }))), [items]);
   useFrame(() => {
     const t = now() - start;
     if (tab.current) {
-      tab.current.rotation.y = t * 0.8;
-      const s = Math.max(0, 1 - Math.max(0, t - 1.2) / 1.2);
+      tab.current.rotation.y = t * (slow ? 0.3 : 0.8);
+      const s = slow ? Math.max(0.35, 1 - t / 14) : Math.max(0, 1 - Math.max(0, t - 1.2) / 1.2);
       tab.current.scale.setScalar(Math.max(0.001, s));
+    }
+    if (gel.current) {
+      gel.current.visible = slow;
+      gel.current.scale.setScalar(1 + Math.min(0.35, t * 0.12));
+      gel.current.rotation.y = t * 0.3;
     }
     parts.forEach((p, i) => {
       const g = mols.current[i];
       if (!g) return;
-      const u = easeOut((t - 1.3) / 2.2);
-      g.visible = t > 1.3;
-      g.position.copy(p.dir).multiplyScalar(u * 1.9);
+      const t0 = slow ? 0.8 + i * 1.1 : 1.3;
+      const u = easeOut((t - t0) / (slow ? 3.5 : 2.2));
+      g.visible = t > t0;
+      g.position.copy(p.dir).multiplyScalar((slow ? 0.55 : 0) + u * (slow ? 1.5 : 1.9));
       g.rotation.y += 0.01;
     });
   });
@@ -456,6 +465,11 @@ function DissolveScene({ items }) {
         <capsuleGeometry args={[0.38, 0.9, 10, 24]} />
         <meshStandardMaterial color="#e2e8f0" emissive="#94a3b8" emissiveIntensity={0.3} roughness={0.3} />
       </mesh>
+      <mesh ref={gel} rotation={[0, 0, Math.PI / 2]} visible={false}>
+        <capsuleGeometry args={[0.5, 1.0, 10, 24]} />
+        <meshStandardMaterial color="#7dd3fc" transparent opacity={0.18} roughness={0.2} emissive="#38bdf8" emissiveIntensity={0.2} />
+      </mesh>
+      {slow && <Tag3 position={[0, 1.15, 0]}>서방형 매트릭스 — 천천히 방출</Tag3>}
       {parts.map((p, i) => <Molecule key={i} data={p.it.data} tint={p.it.color} groupRef={(el) => { mols.current[i] = el; }} />)}
     </group>
   );
@@ -472,6 +486,13 @@ export function molecularPlan(stage, pathway, molByKey, colorOf) {
     if (ch) {
       return { scene: <ChelationScene drug={prepMol(molByKey[ch.drugs[1]], 0.75)} color={colorOf(ch.drugs[1])} name={nameOf(ch.drugs[1])} />,
         caption: `킬레이트 형성 · ${nameOf(ch.drugs[1])} + 금속 이온(Ca²⁺·Fe²⁺·Mg²⁺)`, sub: "불용성 복합체 → 장에서 흡수되지 못함", sev: "mid" };
+    }
+    const er = drugs.filter((d) => d.release === "ER" && d.kind !== "food");
+    if (er.length) {
+      return { scene: <DissolveScene items={er.slice(0, 2).map((d) => mk(d.key, 0.45))} slow />,
+        caption: `서방형 방출 · ${er.map((d) => d.name).join(", ")}`,
+        sub: `정제가 젤처럼 부풀어 약 ${Math.round(er[0].pk?.tmax_h || 6)}시간에 걸쳐 조금씩 녹아 나옵니다 — 쪼개거나 씹으면 한꺼번에 방출`,
+        sev: "normal" };
     }
     const oral = drugs.filter((d) => d.route === "oral" && d.kind !== "food").slice(0, 3);
     return { scene: <DissolveScene items={oral.map((d) => mk(d.key, 0.45))} />, caption: "붕해 · 용해",

@@ -13,6 +13,7 @@ import re
 
 from omnipharm.dosing import DOSE_LIMITS, PPI
 from omnipharm.knowledge import BIOLOGICS, CYP_FDA, DRUG_CLASSES, PRODRUGS_ACTIVATED_BY, drug_groups
+from omnipharm.release import RELEASE_KO
 
 # body sites the UI can draw (frontend/src/components/BodyJourney.jsx has a position for each)
 SITES = {
@@ -230,6 +231,23 @@ PK_REFERENCE = {
     "minoxidil": (1.0, 4.2), "doxylamine": (2.5, 10.0), "triprolidine": (2.0, 4.0), "methylephedrine": (2.0, 6.0),
     "dihydrocodeine": (1.5, 4.0), "codeine": (1.0, 3.0), "isopropylantipyrine": (1.0, 1.5), "ethenzamide": (1.0, 2.0),
 }
+# release-form specific adult values (tmax h, half-life h) that win over the label medians: common drugs whose labels
+# mix populations / metabolites (bupropion, theophylline) or carry no numbers for the extended-release product
+PK_FORM_REFERENCE = {
+    ("bupropion", "IR"): (3.0, 21.0), ("bupropion", "ER"): (5.0, 21.0),
+    ("theophylline", "IR"): (2.0, 8.0), ("theophylline", "ER"): (6.0, 8.0),
+    ("nifedipine", "ER"): (6.0, 7.0), ("metformin", "ER"): (7.0, 6.2), ("venlafaxine", "ER"): (5.5, 5.0),
+    ("paroxetine", "ER"): (8.0, 15.0), ("diclofenac", "DR"): (2.5, 2.0), ("diclofenac", "ER"): (5.0, 2.0),
+    ("acetaminophen", "ER"): (2.0, 3.0), ("tamsulosin", "ER"): (6.0, 10.0), ("gabapentin", "ER"): (8.0, 6.0),
+    ("pregabalin", "ER"): (8.0, 6.3), ("tramadol", "ER"): (12.0, 7.9), ("oxycodone", "ER"): (4.0, 4.5),
+    ("zolpidem", "ER"): (1.5, 2.8), ("alprazolam", "ER"): (9.0, 11.0), ("quetiapine", "ER"): (6.0, 7.0),
+    ("methylphenidate", "ER"): (7.0, 3.5), ("glipizide", "ER"): (8.0, 4.0), ("carbamazepine", "ER"): (12.0, 35.0),
+    ("eperisone", "IR"): (1.6, 1.9), ("eperisone", "ER"): (5.0, 3.0), ("aceclofenac", "IR"): (1.5, 4.0),
+    ("aceclofenac", "ER"): (4.0, 4.0), ("cilostazol", "IR"): (3.0, 11.0), ("cilostazol", "ER"): (6.0, 11.0),
+    ("omeprazole", "DR"): (2.0, 0.75), ("pantoprazole", "DR"): (2.5, 1.0), ("esomeprazole", "DR"): (1.5, 1.3),
+    ("aspirin", "DR"): (4.0, 2.5), ("mesalamine", "DR"): (6.0, 12.0), ("doxazosin", "ER"): (9.0, 20.0),
+    ("dexibuprofen", "ER"): (4.0, 2.0), ("ibuprofen", "ER"): (4.0, 2.0), ("lithium", "ER"): (4.0, 24.0),
+}
 # outcomes that appear around the peak concentration vs. after days of repeated dosing
 ACUTE_HARMS = {"호흡 억제", "과도한 진정", "저혈압·실신", "저혈당", "QT 연장·부정맥", "부정맥", "세로토닌 증후군", "경련",
                "디설피람 유사 반응", "흡수 감소", "과다 복용", "두근거림·혈압 상승", "졸음·호흡 억제", "과도한 졸음·혼돈"}
@@ -376,11 +394,32 @@ class Journey:
             o["protein"] = _protein(o["label"])
         return out[:3]
 
-    def pk(self, g) -> dict:
-        """time to peak / half-life (hours) of one ingredient, with where the numbers come from"""
+    def pk(self, g, form: str = "IR") -> dict:
+        """time to peak / half-life (hours) of one ingredient in this release form, with where the numbers come from"""
         if g.food and g.bare in FOOD_PK:
             t, h, note = FOOD_PK[g.bare]
             return {"tmax_h": t, "t_half_h": h, "source": "일반 지식", "note": note}
+        base = self._pk_ir(g)
+        if form == "IR":
+            return base
+        ref = PK_FORM_REFERENCE.get((g.bare, form))
+        if ref:
+            return {"tmax_h": ref[0], "t_half_h": ref[1], "source": f"{RELEASE_KO[form]} 성인 표준 참고치", "measured": True}
+        v = ((getattr(self.eng, "pk", {}) or {}).get(g.bare) or {}).get(form) or {}
+        if v.get("tmax_h"):  # the product-form labels: the half-life falls back to the ordinary tablet's
+            return {"tmax_h": v["tmax_h"], "t_half_h": v.get("t_half_h") or base["t_half_h"],
+                    "source": f"FDA {RELEASE_KO[form]} 라벨 {max(v.get('n_tmax', 0), v.get('n_thalf', 0))}건 중앙값",
+                    "measured": True}
+        # no numbers for this form: extended release spreads absorption (peak ~3x later, 4-12 h);
+        # delayed release starts dissolving in the intestine (~2 h lag)
+        t = min(12.0, max(4.0, base["tmax_h"] * 3)) if form == "ER" else base["tmax_h"] + 2
+        return {"tmax_h": t, "t_half_h": base["t_half_h"], "source": f"{RELEASE_KO[form]} 추정 (일반형 수치 기반)",
+                "measured": False}
+
+    def _pk_ir(self, g) -> dict:
+        ref2 = PK_FORM_REFERENCE.get((g.bare, "IR"))
+        if ref2:
+            return {"tmax_h": ref2[0], "t_half_h": ref2[1], "source": "성인 표준 참고치", "measured": True}
         v = (getattr(self.eng, "pk", {}) or {}).get(g.bare) or {}
         t, h = v.get("tmax_h"), v.get("t_half_h")
         ref = PK_REFERENCE.get(g.bare)
@@ -435,8 +474,20 @@ class Journey:
         return list(out.values())
 
     # ---------------------------------------------------------------- build
-    def build(self, *, events, disease_alerts, class_dups, duplicates, dosing, pa, overall, patient=None) -> dict:
+    def build(self, *, events, disease_alerts, class_dups, duplicates, dosing, pa, overall, patient=None,
+              products=None) -> dict:
         U = self.U
+        # release form and dosing schedule of each ingredient (from the product it comes in and the dose entered)
+        form_of: dict[str, str] = {}
+        reg_of: dict[str, dict] = {}
+        for p in products or []:
+            rel = p.get("release") or "IR"
+            d = p.get("dose")
+            for g in p["ingredients"]:
+                if rel == "ER" or g.key not in form_of:
+                    form_of[g.key] = rel
+                if d is not None and g.key not in reg_of:
+                    reg_of[g.key] = {"per_day": d.per_day, "days": d.days, "prn": d.prn, "weekly": d.weekly, "source": "입력값"}
         sex = (getattr(patient, "sex", None) or "").upper()[:1] or None
         bmi = (pa.get("body") or {}).get("bmi")
         subject = {"sex": sex if sex in ("F", "M") else None, "age": getattr(patient, "age", None),
@@ -444,10 +495,13 @@ class Journey:
                    "bmi": round(bmi, 1) if bmi else None, "pregnant": "pregnancy" in (pa.get("diseases") or []),
                    "kidney_pct": (pa.get("kidney") or {}).get("pct_normal")}
         info = {g.key: {"key": g.key, "name": self.name(g), "kind": self.kind(g), "route": self.route(g),
-                        "targets": self.targets(g), "enzymes": self.enzymes(g), "pk": self.pk(g),
+                        "targets": self.targets(g), "enzymes": self.enzymes(g), "release": form_of.get(g.key, "IR"),
+                        "pk": self.pk(g, form_of.get(g.key, "IR")),
                         "renal": g.bare in RENAL_CLEARED or any(c.startswith("crcl") for c, _, _ in
                                                                getattr(DOSE_LIMITS.get(g.bare), "adjust", []))}
                 for g in U}
+        for k, v in info.items():
+            v["regimen"] = reg_of.get(k) or default_regimen(v["release"], v["pk"]["t_half_h"], v["route"], v["kind"])
         pair_keys = [(self.by_key.get(r["a_key"]), self.by_key.get(r["b_key"]), r) for r in self.pairs]
         pair_keys = [(a, b, r) for a, b, r in pair_keys if a is not None and b is not None]
         levels: list[dict] = []
@@ -471,6 +525,14 @@ class Journey:
         if any("alcohol" in drug_groups(g.key) for g in U) and any("nsaid" in drug_groups(g.key) for g in U):
             stomach.append({"sev": "mid", "drugs": [g.key for g in U if drug_groups(g.key) & {"alcohol", "nsaid"}],
                             "kind": "mucosa", "text": "술과 소염진통제가 함께 위 점막 보호막을 약하게 합니다"})
+        for k, v in info.items():  # how the tablet itself releases the drug
+            if v["release"] == "ER":
+                stomach.append({"sev": "low", "drugs": [k], "kind": "er",
+                                "text": f"{v['name']}은(는) 서방형 — 장을 지나며 약 {fmt_h(v['pk']['tmax_h'])}에 걸쳐 천천히 "
+                                        "녹아 나옵니다. 쪼개거나 씹으면 한꺼번에 흡수돼 위험할 수 있으니 통째로 삼키세요"})
+            elif v["release"] == "DR":
+                stomach.append({"sev": "low", "drugs": [k], "kind": "dr",
+                                "text": f"{v['name']}은(는) 장용형 — 위산을 피해 장에서 녹습니다(쪼개거나 씹지 마세요)"})
 
         # ---- 2. intestine: gut-wall CYP3A4 (grapefruit), P-gp
         gut: list[dict] = []
@@ -760,8 +822,9 @@ class Journey:
             intake_txt.append(f"{names(inh)}의 성분은 폐로 들어가 혈액으로 퍼집니다")
         stages = [
             {"id": "intake", "site": "stomach", "title": "① 복용 · 위",
-             "text": ". ".join(intake_txt) + "." + (" 위에서 문제가 생깁니다." if stomach else " 위에서는 특별한 문제가 없습니다."),
-             "items": stomach, "sev": max([i["sev"] for i in stomach] or ["normal"], key=_rank)},
+             "text": ". ".join(intake_txt) + "." + (" 위에서 문제가 생깁니다." if any(i["sev"] != "low" for i in stomach)
+                                                   else " 위에서는 특별한 문제가 없습니다."),
+             "items": stomach, "sev": max([i["sev"] for i in stomach if i["sev"] != "low"] or ["normal"], key=_rank)},
             {"id": "absorb", "site": "intestine", "title": "② 장 흡수",
              "text": ("소장 벽을 통과해 흡수된 성분은 문맥(門脈)을 타고 간으로 갑니다."
                       + (" 이 단계에서 흡수량이 달라집니다." if gut else "")),
@@ -887,6 +950,19 @@ def _moa_ko(text: str) -> str:
         out = re.sub(rf"\b(?:{pat})\b", ko, out, flags=re.I)
     out = re.sub(r"\s+", " ", out.replace(";", " ·").replace(",", " ·")).strip()
     return out if len(out) <= 40 else out[:38] + "…"
+
+
+def default_regimen(form: str, t_half: float, route: str, kind: str) -> dict:
+    """usual dosing interval when no dose was entered: by half-life and release form (concept, for the sketch)"""
+    if kind == "food":
+        n = 1
+    elif route == "injection" and t_half >= 96:
+        return {"per_day": 1, "days": None, "prn": False, "weekly": True, "source": "추정(주 1회 주사)"}
+    elif form == "ER":
+        n = 1 if t_half >= 10 else 2
+    else:
+        n = 1 if t_half >= 18 else 2 if t_half >= 8 else 3 if t_half >= 3 else 4
+    return {"per_day": n, "days": None, "prn": False, "weekly": False, "source": "추정(반감기 기준 일반적 복용 간격)"}
 
 
 def _where(b: dict) -> str:

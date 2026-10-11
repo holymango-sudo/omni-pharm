@@ -139,7 +139,7 @@ export default function App() {
     setDrugs((ds) => [...ds, { name, status: "loading" }]);
     api.molecule(name)
       .then((r) => setDrugs((ds) => ds.map((d) => (d.name === name
-        ? { ...d, status: "ok", molecules: r.molecules, product: r.product, unresolved: r.unresolved,
+        ? { ...d, status: "ok", molecules: r.molecules, product: r.product, unresolved: r.unresolved, release: r.release,
           dose_info: r.dose_info, single: r.single } : d))))
       .catch((e) => setDrugs((ds) => ds.map((d) => (d.name === name
         ? { ...d, status: "error", error: e.message, candidates: e.detail?.candidates } : d))));

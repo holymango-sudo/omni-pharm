@@ -171,9 +171,31 @@ EXTRA_LIMITS: dict[str, Limit] = {}
 EXTRA_DURATION: dict[str, int] = {}
 
 
-def effective_limit(key: str, ctx: dict) -> tuple[float, float | None, float | None, list[str]] | None:
+# Extended-release products whose labelled maximum (or single dose) differs from the ordinary tablet (FDA / MFDS labels)
+ER_LIMITS: dict[str, Limit] = {
+    "metformin": Limit(2000, adjust=[("crcl<45", 1000, "신기능 저하(eGFR 30-45)")]),
+    "tramadol": Limit(300, single_max=300, adjust=[("crcl<30", 0.001, "신기능 고도 저하 — 서방형 사용 안 함")]),
+    "zolpidem": Limit(12.5, adjust=[("female", 6.25, "여성(아침 졸림 위험)"), ("age>=65", 6.25, "65세 이상"),
+                                   ("hepatic", 6.25, "간기능 저하")]),
+    "venlafaxine": Limit(225),
+    "bupropion": Limit(450, single_max=450),
+    "paroxetine": Limit(62.5, adjust=[("age>=65", 50, "65세 이상")]),
+    "glipizide": Limit(20),
+    "methylphenidate": Limit(72),
+    "doxazosin": Limit(8),
+    "pregabalin": Limit(660, adjust=[("crcl<60", 330, "신기능 저하(CrCl 30-60)"), ("crcl<30", 0.001, "CrCl <30 — 서방형 사용 안 함")]),
+    "gabapentin": Limit(1800, adjust=[("crcl<60", 0.001, "CrCl <60 — 서방형 사용 안 함")]),
+    "acetaminophen": Limit(4000, warn_mg=3900, single_max=1300, adjust=[
+        ("hepatic", 2000, "간기능 저하"), ("age>=75", 3000, "75세 이상"), ("weight<50", 3000, "체중 50kg 미만")]),
+    "nifedipine": Limit(120),
+}
+# extended-release products are taken once or twice a day (8-hourly acetaminophen ER: 3 times)
+ER_PER_DAY = {"acetaminophen": 3}
+
+
+def effective_limit(key: str, ctx: dict, er: bool = False) -> tuple[float, float | None, float | None, list[str]] | None:
     name = key.removeprefix("ing:").removeprefix("lab:").removeprefix("bio:")
-    lim = DOSE_LIMITS.get(name) or EXTRA_LIMITS.get(name)
+    lim = (ER_LIMITS.get(name) if er else None) or DOSE_LIMITS.get(name) or EXTRA_LIMITS.get(name)
     if lim is None:
         return None
     mx, why = lim.max_mg, []
@@ -216,12 +238,21 @@ def check_doses(items: list[dict], ctx: dict, groups_of, display_of) -> dict:
                 missing.append(it["input"])
                 continue
             per_day = d.per_day / 7 if d.weekly else d.per_day
+            er = it.get("release") == "ER"
             t = totals.setdefault(k, {"key": k, "display": display_of(k), "daily_mg": 0.0, "single_max_dose": 0.0,
+                                      "single_ir": 0.0, "single_er": 0.0, "er": False, "ir": False,
                                       "sources": [], "days": 0, "regular": False})
             t["daily_mg"] += per_dose * per_day
             t["single_max_dose"] = max(t["single_max_dose"], per_dose)
+            t["single_er" if er else "single_ir"] = max(t["single_er" if er else "single_ir"], per_dose)
+            t["er" if er else "ir"] = True
             t["sources"].append({"product": it["input"], "per_dose_mg": round(per_dose, 3),
-                                 "per_day": d.per_day, "weekly": d.weekly})
+                                 "per_day": d.per_day, "weekly": d.weekly, "release": it.get("release") or "IR"})
+            name0 = k.removeprefix("ing:").removeprefix("lab:").removeprefix("bio:")
+            cap = ER_PER_DAY.get(name0, 2)
+            if er and not d.weekly and d.per_day > cap and not any(a["text"].startswith(it["input"]) for a in alerts):
+                alerts.append({"sev": "주의", "text": f"{it['input']}: 서방형인데 하루 {d.per_day:g}회 — 서방형은 보통 하루 "
+                               f"{cap}회 이하로 복용합니다(약이 겹쳐 한꺼번에 많이 노출될 수 있음)"})
             t["days"] = max(t["days"], d.days or 0)
             t["regular"] = t["regular"] or not d.prn
             # weekly-only drugs taken daily
@@ -231,30 +262,42 @@ def check_doses(items: list[dict], ctx: dict, groups_of, display_of) -> dict:
 
     out = []
     for k, t in totals.items():
-        lim = effective_limit(k, ctx)
         name = k.removeprefix("ing:").removeprefix("lab:").removeprefix("bio:")
+        lim_ir = effective_limit(k, ctx) if t["ir"] else None
+        lim_er = effective_limit(k, ctx, er=True) if t["er"] else None
+        er_own = t["er"] and name in ER_LIMITS
+        # ordinary + extended-release of the same ingredient: the stricter daily maximum applies
+        lim = min([x for x in (lim_ir, lim_er) if x], key=lambda x: x[0], default=None)
         row = {**t, "daily_mg": round(t["daily_mg"], 3), "max_mg": None, "status": "기준 없음", "why": [],
-               "source": ("식약처 DUR 용량주의" if name not in DOSE_LIMITS and name in EXTRA_LIMITS else SRC_LABEL)}
+               "source": ("서방형 허가사항 1일 최대용량" if er_own and lim is lim_er else
+                          "식약처 DUR 용량주의" if name not in DOSE_LIMITS and name in EXTRA_LIMITS else SRC_LABEL)}
         if lim:
-            mx, warn, single, why = lim
-            row.update(max_mg=mx, warn_mg=warn, single_max=single, why=why)
+            mx, warn, _, why = lim
+            row.update(max_mg=mx, warn_mg=warn, single_max=(lim_er or lim_ir)[2], why=why)
             many = len(t["sources"]) > 1
             src = f" ({' + '.join(s['product'] for s in t['sources'])} 합계)" if many else ""
-            if t["daily_mg"] > mx * 1.001:
+            if mx < 0.01:  # 'do not use the extended-release form' (e.g. pregabalin ER with CrCl < 30)
                 row["status"] = "초과"
-                alerts.append({"sev": "금기", "text": f"{t['display']} 하루 {fmt_mg(t['daily_mg'])}{src} — "
-                               f"1일 최대 {fmt_mg(mx)}{' (' + ', '.join(why) + ')' if why else ''}를 넘습니다"})
+                alerts.append({"sev": "금기", "text": f"{t['display']} 서방형 — {', '.join(why)}: 서방형은 쓰지 않고 일반형으로 "
+                               "용량을 조절합니다"})
+            elif t["daily_mg"] > mx * 1.001:
+                row["status"] = "초과"
+                alerts.append({"sev": "금기", "text": f"{t['display']}{' 서방형' if lim is lim_er and er_own else ''} 하루 "
+                               f"{fmt_mg(t['daily_mg'])}{src} — 1일 최대 {fmt_mg(mx)}"
+                               f"{' (' + ', '.join(why) + ')' if why else ''}를 넘습니다"})
             elif warn and t["daily_mg"] > warn * 1.001:
                 row["status"] = "주의"
                 alerts.append({"sev": "주의", "text": f"{t['display']} 하루 {fmt_mg(t['daily_mg'])}{src} — 일반약 기준"
                                f" {fmt_mg(warn)}을 넘어 의사·약사의 지시가 있을 때만 가능한 용량입니다"})
             else:
                 row["status"] = "적정"
-            if single and t["single_max_dose"] > single * 1.001:
-                alerts.append({"sev": "주의", "text": f"{t['display']} 1회 {fmt_mg(t['single_max_dose'])} — "
-                               f"1회 최대 {fmt_mg(single)}를 넘습니다"})
-                if row["status"] == "적정":
-                    row["status"] = "주의"
+            for kind, lm, dose1 in (("", lim_ir, t["single_ir"]), (" 서방형", lim_er, t["single_er"])):
+                single = lm[2] if lm else None
+                if single and dose1 > single * 1.001:
+                    alerts.append({"sev": "주의", "text": f"{t['display']}{kind} 1회 {fmt_mg(dose1)} — "
+                                   f"1회 최대 {fmt_mg(single)}를 넘습니다"})
+                    if row["status"] == "적정":
+                        row["status"] = "주의"
         out.append(row)
 
     # dose-dependent interactions

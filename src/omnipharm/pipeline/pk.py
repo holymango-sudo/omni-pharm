@@ -4,7 +4,8 @@ The body view labels each step with the time after the dose ("복용 후 1시간
 from the CLINICAL PHARMACOLOGY / PHARMACOKINETICS sections of all single-ingredient openFDA labels; the median over
 labels is kept, with the number of labels it came from.
 
-Output: processed/pk.json  {ingredient key: {"tmax_h", "t_half_h", "n_tmax", "n_thalf"}}
+Output: processed/pk.json  {ingredient key: {"tmax_h", "t_half_h", "n_tmax", "n_thalf", "ER": {...}, "DR": {...}}}
+(plain values = ordinary tablets; ER / DR = labels of extended / delayed-release products)
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ import pandas as pd
 
 from omnipharm.knowledge import BIOLOGIC_LABEL_NAMES, BIOLOGICS, lab_name, normalize_ingredient
 from omnipharm.pipeline.common import PROC, RAW
+from omnipharm.release import release_of
 
 log = logging.getLogger("pipeline.pk")
 OUT = PROC / "pk.json"
@@ -75,8 +77,8 @@ def build() -> None:
         k = normalize_ingredient(s, known)
         return BIOLOGIC_LABEL_NAMES.get(k, k) if k else lab_name(s)
 
-    tm: dict[str, list[float]] = {}
-    hl: dict[str, list[float]] = {}
+    tm: dict[tuple[str, str], list[float]] = {}  # (key, release form) -> values
+    hl: dict[tuple[str, str], list[float]] = {}
     n_lab = 0
     for z in sorted((RAW / "openfda_label").glob("*.zip")):
         with zipfile.ZipFile(z) as zf, zf.open(zf.namelist()[0]) as f:
@@ -92,18 +94,32 @@ def build() -> None:
             if len(keys) != 1 or len(subs) > 1:  # combination products describe several drugs in one text
                 continue
             key = keys.pop()
+            form = release_of(" ".join(o.get("brand_name", []) or []) + " " + " ".join(o.get("generic_name", []) or [])
+                              + " " + " ".join(res.get("spl_product_data_elements") or [])[:400])
             t, h = extract(text)
             if t or h:
                 n_lab += 1
-                tm.setdefault(key, []).extend(t)
-                hl.setdefault(key, []).extend(h)
+                tm.setdefault((key, form), []).extend(t)
+                hl.setdefault((key, form), []).extend(h)
         del data
-        log.info(f"{z.name}: {n_lab:,} labels with PK numbers, {len(set(tm) | set(hl)):,} ingredients")
-    out = {}
-    for k in sorted(set(tm) | set(hl)):
-        t, h = tm.get(k, []), hl.get(k, [])
-        out[k] = {"tmax_h": round(statistics.median(t), 2) if t else None, "n_tmax": len(t),
-                  "t_half_h": round(statistics.median(h), 2) if h else None, "n_thalf": len(h)}
+        log.info(f"{z.name}: {n_lab:,} labels with PK numbers, {len({k for k, _ in set(tm) | set(hl)}):,} ingredients")
+
+    def summary(t: list[float], h: list[float]) -> dict:
+        return {"tmax_h": round(statistics.median(t), 2) if t else None, "n_tmax": len(t),
+                "t_half_h": round(statistics.median(h), 2) if h else None, "n_thalf": len(h)}
+
+    out: dict[str, dict] = {}
+    for k in sorted({k for k, _ in set(tm) | set(hl)}):
+        ir_t, ir_h = tm.get((k, "IR"), []), hl.get((k, "IR"), [])
+        all_t = [v for f_ in ("IR", "ER", "DR") for v in tm.get((k, f_), [])]
+        all_h = [v for f_ in ("IR", "ER", "DR") for v in hl.get((k, f_), [])]
+        # the plain entry is the ordinary tablet; drugs that only exist as ER / DR fall back to those labels
+        out[k] = summary(ir_t or all_t, ir_h or all_h)
+        for f_ in ("ER", "DR"):
+            t, h = tm.get((k, f_), []), hl.get((k, f_), [])
+            if t or h:
+                out[k][f_] = summary(t, h)
     OUT.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     log.info(f"pk.json: {len(out):,} ingredients (Tmax {sum(1 for v in out.values() if v['tmax_h']):,}, "
-             f"t1/2 {sum(1 for v in out.values() if v['t_half_h']):,})")
+             f"t1/2 {sum(1 for v in out.values() if v['t_half_h']):,}, extended-release "
+             f"{sum(1 for v in out.values() if 'ER' in v):,})")

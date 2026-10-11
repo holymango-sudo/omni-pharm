@@ -73,6 +73,8 @@ export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario,
             {d.status === "loading" && <i className="spin" />}
             {d.name}
             {d.molecules?.length > 1 && <small> ({d.molecules.length}성분)</small>}
+            {d.release === "ER" && <small className="rel-tag" title="서방형: 천천히 녹아 오래 작용 — 쪼개거나 씹지 말 것. 최고 농도 시간·1일 최대량을 서방형 기준으로 계산">서방형</small>}
+            {d.release === "DR" && <small className="rel-tag dr" title="장용형: 위를 지나 장에서 녹음 — 쪼개거나 씹지 말 것">장용형</small>}
             {d.molecules?.some((m) => !m.known) && <small className="novel"> NEW</small>}
             {d.molecules?.some((m) => m.biologic) && <small className="novel" title="분자 구조가 없는 성분: 허가 문서·임상 규칙으로 평가">
               {" "}{[...new Set(d.molecules.filter((m) => m.biologic).map((m) => (m.category === "생물의약품" ? "바이오" : m.category?.split("·")[0])))].join("·")}</small>}

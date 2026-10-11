@@ -4,42 +4,96 @@ import React, { useEffect, useState } from "react";
    finding (problem stage). Both are drawn from the analysis data; the curve is a concept sketch scaled by the
    evidence category (e.g. FDA 'strong inhibitor x sensitive substrate' = AUC >= 5x), not a measured concentration. */
 
-const KA = 1.4; // absorption rate (1/h)
-const KE = 0.18; // elimination rate (1/h), t1/2 ~ 3.9 h
-const T_MAX = 24;
+/* One-compartment oral model per drug: elimination from its label half-life, absorption solved so the peak falls at
+   its label Tmax (extended-release products: their own, later Tmax -> flatter curve). Repeated dosing = the same dose
+   curve added every dosing interval. 'This combination' changes clearance (enzyme block, kidneys: ke / fold) or the
+   amount absorbed (chelation, duplicated product: x fold). Concentrations are relative to the usual peak. */
 
-function curve(kind, fold) {
-  let amp = 1, ke = KE;
-  if (kind === "amount") amp = fold; // absorption / duplicated dose: same shape, more or less drug
-  else ke = KE / fold; // clearance blocked (fold > 1) or induced (fold < 1)
-  const raw = (t) => (Math.exp(-ke * t) - Math.exp(-KA * t));
-  const base = (t) => (Math.exp(-KE * t) - Math.exp(-KA * t));
-  let bmax = 0;
-  for (let t = 0; t <= T_MAX; t += 0.1) bmax = Math.max(bmax, base(t));
-  // same dose: AUC scales with 1/ke, so normalise both to the baseline's (KE) dose constant
-  const k = (KA - KE) / (KA - ke);
-  return (t) => (amp * k * raw(t)) / bmax;
+/** absorption rate giving the peak at tmax for elimination rate ke (ka < ke = absorption-limited, typical of ER) */
+function solveKa(tmax, ke) {
+  const g = (ka) => Math.log(ka / ke) / (ka - ke);
+  if (Math.abs(tmax - 1 / ke) < 1e-6) return ke * 1.0001;
+  let lo, hi;
+  if (tmax < 1 / ke) { lo = ke * 1.0001; hi = 200; } else { lo = 1e-5; hi = ke * 0.9999; }
+  for (let i = 0; i < 80; i++) { const m = (lo + hi) / 2; if (g(m) > tmax) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+const one = (t, ka, ke) => (t <= 0 ? 0 : (ka / (ka - ke)) * (Math.exp(-ke * t) - Math.exp(-ka * t)));
+
+function drugModel(d, lv) {
+  const T = Math.max(0.1, d?.pk?.tmax_h || 1.5), H = Math.max(0.2, d?.pk?.t_half_h || 6);
+  const ke = Math.LN2 / H;
+  const ka = solveKa(T, ke);
+  let amp = 1, keX = ke;
+  if (lv?.fold) {
+    if (/흡수|중복|최대량/.test(lv.why || "")) amp = lv.fold;
+    else keX = ke / lv.fold;
+  }
+  const r = d?.regimen || {};
+  const tau = r.weekly ? 168 : 24 / Math.max(1, r.per_day || 1);
+  return { T, H, ke, ka, keX, amp, tau, days: r.days, regimen: r };
 }
 
-const kindOf = (why = "") => (/흡수|중복|최대량/.test(why) ? "amount" : "clearance");
+/** concentration at time t (h) for doses every tau until stop (h); keFor/ampFor pick baseline or this combination */
+function conc(m, t, repeat, stop, mine) {
+  const ke = mine ? m.keX : m.ke, a = mine ? m.amp : 1;
+  if (!repeat) return a * one(t, m.ka, ke);
+  let c = 0;
+  for (let td = 0; td <= Math.min(t, stop - 1e-9); td += m.tau) c += one(t - td, m.ka, ke);
+  return a * c;
+}
 
-export function PKChart({ levels, drugs, colorOf, title, mode }) {
+const fmtT = (h) => (h < 48 ? `${Math.round(h)}h` : `${Math.round(h / 24)}일`);
+
+export function PKChart({ levels, drugs, colorOf, title, mode, defaultView = "single" }) {
+  const [view, setView] = useState(defaultView);
+  useEffect(() => setView(defaultView), [defaultView, title]);
   const W = 300, H = 168, L = 34, B = 22, T = 14, R = 8;
   const rows = (levels || []).filter((l) => l.fold && Math.abs(Math.log(l.fold)) > 0.05).slice(0, 2);
   const shown = rows.length ? rows : (drugs || []).filter((d) => d.kind === "drug").slice(0, 1).map((d) => ({ drug: d.key, fold: 1 }));
-  const curves = shown.map((l) => ({ l, f: curve(kindOf(l.why), l.fold), b: curve("amount", 1) }));
+  const byKey = Object.fromEntries((drugs || []).map((d) => [d.key, d]));
+  const repeat = view === "repeat";
+  const models = shown.map((l) => ({ l, m: drugModel(byKey[l.drug], l) }));
+  // time window: one dose -> until ~97% gone; repeated -> to steady state (and the wash-out after the last dose)
+  const effH = Math.max(...models.map(({ m }) => m.H * (m.ke / m.keX)), 1);
+  const baseH = Math.max(...models.map(({ m }) => m.H), 1);
+  let tEnd, stop = Infinity;
+  if (!repeat) tEnd = Math.min(24 * 14, Math.max(24, Math.max(...models.map(({ m }) => m.T)) + 5 * effH));
+  else {
+    const given = Math.max(0, ...models.map(({ m }) => m.days || 0));
+    const dosing = given || Math.min(14, Math.max(3, Math.ceil((5 * effH) / 24) + 1));
+    const washout = mode === "excrete" || given ? Math.min(24 * 10, 5 * effH) : 0;
+    stop = mode === "excrete" || given ? dosing * 24 : Infinity;
+    tEnd = Math.min(24 * 21, dosing * 24 + washout);
+  }
+  const N = 240;
+  const ts = Array.from({ length: N + 1 }, (_, i) => (i * tEnd) / N);
+  // relative scale: the usual peak (single dose) / the usual steady-state peak (repeated) = 1
+  const norm = Math.max(1e-9, ...models.map(({ m }) => Math.max(...ts.map((t) => conc(m, t, repeat, stop, false)))));
+  const curves = models.map(({ l, m }) => ({ l, m, mine: ts.map((t) => conc(m, t, repeat, stop, true) / norm),
+    base: ts.map((t) => conc(m, t, repeat, stop, false) / norm) }));
   let ymax = 1.9;
-  for (const c of curves) for (let t = 0; t <= T_MAX; t += 0.25) ymax = Math.max(ymax, c.f(t) * 1.08);
-  ymax = Math.min(ymax, 7);
-  const x = (t) => L + ((W - L - R) * t) / T_MAX;
+  for (const c of curves) ymax = Math.max(ymax, ...c.mine.map((v) => v * 1.08));
+  ymax = Math.min(ymax, 8);
+  const x = (t) => L + ((W - L - R) * t) / tEnd;
   const y = (v) => T + (H - T - B) * (1 - Math.min(v, ymax) / ymax);
-  const path = (f) => Array.from({ length: 97 }, (_, i) => (i * T_MAX) / 96).map((t, i) => `${i ? "L" : "M"}${x(t).toFixed(1)},${y(f(t)).toFixed(1)}`).join("");
+  const path = (vals) => vals.map((v, i) => `${i ? "L" : "M"}${x(ts[i]).toFixed(1)},${y(v).toFixed(1)}`).join("");
   const MEC = 0.25, MTC = 1.3; // therapeutic window relative to the usual peak (concept)
+  const step = tEnd <= 30 ? 6 : tEnd <= 72 ? 12 : tEnd <= 24 * 7 ? 24 : 72;
+  const ticks = Array.from({ length: Math.floor(tEnd / step) + 1 }, (_, i) => i * step);
+  const ss = 5 * effH;
   const nameOf = (k) => drugs.find((d) => d.key === k)?.name || k;
+  const regText = (m) => (m.regimen.weekly ? "주 1회" : `하루 ${m.regimen.per_day || 1}회`)
+    + (m.regimen.source === "입력값" ? "" : "(추정)");
   return (
     <div className="bj-panel">
-      <div className="bj-ptitle">{title}<span>개념도</span></div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="bj-pk">
+      <div className="bj-ptitle">{title}
+        <span className="bj-ptabs">
+          <button className={!repeat ? "on" : ""} onClick={() => setView("single")}>1회 복용</button>
+          <button className={repeat ? "on" : ""} onClick={() => setView("repeat")}>반복 복용</button>
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="bj-pk" key={`${view}${title}`}>
         <defs>
           <linearGradient id="tox" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ff2d55" stopOpacity="0.28" /><stop offset="1" stopColor="#ff2d55" stopOpacity="0.06" /></linearGradient>
         </defs>
@@ -49,26 +103,40 @@ export function PKChart({ levels, drugs, colorOf, title, mode }) {
         <line x1={L} x2={W - R} y1={y(MEC)} y2={y(MEC)} className="pk-lim" />
         <text x={W - R - 2} y={y(MTC) - 3} className="pk-note tox" textAnchor="end">독성 범위</text>
         <text x={W - R - 2} y={(y(MTC) + y(MEC)) / 2 + 3} className="pk-note ok" textAnchor="end">치료 범위</text>
-        {[0, 6, 12, 18, 24].map((t) => (
+        {ticks.map((t) => (
           <g key={t}><line x1={x(t)} x2={x(t)} y1={H - B} y2={H - B + 3} className="pk-ax" />
-            <text x={x(t)} y={H - B + 13} className="pk-tick" textAnchor="middle">{t}h</text></g>
+            <text x={x(t)} y={H - B + 13} className="pk-tick" textAnchor="middle">{fmtT(t)}</text></g>
         ))}
         <line x1={L} x2={W - R} y1={H - B} y2={H - B} className="pk-ax" />
         <line x1={L} x2={L} y1={T} y2={H - B} className="pk-ax" />
         <text x={10} y={(H - B + T) / 2} className="pk-tick" transform={`rotate(-90 10 ${(H - B + T) / 2})`} textAnchor="middle">혈중 농도</text>
-        {curves.map(({ l, f, b }) => (
+        {repeat && ss < (stop === Infinity ? tEnd : stop) && (
+          <g><line x1={x(ss)} x2={x(ss)} y1={T} y2={H - B} className="pk-mark" />
+            <text x={x(ss) + 2} y={T + 9} className="pk-note">정상상태 ≈{fmtT(ss)}</text></g>
+        )}
+        {repeat && stop < tEnd && (
+          <g><line x1={x(stop)} x2={x(stop)} y1={T} y2={H - B} className="pk-mark stop" />
+            <text x={x(stop) + 2} y={T + 19} className="pk-note stop">복용 중단</text></g>
+        )}
+        {curves.map(({ l, base, mine }) => (
           <g key={l.drug}>
-            <path d={path(b)} className="pk-base" style={{ stroke: colorOf(l.drug) }} />
-            <path d={path(f)} className="pk-line" style={{ stroke: colorOf(l.drug) }} />
+            <path d={path(base)} className="pk-base" style={{ stroke: colorOf(l.drug) }} />
+            <path d={path(mine)} className="pk-line" style={{ stroke: colorOf(l.drug) }} />
           </g>
         ))}
       </svg>
       <div className="bj-plegend">
-        {curves.map(({ l }) => (
-          <span key={l.drug}><i style={{ background: colorOf(l.drug) }} />{nameOf(l.drug)}
-            <b className={l.dir === "up" ? "up" : l.dir === "down" ? "down" : ""}>{l.fold_label || (mode === "excrete" ? "정상 배출" : "변화 없음")}</b></span>
-        ))}
-        <span className="muted">점선 = 단독 복용 · 실선 = 이 조합·이 환자</span>
+        {curves.map(({ l, m }) => {
+          const d = byKey[l.drug];
+          return (
+            <span key={l.drug}><i style={{ background: colorOf(l.drug) }} />{nameOf(l.drug)}
+              {d?.release === "ER" && <em className="rel">서방형</em>}{d?.release === "DR" && <em className="rel">장용형</em>}
+              <b className={l.dir === "up" ? "up" : l.dir === "down" ? "down" : ""}>{l.fold_label || (mode === "excrete" ? "정상 배출" : "변화 없음")}</b>
+              <small>Tmax {fmtT(m.T)} · t½ {m.H < 48 ? `${m.H.toFixed(m.H < 10 ? 1 : 0)}h` : fmtT(m.H)}{repeat ? ` · ${regText(m)}` : ""}</small></span>
+          );
+        })}
+        <span className="muted">점선 = 단독 복용 · 실선 = 이 조합·이 환자 · {repeat ? "평소 정상상태 최고치 = 1" : "평소 최고치 = 1"}
+          {byKey[shown[0]?.drug]?.pk?.source ? ` · 수치 출처: ${byKey[shown[0].drug].pk.source}` : ""}</span>
       </div>
     </div>
   );

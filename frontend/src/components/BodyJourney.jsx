@@ -559,6 +559,9 @@ function planRaw(pathway, stage, colorOf) {
       if (chelVictim.has(d.key)) {
         add(d.key, [W.cardia, SITE.stomach], "stuck", per * 0.75, 0.4, 0.09);
         add(d.key, GUT_PATH, "flow", per * 0.25, 0.1, 0.04);
+      } else if (d.release === "ER") { // the tablet matrix travels down the gut and lets the drug out slowly
+        add(d.key, GUT_PATH.slice(0, 8), "stuck", per * 0.55, 0.12, 0.07);
+        add(d.key, GUT_PATH, "flow", per * 0.45, 0.05, 0.04);
       } else add(d.key, GUT_PATH, "flow", per * (boosted.has(d.key) ? 1.7 : 1), 0.1, 0.045);
     }
     sites.intestine = { active: true, sev: stage.sev };
@@ -811,7 +814,24 @@ function SidePanel({ pathway, stage, molecules, colorOf }) {
   const mp = useMemo(() => (["intake", "absorb", "liver", "target"].includes(stage.id)
     ? molecularPlan(stage, pathway, molByKey, colorOf) : null), [stage, pathway, molByKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const blood = pathway.stages.find((s) => s.id === "blood");
-  if (stage.id === "problem") return <MechanismChain problems={stage.problems} />;
+  const [probView, setProbView] = useState("chain");
+  if (stage.id === "problem") {
+    // the chain explains WHY; the repeated-dosing curve shows HOW it builds up over days (cumulative harms)
+    const tabs = (
+      <span className="bj-ptabs side">
+        <button className={probView === "chain" ? "on" : ""} onClick={() => setProbView("chain")}>기전 경로</button>
+        <button className={probView === "pk" ? "on" : ""} onClick={() => setProbView("pk")}>반복 복용 농도</button>
+      </span>
+    );
+    return (
+      <div className="bj-side">
+        {tabs}
+        {probView === "chain" ? <MechanismChain problems={stage.problems} />
+          : <PKChart levels={blood?.levels} drugs={pathway.drugs} colorOf={colorOf} title="반복 복용 시 농도 (PK)" mode="problem"
+            defaultView="repeat" />}
+      </div>
+    );
+  }
   if (mp) {
     return (
       <div className={`bj-panel mol sev-${mp.sev}`}>
@@ -822,8 +842,8 @@ function SidePanel({ pathway, stage, molecules, colorOf }) {
     );
   }
   if (stage.id === "excrete") {
-    const lv = (blood?.levels || []).filter((l) => /콩팥/.test(l.why));
-    return <PKChart levels={lv} drugs={pathway.drugs} colorOf={colorOf} title="배출 · 체내 잔류 (PK)" mode="excrete" />;
+    return <PKChart levels={blood?.levels} drugs={pathway.drugs} colorOf={colorOf} title="복용 중단 후 배출 (PK)" mode="excrete"
+      defaultView="repeat" />;
   }
   return <PKChart levels={blood?.levels} drugs={pathway.drugs} colorOf={colorOf} title="혈중농도-시간 곡선 (PK)" mode="blood" />;
 }
@@ -873,7 +893,8 @@ export function JourneyHud({ pathway, j, onMolecules, compact, boxRef, molecules
         <div className="bj-legend">
           {pathway.drugs.map((d) => (
             <span key={d.key}><i className="bj-dot" style={{ background: colorOf(d.key) }} />{d.name}
-              {d.route !== "oral" && <small> ({d.route === "injection" ? "주사" : "흡입"})</small>}</span>
+              {d.route !== "oral" && <small> ({d.route === "injection" ? "주사" : "흡입"})</small>}
+              {d.release === "ER" && <small className="rel-tag">서방형</small>}{d.release === "DR" && <small className="rel-tag dr">장용형</small>}</span>
           ))}
         </div>
       </div>
