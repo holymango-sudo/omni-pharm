@@ -1,4 +1,4 @@
-# OMNI-PHARM v2.8 — 개인화 다중 약물 상호작용 분석 시스템
+# OMNI-PHARM v2.9 — 개인화 다중 약물 상호작용 분석 시스템
 
 함께 복용하는 약들이 **이 환자에게** 얼마나 위험한지를 환자 상태(나이·키·몸무게·신장/간 기능·기저질환·임신)와
 약물의 **분자 구조**를 함께 분석해 판정합니다. 근거(식약처 DUR·허가 문서·임상 규칙·실제 부작용 보고·AI 예측)를 구분해 보여주는
@@ -57,6 +57,19 @@
 | 감사 로그 | `logs\audit\YYYY-MM.jsonl` — 누가·언제·어떤 약 이름으로 분석했고 판정이 무엇이었는지. 환자 정보는 기록하지 않음. 관리자는 `GET /api/v1/audit` |
 | EMR/OCS 연동 | `POST /api/v1/fhir/assess` — HL7 FHIR R4 Bundle(Patient·Observation(LOINC)·Condition(ICD-10/KCD)·MedicationRequest) → 판정 + FHIR `DetectedIssue` 목록 |
 
+## 1-1. 백업과 버전 관리 (v2.9)
+코드는 git 저장소로 관리합니다(`runtime\git` — 휴대용 Git for Windows, C: 설치 없음). 데이터·모델·런타임·`.env`(API 키)·계정 해시는
+저장소에서 제외됩니다(`.gitignore`).
+
+| 작업 | 방법 |
+|---|---|
+| 백업 | **`OMNI-PHARM 백업.bat`** — 바뀐 코드를 커밋하고, 전체 이력을 파일 하나(`.bundle`)로, 처리된 데이터·모델·설정을 `D:\OMNI-PHARM_backups`에 복사 |
+| 다른 드라이브에 | `"OMNI-PHARM 백업.bat" -Target E:\OMNI-PHARM_backups` (SSD 고장 대비는 반드시 다른 드라이브·USB) |
+| 자동 스냅샷 | 프로그램을 켤 때마다 코드가 바뀌었으면 자동으로 커밋 + 코드 묶음 저장(최근 30개 유지) |
+| 이력 보기 | `runtime\git\cmd\git.exe log --oneline` |
+| 이전 버전으로 | `runtime\git\cmd\git.exe checkout v2.8.0 -- src` (특정 폴더만), 전체 되돌리기는 `git checkout <커밋>` |
+| 다른 곳에 복원 | `runtime\git\cmd\git.exe clone D:\OMNI-PHARM_backups\code\omnipharm_YYYYMMDD_HHmm.bundle OMNI-PHARM` 후 `full\` 폴더의 데이터·모델·설정을 복사 |
+
 ## 2. 다른 PC로 옮기기 (SSD째 이동)
 이 폴더 하나에 실행에 필요한 것이 모두 들어 있습니다 — C: 드라이브를 쓰지 않습니다.
 
@@ -65,6 +78,7 @@
 | `runtime\python` | Python 3.11 실행 파일 (`.venv`가 이것을 사용) |
 | `runtime\ollama`, `runtime\ollama-models` | 로컬 LLM 실행기와 AI 소견서 모델(gemma4:12b, 7.5 GB) |
 | `runtime\node` | Node.js (화면을 다시 빌드할 때만 필요) |
+| `runtime\git` | Git for Windows 휴대용 (버전 관리·백업) |
 | `.venv`, `data`, `artifacts`, `frontend\dist` | 패키지, 데이터베이스, 학습된 모델, 화면 |
 
 SSD를 다른 PC에 꽂고 **`OMNI-PHARM 실행.bat`**만 누르면 됩니다. 드라이브 문자가 바뀌어도(D: → E:) 실행기가 경로를 자동으로 고칩니다.
@@ -118,6 +132,12 @@ ollama pull gemma4:12b                                        # 선택: AI 소�
   정상상태 이후 며칠~몇 주') 설명 칸에 로그 시간 눈금(0 · 1시간 · 1일 · 1주)이 표시됩니다. 약별 최고농도 도달 시간(Tmax)·반감기는
   **FDA 라벨 2.2만 건에서 추출한 1,147개 성분의 중앙값**(`pipeline.py pk` → `pk.json`)이며, 라벨에 수치가 없는 일반약(아세트아미노펜 등)은
   성인 표준 참고치로 보완합니다. 효소 억제·신기능 저하 시 반감기는 농도 곡선과 같은 배수로 늘어납니다.
+- **서방형(ER·SR·XR·CR·LP·서방정·이알)·장용형 구분(v2.9)**: 제품명으로 제형을 판별(`src/omnipharm/release.py`; 한국 서방형 1,725 · 장용 145,
+  해외 서방형 1,196개 제품)하고 — 서방형 라벨의 Tmax(81개 성분) 또는 제형별 성인 참고치로 시간축·농도 곡선을 그리며,
+  서방형 1일 최대량·1회량(메트포르민 XR 2,000mg, 트라마돌 ER 300mg, 졸피뎀 CR 12.5mg, 타이레놀 8시간 ER 1회 1,300mg 등)과
+  복용 횟수(서방형 하루 1~2회, 8시간 ER 3회)를 따로 점검하고, "쪼개거나 씹지 말고 통째로 삼키세요"를 안내합니다. 약 칩에 '서방형' 표시.
+- **반복 복용 그래프(v2.9)**: 농도 곡선 패널의 '1회 복용 / 반복 복용' 전환. 약마다 라벨 Tmax·반감기로 맞춘 1구획 모델을 복용 간격마다 더해
+  정상상태까지 쌓이는 농도, 상호작용·신기능으로 늘어난 축적, '복용 중단' 후 배출을 그립니다(입력한 하루 횟수·일수, 없으면 반감기로 추정한 간격).
   화면은 판정과 **같은 근거만** 씁니다(FDA CYP 지표표·ChEMBL·임상 규칙·DUR·AI 신호·질환·용량·신기능 — `src/omnipharm/journey.py`):
   빨간 장기는 판정이 '위험'일 때만 나타나고, 근거가 없는 단계는 "문제 없음"으로 표시합니다(무작위 5천 조합에서 판정과 불일치 0건).
 - **출력**: 환자용 안내문(큰 글씨·숫자 없음) / 전문가 리포트(DUR·규칙·근거 원문·용량 기준 출처 포함).
@@ -218,7 +238,7 @@ $py = ".\.venv\Scripts\python.exe"
 & $py scripts\pipeline.py labelsearch       # openFDA 라벨 전체 8.4만 건 전문 검색 DB (labels.db, 1분)
 & $py scripts\pipeline.py pk                # 라벨의 약동학 항목 → 성분별 Tmax·반감기 (pk.json, 1분)
 #   또는 한 번에:  & $py scripts\pipeline.py all   (위 순서 그대로)
-& $py -m pytest                             # 테스트 238개
+& $py -m pytest                             # 테스트 262개
 & $py scripts\audit_combos.py [--holdout|--patients|--foods]   # 임상 조합 감사
 & $py scripts\sweep_random.py 3000          # 무작위 대량 점검
 & $py scripts\validate_external.py          # 식약처 DUR 외부 검증
@@ -234,7 +254,7 @@ src/omnipharm/   api.py, engine.py, clinical.py, knowledge.py, journey.py (몸�
 frontend/        React + R3F 화면 (dist/ = 빌드 결과, 서버가 제공)
 scripts/         pipeline.py (데이터·학습), users.py (계정), audit_combos.py · sweep_random.py · validate_external.py ·
                  review_sheet.py · score_review.py (검증), bench_engine.py · bench_llm.py (성능), coverage_audit.py
-tests/           단위·API·보안·견고성·엔진·임상 시나리오·조합 감사·몸속 이동 테스트 (238개)
+tests/           단위·API·보안·견고성·엔진·임상 시나리오·조합 감사·몸속 이동·서방형 테스트 (262개)
 runtime/         Python·Ollama·Node 실행 파일과 AI 모델 (폴더째 이동 가능)
 config/          users.json (사용자 계정, 비밀번호 해시)
 data/            raw / interim / processed / cache

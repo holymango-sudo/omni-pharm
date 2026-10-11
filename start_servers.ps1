@@ -106,6 +106,11 @@ if ($ok) {
         foreach ($ip in $ips) { Write-Host ("LAN:  http://{0}:{1}" -f $ip.IPAddress, $Port) -ForegroundColor Green }
     }
     if (-not $NoBrowser) { Start-Process $url }
+    # automatic code snapshot (version history + bundle) when the code changed since the last one; runs detached
+    $bk = Join-Path $root "scripts\backup.ps1"
+    if ((Test-Path $bk) -and (Test-Path (Join-Path $root "runtime\git\cmd\git.exe"))) {
+        Launch "powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$bk`" -Quiet -IfChanged"
+    }
 } else {
     Write-Host "Server did not start - see logs\api.log" -ForegroundColor Red
     Get-Content (Join-Path $root "logs\api.log") -Tail 15

@@ -29,6 +29,7 @@
 | PyTorch, RDKit, scikit-learn, NumPy, pandas | BSD 계열 |
 | PyTorch Geometric, FastAPI, React, three.js, React Three Fiber, Vite | MIT |
 | Ollama | MIT |
+| Git for Windows (휴대용, `runtime\git` — 백업·버전 관리 도구, 프로그램과 함께 배포하지 않으면 무관) | GPL-2.0 |
 | Gemma 4 / Qwen3 (로컬 LLM) | Apache-2.0 |
 | ⚠ EXAONE 3.5 (선택 LLM) | EXAONE AI Model License — **비상업적 이용만 허용** |
 | Noto Sans KR, Orbitron, JetBrains Mono (폰트) | SIL Open Font License |

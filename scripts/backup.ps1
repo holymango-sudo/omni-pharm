@@ -9,7 +9,8 @@
 # Restore data (Full):         copy <backup>\full\data\processed, artifacts, config, .env back into the folder
 #
 # A backup on the same SSD protects against mistakes, not against losing the SSD: use -Target on another drive / USB.
-param([string]$Target = "", [switch]$Full, [string]$Message = "", [int]$Keep = 30, [switch]$Quiet)
+#   -IfChanged   only when the code changed (used by start_servers.ps1 for an automatic snapshot at every start)
+param([string]$Target = "", [switch]$Full, [string]$Message = "", [int]$Keep = 30, [switch]$Quiet, [switch]$IfChanged)
 $ErrorActionPreference = "Continue"  # git writes progress to stderr; failures are checked via exit codes
 $root = Split-Path $PSScriptRoot -Parent
 $git = Join-Path $root "runtime\git\cmd\git.exe"
@@ -30,7 +31,10 @@ try {
         & $git commit -q -F $msgFile
         Remove-Item $msgFile -ErrorAction SilentlyContinue
         Say ("Committed " + @($pending).Count + " changed file(s): " + $Message) "Cyan"
-    } else { Say "No code changes since the last snapshot." }
+    } else {
+        Say "No code changes since the last snapshot."
+        if ($IfChanged -and -not $Full) { exit 0 }
+    }
 
     # 2. portable copy of the whole history (one file, restorable with git clone)
     $codeDir = Join-Path $Target "code"
