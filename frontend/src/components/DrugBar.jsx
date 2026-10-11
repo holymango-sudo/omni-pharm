@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import DoseEditor, { doseLabel } from "./DoseEditor.jsx";
+import SymptomFinder from "./SymptomFinder.jsx";
 
 export const SCENARIOS = [
   { name: "타이레놀 + 와파린", drugs: ["타이레놀", "와파린"] },
@@ -16,8 +17,9 @@ export const SCENARIOS = [
 const LIFESTYLE = [["🍺", "술"], ["🍊", "자몽주스"], ["🥛", "우유"], ["☕", "커피"], ["🥬", "녹색채소"], ["🚬", "흡연"]];
 const isFood = (d) => d.molecules?.length > 0 && d.molecules.every((m) => m.category === "음식·생활");
 
-export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario, onPredict, onDose, busy }) {
+export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario, onPredict, onDose, busy, patientPayload }) {
   const [q, setQ] = useState("");
+  const [finder, setFinder] = useState(false);
   const [editing, setEditing] = useState(null);
   const [hits, setHits] = useState([]);
   const [focus, setFocus] = useState(false);
@@ -44,7 +46,14 @@ export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario,
 
   return (
     <div className="drugbar">
-      <div className="panel-title"><span className="idx">02</span> 3D 약물 합성 — 약물 검색</div>
+      <div className="panel-title"><span className="idx">02</span> 3D 약물 합성 — 약물 검색
+        <button className={`btn mini sym-open ${finder ? "on" : ""}`} onClick={() => setFinder(!finder)}
+          title="감기·두통 등 증상을 고르면 이 환자에게 맞는 일반의약품을 찾아 줍니다">🤒 증상으로 약 찾기</button>
+      </div>
+      {finder && (
+        <SymptomFinder patient={patientPayload} drugs={drugs.filter((d) => d.status === "ok").map((d) => d.name)}
+          onAdd={(n) => onAdd(n)} onClose={() => setFinder(false)} />
+      )}
       <div className="search-wrap">
         <input ref={input} className="search" value={q} placeholder="국내·해외 제품명(콜대원, NyQuil, Doliprane, ロキソニン…), 성분명(와파린, warfarin), 또는 SMILES"
           onChange={(e) => { setQ(e.target.value); setSel(0); }}

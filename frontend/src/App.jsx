@@ -7,6 +7,7 @@ import PatientPanel, { PRESETS } from "./components/PatientPanel.jsx";
 import DrugBar from "./components/DrugBar.jsx";
 import ResultPanel from "./components/ResultPanel.jsx";
 import DetailDrawer from "./components/DetailDrawer.jsx";
+import ChatPanel from "./components/ChatPanel.jsx";
 import { printReport } from "./print.js";
 
 const now = () => performance.now() / 1000;
@@ -69,6 +70,7 @@ export default function App() {
   const wide = useWide();
   // after a prediction the center stage switches from the molecules to the drugs' journey through the body
   const [view, setView] = useState("mol");
+  const [chatOpen, setChatOpen] = useState(false);
   const bodyTimer = useRef(null);
   const journey = useJourney(view === "body" ? res?.pathway : null);
   const showBody = view === "body" && !!res?.pathway;
@@ -288,7 +290,7 @@ export default function App() {
           ) : (
             <DrugBar drugs={drugs} onAdd={addDrug} onRemove={removeDrug} onReplace={replaceDrug} onScenario={scenario}
               onDose={(name, dose) => { resetResult(); setDrugs((ds) => ds.map((d) => (d.name === name ? { ...d, dose } : d))); }}
-              onPredict={predict} busy={busy} />
+              onPredict={predict} busy={busy} patientPayload={payload} />
           )}
         </section>
         <ResultPanel res={res} report={report} streaming={streaming} showReport={!!res} expert={expert}
@@ -299,6 +301,13 @@ export default function App() {
         {res && <span className="mono"> · 추론 {res.elapsed_ms}ms</span>}
       </footer>
       {drawer && <DetailDrawer res={res} initial={drawer} onClose={() => setDrawer(null)} />}
+      {!chatOpen && (
+        <button className={`chat-fab ${res ? "ready" : ""}`} onClick={() => setChatOpen(true)}
+          title={res ? "방금 분석한 약에 대해 물어보세요" : "예측 후 질문할 수 있습니다"}>
+          💬 AI 복약 상담{res && <small>질문하기</small>}
+        </button>
+      )}
+      <ChatPanel res={res} open={chatOpen} onClose={() => setChatOpen(false)} />
       {help && !needPin && !needLogin && <HelpModal onClose={closeHelp} />}
       {needLogin && <LoginModal onLogin={doLogin} />}
       {needPin && <PinModal onSubmit={(p) => { setPin(p); setNeedPin(false); loadAll(); }} />}

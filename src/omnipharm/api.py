@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from omnipharm import fhir, security
+from omnipharm import fhir, recommend, security
 from omnipharm.clinical import Patient, assess
 from omnipharm.config import VERSION, settings
 from omnipharm.dosing import Dose
@@ -40,6 +40,7 @@ log = logging.getLogger("omnipharm.api")
 logging.getLogger("httpx").setLevel(logging.WARNING)  # request URLs may contain API keys
 E: dict = {}
 REPORTS: OrderedDict[str, dict] = OrderedDict()  # report_id -> fact sheet (bounded LRU)
+CHATS: OrderedDict[str, dict] = OrderedDict()  # report_id -> what the AI 상담 may rely on (memory only, never saved)
 FIELD_KO = {"age": "나이", "weight_kg": "몸무게", "height_cm": "키", "scr": "크레아티닌", "egfr": "eGFR",
             "ast": "AST", "alt": "ALT", "total_bilirubin": "빌리루빈", "drugs": "약물 목록", "name": "약물명"}
 
@@ -294,8 +295,11 @@ async def _predict(req: PredictRequest) -> dict:
     res["version"] = VERSION
     rid = uuid.uuid4().hex[:12]
     REPORTS[rid] = llm.fact_sheet(res, req.patient.model_dump())
+    CHATS[rid] = llm.chat_context(res, req.patient.model_dump())
     while len(REPORTS) > 200:
         REPORTS.popitem(last=False)
+    while len(CHATS) > 200:
+        CHATS.popitem(last=False)
     res["report_id"] = rid
     return res
 
@@ -314,6 +318,58 @@ async def report(rid: str, request: Request):
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+class ChatTurn(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., max_length=4000)
+
+
+class ChatRequest(BaseModel):
+    report_id: str = Field(..., min_length=6, max_length=40)
+    question: str = Field(..., min_length=1, max_length=600)
+    history: list[ChatTurn] = Field(default_factory=list, max_length=20)
+
+
+@app.post("/api/v1/chat")
+async def chat(req: ChatRequest, request: Request):
+    """AI 복약 상담: questions about one analysis, answered from its facts by the local LLM (streamed).
+    The question is not logged (it may contain health details) - only that a question was asked."""
+    ctx = CHATS.get(req.report_id)
+    if ctx is None:
+        raise HTTPException(404, {"message": "분석 결과를 찾을 수 없습니다 (서버가 재시작되었을 수 있습니다). 다시 예측하세요."})
+    security.audit("chat", _who(request), _client(request), report_id=req.report_id, chars=len(req.question))
+
+    async def gen():
+        async for tok in llm.stream_chat(ctx, [h.model_dump() for h in req.history], req.question):
+            yield f"data: {json.dumps({'t': tok}, ensure_ascii=False)}\n\n"
+        yield "event: done\ndata: {}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.get("/api/v1/symptoms")
+def symptoms():
+    return recommend.catalog()
+
+
+class RecommendRequest(BaseModel):
+    symptoms: list[str] = Field(..., min_length=1, max_length=8)
+    drugs: list[str] = Field(default_factory=list, max_length=15)
+    patient: Patient = Field(default_factory=Patient)
+
+
+@app.post("/api/v1/recommend")
+async def recommend_drugs(req: RecommendRequest):
+    """'증상으로 약 찾기': OTC options per symptom, screened against this patient and the medicines already entered."""
+    eng: Engine = E["engine"]
+    current = []
+    for name in req.drugs:
+        ings, _info, err = await _resolve(name)
+        if not err:
+            current.append({"input": name, "ingredients": ings})
+    return await asyncio.to_thread(recommend.recommend, eng, req.symptoms, current, req.patient)
 
 
 # --------------------------------------------------------------------------- built React UI

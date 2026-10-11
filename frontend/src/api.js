@@ -49,6 +49,47 @@ export const api = {
   molecule: (name) => req("molecule", { method: "POST", body: JSON.stringify({ name }) }),
   // drugs: [{name, dose?}] - dose = {amount, unit, per_day, days, prn, weekly}
   predict: (drugs, patient) => req("predict", { method: "POST", body: JSON.stringify({ drugs, patient }) }),
+  symptoms: () => req("symptoms"),
+  recommend: (symptoms, drugs, patient) => req("recommend", { method: "POST", body: JSON.stringify({ symptoms, drugs, patient }) }),
+  /** AI 복약 상담: POST + streamed server-sent events; returns a function that stops the answer */
+  chat(body, onToken, onDone) {
+    const ctrl = new AbortController();
+    const token = getToken();
+    (async () => {
+      try {
+        const r = await fetch("/api/v1/chat", {
+          method: "POST", signal: ctrl.signal, body: JSON.stringify(body),
+          headers: { "Content-Type": "application/json", "X-Access-PIN": getPin(), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        });
+        if (!r.ok) {
+          const b = await r.json().catch(() => ({}));
+          onToken(`⚠ ${b.detail?.message || `요청 실패 (HTTP ${r.status})`}`);
+          onDone();
+          return;
+        }
+        const reader = r.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf("\n\n")) >= 0) {
+            const evt = buf.slice(0, i);
+            buf = buf.slice(i + 2);
+            const data = evt.split("\n").find((l) => l.startsWith("data: "));
+            if (evt.startsWith("event: done")) continue;
+            if (data) onToken(JSON.parse(data.slice(6)).t || "");
+          }
+        }
+      } catch (e) {
+        if (e.name !== "AbortError") onToken("⚠ 서버에 연결할 수 없습니다.");
+      }
+      onDone();
+    })();
+    return () => ctrl.abort();
+  },
   streamReport(id, onToken, onDone) {
     const pin = getPin();
     const token = getToken();

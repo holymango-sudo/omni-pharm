@@ -953,6 +953,28 @@ class Engine:
                                 "excerpt": "…" + " ".join(text[s:e].split()) + "…"})
         return out
 
+    def pair_level(self, A: Ingredient, B: Ingredient) -> tuple[str, str | None]:
+        """The pair verdict of predict() for one pair, with its main reason (used to screen suggested medicines)."""
+        lev = [] if (_minor(A) and _minor(B)) else self._label_evidence(A, B)
+        for e in lev:
+            e["context"] = _context(e)
+        own = _own(lev)
+        contra = any(e["section"] == "병용금기/금기"
+                     or (e["section"] == "박스 경고" and BOXED_COMBINATION.search(_about(e))
+                         and not AMOUNT_ONLY.search(_about(e))) for e in own)
+        strong = any(SEVERE_LABEL.search(_about(e)) and not AMOUNT_ONLY.search(_about(e)) for e in own
+                     if e["section"] in ("상호작용", "병용금기/금기", "박스 경고"))
+        mech = self._mechanism(A, B)
+        dur = self.dur_pairs.get(frozenset((A.bare, B.bare)))
+        if dur:
+            return "높음", "식약처 DUR 병용금기" + (f" — {dur['content']}" if dur.get("content") else "")
+        severe = next((m["text"] for m in mech if m.get("severe")), None)
+        if contra or strong or severe:
+            return "높음", severe or "허가 문서에 피해야 하는 조합으로 기재"
+        if own or mech:
+            return "주의", mech[0]["text"] if mech else "허가 문서에 상호작용으로 기재"
+        return "낮음", None
+
     # ------------------------------------------------------------------ prediction
     def predict(self, products: list[dict], patient: Patient) -> dict:
         with self.lock:

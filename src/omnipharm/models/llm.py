@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import AsyncIterator
 
 import httpx
@@ -190,6 +191,98 @@ async def stream_report(facts: dict) -> AsyncIterator[str]:
             if not sent:
                 yield template_report(facts)
             return
+
+
+# --------------------------------------------------------------------------- AI 복약 상담 (questions about one analysis)
+CHAT_SYSTEM = """당신은 'AI 복약 상담'입니다. 환자나 보호자가 방금 분석한 약 조합에 대해 묻는 질문에 한국어로 답합니다.
+당신은 의사·약사가 아니며 진단·처방을 하지 않습니다. 아래 [분석 결과]가 이 시스템의 결론이고, 당신의 답은 이와 어긋나면 안 됩니다.
+규칙 (반드시 지킬 것):
+- [분석 결과]에 있는 사실을 우선 근거로 쓰세요. 일반적으로 잘 알려진 약 상식(식후 복용, 물과 함께 등)은 써도 되지만 '일반적으로'라고 밝히세요.
+- [분석 결과]에 없는 용량(mg)·횟수·검사 수치를 새로 만들지 마세요. 용량은 '정해진 용법' 또는 결과에 있는 최대량만 말하세요.
+- 처방약을 끊거나 바꾸라고 하지 마세요. '의사·약사와 상의'로 안내하세요. 다른 약 이름을 새로 추천하지 마세요
+  (단, [분석 결과]의 '증상추천'에 있는 성분은 언급 가능).
+- 위험 판정(병용금기·DUR·피해야 함)은 그대로 전하세요. 괜찮다고 안심시키지 마세요.
+- 숨이 차거나 의식이 흐림, 경련, 가슴 통증, 피를 토함·검은 변, 심한 알레르기(입술·혀 부음), 과량 복용, 자해 생각 → 즉시 119 또는 응급실을 먼저 안내하세요.
+- 질문이 약·건강과 무관하면 정중히 이 분석에 대한 질문을 해 달라고 하세요.
+- 쉬운 말로, 핵심부터, 200단어 이내. 필요하면 짧은 불릿('- ')을 쓰세요. 마지막 줄에 근거 출처를 짧게 적으세요(예: '근거: 식약처 DUR, FDA 라벨').
+- 모르는 것은 모른다고 하고 약사·의사에게 확인하라고 하세요."""
+EMERGENCY = re.compile(r"숨[이을]? ?(차|막|못)|호흡곤란|의식|정신을 잃|경련|발작|가슴[이 ]*(아프|통증|조여)|흉통|피를 토|토혈|"
+                       r"검은 ?변|혈변|입술.*부|혀.*부|목이 붓|과다 ?복용|많이 먹었|한꺼번에.*먹|통째로.*먹었|죽고 싶|자살|자해")
+EMERGENCY_TEXT = ("**⚠ 응급 신호일 수 있습니다.** 지금 숨이 차거나, 의식이 흐리거나, 경련·가슴 통증·피를 토하거나 검은 변, "
+                  "입술·혀가 붓는 증상, 또는 약을 너무 많이 먹었다면 **바로 119에 전화하거나 응급실로 가세요.** "
+                  "(약 중독 상담: 119 구급상황관리센터)\n\n")
+
+
+def chat_context(res: dict, patient: dict) -> dict:
+    """What the chat may rely on: the report facts + the time course / release form / suggestions of this analysis."""
+    facts = fact_sheet(res, patient)
+    j = res.get("pathway") or {}
+    pk = []
+    for d in j.get("drugs", []):
+        p, r = d.get("pk") or {}, d.get("regimen") or {}
+        rel = {"ER": "서방형", "DR": "장용형"}.get(d.get("release"), "")
+        name = f"{d['name']}({rel})" if rel else d["name"]
+        freq = "주 1회" if r.get("weekly") else f"하루 {r.get('per_day')}회"
+        pk.append(f"{name}: 복용 후 최고 농도 약 {p.get('tmax_h')}시간, 반감기 약 {p.get('t_half_h')}시간, "
+                  f"{freq}({r.get('source', '')}) [{p.get('source', '')}]")
+    facts["약동학(복용 후 시간)"] = pk
+    facts["몸속단계"] = [f"{s['title']}: {(s.get('time') or {}).get('label', '')} — {s['text'][:160]}" for s in j.get("stages", [])]
+    c = j.get("clock") or {}
+    if c:
+        facts["시간축기준"] = (f"{c.get('name')} 기준, 반감기 {c.get('t_half_h')}시간"
+                          + (f" → 이 조합에서 {c.get('t_half_eff_h')}시간" if abs((c.get('fold') or 1) - 1) > 0.15 else ""))
+    facts["복용제품"] = [f"{p['input']} = {', '.join(p['ingredients'])}" for p in res.get("products", [])]
+    return _prune(facts)
+
+
+def chat_fallback(ctx: dict, question: str) -> str:
+    """No local LLM: answer from the facts with simple keyword routing (no free text)."""
+    q = question
+    lines = []
+    if re.search(r"언제|몇 ?시간|간격|시간|얼마나|오래", q):
+        lines += [f"- {x}" for x in ctx.get("약동학(복용 후 시간)", [])[:4]]
+    if re.search(r"술|자몽|우유|커피|담배|흡연|음식", q):
+        lines += [f"- {x}" for x in ctx.get("판정이유", []) if re.search(r"술|자몽|우유|커피|흡연|녹색", x)][:4]
+    if not lines:
+        lines += [f"- {x}" for x in ctx.get("판정이유", [])[:4]]
+    lines += [f"- 할 일: {a}" for a in ctx.get("권고", [])[:3]]
+    return ("로컬 AI가 실행 중이 아니어서 분석 결과에서 관련 내용을 찾아 보여 드립니다.\n\n" + "\n".join(lines or ["- 관련 정보가 없습니다."])
+            + "\n\n자세한 내용은 약사·의사와 상의하세요.")
+
+
+async def stream_chat(ctx: dict, history: list[dict], question: str) -> AsyncIterator[str]:
+    if EMERGENCY.search(question):
+        yield EMERGENCY_TEXT
+    system = CHAT_SYSTEM + "\n\n[분석 결과]\n```json\n" + json.dumps(ctx, ensure_ascii=False, indent=1) + "\n```"
+    msgs = [{"role": "system", "content": system}]
+    for h in history[-8:]:
+        if h.get("role") in ("user", "assistant") and h.get("content"):
+            msgs.append({"role": h["role"], "content": str(h["content"])[:2000]})
+    msgs.append({"role": "user", "content": question})
+    body = {"model": settings.llm_model, "stream": True, "keep_alive": "30m", "messages": msgs,
+            "options": {"temperature": 0.3, "num_ctx": 8192, "num_predict": 700}}
+    if await _thinks(settings.llm_model):
+        body["think"] = False
+    sent = False
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=3.0)) as c:
+            async with c.stream("POST", f"{settings.ollama_url}/api/chat", json=body) as r:
+                if r.status_code != 200:
+                    raise RuntimeError(f"Ollama HTTP {r.status_code}")
+                async for line in r.aiter_lines():
+                    if not line:
+                        continue
+                    msg = json.loads(line)
+                    tok = msg.get("message", {}).get("content", "")
+                    if tok:
+                        sent = True
+                        yield tok
+                    if msg.get("done"):
+                        return
+    except Exception as e:
+        log.warning(f"chat LLM unavailable ({e}); fact-based answer")
+        if not sent:
+            yield chat_fallback(ctx, question)
 
 
 async def llm_available() -> bool:
