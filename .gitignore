@@ -1,0 +1,42 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Data & artifacts (large / licensed - never commit)
+data/raw/
+data/interim/
+data/processed/
+artifacts/
+logs/
+*.parquet
+*.pt
+*.ckpt
+
+# Secrets (API key, user password hashes) and bundled runtimes / model files
+.env
+*.key
+config/users.json
+runtime/
+data/cache/
+
+# Node
+node_modules/
+frontend/dist/
+
+# local tool settings, backup archives
+.claude/
+backups/
+*.bundle
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
