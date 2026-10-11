@@ -118,6 +118,7 @@ def test_quick_check_runs_the_engine_with_the_analysis(eng):
     assert assistant.quick_check(eng, base, "타이레놀", old) is None  # already in the analysis
     alone = assistant.quick_check(eng, [], "박카스", Patient(**ADULT))
     assert alone["확인한 제품"].startswith("박카스") and "하나만" in alone["함께 먹을 때 판정"]
+    assert any("카페인" in x and "400mg" in x for x in alone["1일최대량(허가기준·이 환자)"])  # '하루 몇 병?' is grounded
     assert assistant.lookups(eng, "오늘 날씨 어때?", base, old) == []
 
 

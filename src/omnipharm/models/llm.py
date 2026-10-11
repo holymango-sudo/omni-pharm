@@ -225,7 +225,11 @@ CHAT_SYSTEM = """당신은 OMNI-PHARM의 'AI 복약 상담'입니다. 친절하�
   이 사람에게 맞는 후보를 확인하라고 안내하세요.
 - 모르는 것은 모른다고 하고 약사·의사에게 확인하라고 하세요.
 
+- '하루 몇 개(병·알)까지?' 질문은 [방금 확인한 결과]의 '1개당 함량'과 '1일최대량'으로 계산해 답하고, 커피 등 같은 성분을
+  함께 먹으면 합쳐서 세야 한다고 알려 주세요. 두 숫자가 없으면 '제품 설명서의 용법'을 따르라고 하세요.
+
 형식: 쉬운 말로 핵심부터. 짧은 질문에는 짧게, 보통 250단어 이내. 필요하면 짧은 불릿('- ').
+대화 중이므로 매 답변을 인사('안녕하세요')나 자기소개로 시작하지 말고, 자신의 말투·역할을 설명하지 마세요.
 약·건강에 대한 답이면 마지막 줄에 '근거: ...'를 적되, '근거종류' 목록에 있는 이름만 쓰고(없는 출처를 지어내지 말 것)
 일반 지식으로 답한 부분은 '일반 복약 상식'이라고 쓰세요. 일상 대화에는 근거 줄을 쓰지 마세요."""
 EMERGENCY = re.compile(r"숨[이을]? ?(차|막|못)|호흡곤란|의식|정신을 잃|경련|발작|가슴[이 ]*(아프|통증|조여)|흉통|피를 토|토혈|"
@@ -303,7 +307,7 @@ def lookup_block(found: list[dict]) -> str:
     """The quick checks of the medicines / foods named in the question, attached to that question."""
     if not found:
         return ""
-    return "\n\n[방금 확인한 결과]\n```json\n" + json.dumps(found, ensure_ascii=False, indent=1) + "\n```"
+    return "\n\n[방금 확인한 결과]\n```json\n" + json.dumps(_prune(found), ensure_ascii=False, indent=1) + "\n```"
 
 
 def chat_fallback(ctx: dict, question: str, found: list[dict] | None = None) -> str:
@@ -343,26 +347,33 @@ async def stream_chat(ctx: dict, history: list[dict], question: str,
             "options": {"temperature": 0.4, "num_ctx": 8192, "num_predict": 800}}
     if await _thinks(settings.llm_model):
         body["think"] = False
-    sent = False
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=3.0)) as c:
-            async with c.stream("POST", f"{settings.ollama_url}/api/chat", json=body) as r:
-                if r.status_code != 200:
-                    raise RuntimeError(f"Ollama HTTP {r.status_code}")
-                async for line in r.aiter_lines():
-                    if not line:
-                        continue
-                    msg = json.loads(line)
-                    tok = msg.get("message", {}).get("content", "")
-                    if tok:
-                        sent = True
-                        yield tok
-                    if msg.get("done"):
-                        return
-    except Exception as e:
-        log.warning(f"chat LLM unavailable ({e}); fact-based answer")
-        if not sent:
-            yield chat_fallback(ctx, question, found)
+    import asyncio
+
+    for attempt in range(2):  # right after start-up the model may still be loading into VRAM
+        sent = False
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=3.0)) as c:
+                async with c.stream("POST", f"{settings.ollama_url}/api/chat", json=body) as r:
+                    if r.status_code != 200:
+                        raise RuntimeError(f"Ollama HTTP {r.status_code}")
+                    async for line in r.aiter_lines():
+                        if not line:
+                            continue
+                        msg = json.loads(line)
+                        tok = msg.get("message", {}).get("content", "")
+                        if tok:
+                            sent = True
+                            yield tok
+                        if msg.get("done"):
+                            return
+        except Exception as e:
+            if attempt == 0 and not sent:
+                await asyncio.sleep(4)
+                continue
+            log.warning(f"chat LLM unavailable ({e}); fact-based answer")
+            if not sent:
+                yield chat_fallback(ctx, question, found)
+            return
 
 
 async def llm_available() -> bool:

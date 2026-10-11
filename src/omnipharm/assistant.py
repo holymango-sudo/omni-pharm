@@ -11,6 +11,7 @@ import logging
 import re
 
 from omnipharm.clinical import Patient
+from omnipharm.dosing import effective_limit, fmt_mg
 from omnipharm.engine import ResolveError
 from omnipharm.knowledge import FOOD_ALIAS
 
@@ -99,8 +100,8 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     keys = {g.key for g in ings}
     if not keys or keys <= {g.key for p in base for g in p["ingredients"]}:
         return None  # already in the analysis ('타이레놀' asked about while 타이레놀정500 is analysed)
-    products = base + [{"input": name, "ingredients": ings, "product": info.get("product"), "release": info.get("release"),
-                        "strength": info.get("strength")}]
+    products = [*base, {"input": name, "ingredients": ings, "product": info.get("product"),
+                        "release": info.get("release"), "strength": info.get("strength")}]
     r = eng.predict(products, patient)
     s = r["summary"]
     names = [eng.ko(g) for g in ings]
@@ -118,11 +119,28 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     else:
         verdict = f"{s['verdict']} (추가해도 판정 변화 없음)" if base_verdict else s["verdict"]
     shown = ", ".join(names[:5]) + (f" 외 {len(names) - 5}개" if len(names) > 5 else "")
+    # how much is in one unit and the labelled daily maximum for this patient: '하루 몇 병?' gets a grounded answer
+    st = info.get("strength") or {}
+    content = [f"{eng.ko(g)} {fmt_mg(st['mg'][g.key])}" for g in ings if (st.get("mg") or {}).get(g.key)]
+    pa = r.get("patient") or {}
+    lctx = {"crcl": (pa.get("kidney") or {}).get("clearance"), "age": patient.age,
+            "sex": (patient.sex or "").upper()[:1] or None, "weight": patient.weight_kg,
+            "hepatic": bool((pa.get("flags") or {}).get("hepatic"))}
+    limits = []
+    for g in ings:
+        lim = effective_limit(g.key, lctx, er=info.get("release") == "ER")
+        if lim:
+            mx, warn, single, why = lim
+            limits.append(f"{eng.ko(g)}: 1일 최대 {fmt_mg(mx)}" + (f"(일반약 자가복용 기준 {fmt_mg(warn)})" if warn else "")
+                          + (f", 1회 최대 {fmt_mg(single)}" if single else "") + (f" — {', '.join(why)} 반영" if why else "")
+                          + " (다른 약·음료의 같은 성분과 합쳐서)")
     return {"확인한 제품": f"{name} = {shown}", "함께 먹을 때 판정": verdict,
+            "1개당 함량": f"{st.get('unit') or '1회 단위'}당 " + ", ".join(content) if content else None,
+            "1일최대량(허가기준·이 환자)": limits,
             "이 제품 관련 이유": [x["text"] for x in s["reasons"] if x["sev"] != "low" and mine(x["text"])][:5],
             "이 제품 관련 참고": [x["text"] for x in s["reasons"] if x["sev"] == "low" and mine(x["text"])][:2],
             "할 일": s["advice"][:3], "상호작용": pairs,
-            "근거종류": sorted(_sources(r, keys, names))}
+            "근거종류": sorted(_sources(r, keys, names) | ({"허가 용량 기준"} if limits else set()))}
 
 
 def _sources(r: dict, keys: set[str], names: list[str]) -> set[str]:
