@@ -288,7 +288,7 @@ async def _predict(req: PredictRequest) -> dict:
         if ctl:  # harm reduction: dangerous combinations yes, amounts never (no dose check for these)
             controlled.append({**ctl, "input": d.name, "keys": [g.key for g in ings]})
         products.append({"input": d.name, "ingredients": ings, "product": info["product"],
-                         "dose": None if ctl else d.dose,
+                         "dose": None if ctl else d.dose, "controlled": ctl,
                          "strength": info.get("strength"), "release": info.get("release"),
                          "label_ko": info.get("label_ko")})
         if info["unresolved"]:
@@ -369,7 +369,7 @@ async def chat(req: ChatRequest, request: Request):
             if not err:
                 base.append({"input": name, "ingredients": ings, "product": info["product"],
                              "strength": info.get("strength"), "release": info.get("release"),
-                             "label_ko": info.get("label_ko")})
+                             "label_ko": info.get("label_ko"), "controlled": info.get("controlled")})
         ctx = llm.general_context(assess(patient), patient.model_dump())
         if base:
             ctx["입력한 약(아직 조합 분석 전)"] = [f"{p['input']} = {', '.join(eng.ko(g) for g in p['ingredients'])}"

@@ -26,6 +26,7 @@ import numpy as np
 import pandas as pd
 import torch
 
+from omnipharm import recreational
 from omnipharm.chem.conformer import mol_3d
 from omnipharm.chem.featurize import MoleculeError, smiles_to_graph, standardize
 from omnipharm.clinical import Patient, assess
@@ -58,7 +59,6 @@ from omnipharm.knowledge import (
     resolve_korean,
     structureless_category,
 )
-from omnipharm import recreational
 from omnipharm.models.gnn import FingerprintEncoder, OmniPharmModel, RegimenPatientModel
 from omnipharm.models.patient import MAX_DRUGS, PATIENT_DIM, patient_vector
 from omnipharm.release import RELEASE_KO, release_of
@@ -1300,6 +1300,8 @@ class Engine:
         elif dosing["alerts"] and overall == "낮음":
             overall = "주의"
         prn_keys = {g.key for p in products if p.get("dose") is not None and p["dose"].prn for g in p["ingredients"]}
+        # recreational / controlled substances (recreational.py): the advice never suggests an amount for them
+        ctl_keys = {g.key for p in products if p.get("controlled") for g in p["ingredients"]}
 
         top = sorted([e for e in events if e["serious"] and e["prob"] >= MIN_P and e["lift"] >= 1.5],
                      key=lambda e: -(e["lift"] * np.sqrt(e["prob"])))[:2]
@@ -1334,7 +1336,7 @@ class Engine:
                 e["level_word"] = "약간 높음"  # nausea, headache ...: worth knowing, not a red alarm
         events = sorted(events, key=lambda e: -e["lift"] * np.sqrt(e["prob"]) * (1.5 if e["serious"] else 1))
         summary = self._summary(overall, duplicates, class_dups, disease_alerts, pair_rows, events, pa,
-                                dosing, prn_keys)
+                                dosing, prn_keys, ctl_keys)
         special = [p["input"] for p in products if p["release"] in ("ER", "DR")]
         if special:  # crushing / chewing an extended-release tablet releases the whole dose at once (dose dumping)
             forms = "/".join(sorted({RELEASE_KO[p["release"]] for p in products if p["input"] in special}))
@@ -1433,10 +1435,16 @@ class Engine:
         return sorted(found.values(), key=lambda d: -rank[d["severity"]])
 
     def _summary(self, overall, duplicates, class_dups, disease_alerts, pair_rows, events, pa,
-                 dosing=None, prn_keys=frozenset()) -> dict:
-        """Plain-language verdict for people who are not clinicians: what is wrong and what to do."""
+                 dosing=None, prn_keys=frozenset(), ctl_keys=frozenset()) -> dict:
+        """Plain-language verdict for people who are not clinicians: what is wrong and what to do.
+        ctl_keys = ingredients of recreational / controlled substances: 'do not combine', never 'adjust the dose'."""
         reasons: list[dict] = []
         advice: list[str] = []
+
+        def avoid(r: dict) -> str | None:
+            if r["a_key"] in ctl_keys or r["b_key"] in ctl_keys:
+                return f"{r['a']}과(와) {r['b']}을(를) 함께 쓰지 마세요 — 위험 신호가 보이면 바로 119."
+            return None
         for a in (dosing or {}).get("alerts", []):
             reasons.append({"sev": "high" if a["sev"] == "금기" else "mid", "icon": "⚖️", "text": a["text"] + "."})
         if any(a["sev"] == "금기" for a in (dosing or {}).get("alerts", [])):
@@ -1491,16 +1499,18 @@ class Engine:
             elif "병용금기/금기" in secs:
                 reasons.append({"sev": "high", "icon": "⛔",
                                 "text": f"{r['a']}과(와) {r['b']}은(는) 허가 문서에 함께 쓰지 말라고 되어 있습니다."})
-                advice.append(f"{r['a']}과(와) {r['b']}을(를) 함께 복용하지 마세요.")
+                advice.append(avoid(r) or f"{r['a']}과(와) {r['b']}을(를) 함께 복용하지 마세요.")
             elif r["level"] == "높음" and not own and any(m.get("severe") for m in r.get("mechanism", [])):
                 m = next(m for m in r["mechanism"] if m.get("severe"))
                 reasons.append({"sev": "high", "icon": "🧬", "text": f"{r['a']} + {r['b']}: {m['text']}."})
-                advice.append(f"{r['a']}과(와) {r['b']}은(는) 보통 함께 쓰지 않거나 용량을 크게 줄입니다. 의사·약사와 상의하세요.")
+                advice.append(avoid(r) or f"{r['a']}과(와) {r['b']}은(는) 보통 함께 쓰지 않거나 용량을 크게 줄입니다. "
+                                           "의사·약사와 상의하세요.")
             elif r["level"] == "높음" and own:
                 reasons.append({"sev": "high", "icon": "📄",
                                 "text": f"{r['a']}과(와) {r['b']}은(는) 허가 문서에 '피하거나 용량을 줄여야 하는' "
                                         f"중대한 상호작용으로 적혀 있습니다."})
-                advice.append(f"{r['a']}과(와) {r['b']}을(를) 함께 써야 한다면 용량 조절·검사 계획을 의사·약사와 정하세요.")
+                advice.append(avoid(r) or f"{r['a']}과(와) {r['b']}을(를) 함께 써야 한다면 용량 조절·검사 계획을 "
+                                           "의사·약사와 정하세요.")
             elif not own and r.get("mechanism"):
                 m = r["mechanism"][0]
                 reasons.append({"sev": "mid", "icon": "📋" if m["kind"] == "규칙" else "🧬",
@@ -1564,6 +1574,9 @@ class Engine:
         headline = {"위험": "이 약 조합은 이 환자에게 위험할 수 있습니다.",
                     "주의": "주의가 필요한 조합입니다. 아래 이유를 확인하세요.",
                     "비교적 안전": "뚜렷한 위험 신호는 없습니다. 복약 안내는 그대로 지켜 주세요."}[verdict]
+        if ctl_keys:  # harm reduction instead of 'keep to the labelled dose' (kept within the 4 lines shown)
+            advice.insert(min(len(advice), 3), "혼자 쓰지 말고 다른 약·술과 섞지 마세요 — 위험 신호가 보이면 바로 119 "
+                                               "(마약류 24시간 익명 상담 1342).")
         if not advice:
             advice.append("새로운 증상이 생기면 복용을 멈추고 의사·약사와 상의하세요." if verdict != "비교적 안전"
                           else "정해진 용법·용량을 지키세요.")

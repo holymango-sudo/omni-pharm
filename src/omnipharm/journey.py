@@ -480,10 +480,13 @@ class Journey:
         # release form and dosing schedule of each ingredient (from the product it comes in and the dose entered)
         form_of: dict[str, str] = {}
         reg_of: dict[str, dict] = {}
+        controlled: set[str] = set()  # recreational substances: no repeated-dosing schedule in the body view
         for p in products or []:
             rel = p.get("release") or "IR"
             d = p.get("dose")
             for g in p["ingredients"]:
+                if p.get("controlled"):
+                    controlled.add(g.key)
                 if rel == "ER" or g.key not in form_of:
                     form_of[g.key] = rel
                 if d is not None and g.key not in reg_of:
@@ -502,6 +505,7 @@ class Journey:
                 for g in U}
         for k, v in info.items():
             v["regimen"] = reg_of.get(k) or default_regimen(v["release"], v["pk"]["t_half_h"], v["route"], v["kind"])
+            v["controlled"] = k in controlled
         pair_keys = [(self.by_key.get(r["a_key"]), self.by_key.get(r["b_key"]), r) for r in self.pairs]
         pair_keys = [(a, b, r) for a, b, r in pair_keys if a is not None and b is not None]
         levels: list[dict] = []

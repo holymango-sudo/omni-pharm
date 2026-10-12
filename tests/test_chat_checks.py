@@ -61,3 +61,14 @@ def test_numbers_and_sources_are_grounded():
     assert C.sources_allowed("…\n근거: [방금 확인한 결과]", allowed)
     assert C.sources_allowed("…\n근거: 상호작용 검사(문서·규칙 근거 없음)", {"상호작용 검사(문서·규칙 근거 없음)"}) is None
     assert C.mentions("하루 6알(3,000mg)", ["3,000", "6알"]) is None
+
+
+def test_controlled_substance_answers_give_no_amounts():
+    assert C.no_use_guidance("처음에는 0.5g 정도가 무난합니다.")
+    assert C.no_use_guidance("100mg 이하로 쓰세요.")
+    assert C.no_use_guidance("소량부터 시작하세요.")
+    assert C.no_use_guidance("효과가 약하면 한 번 더 하셔도 됩니다.")
+    ok = ("안전한 양은 없습니다. 술과 섞으면 호흡이 멈출 수 있어요. 소량만 써도 위험할 수 있고, 물은 조금씩 드세요. "
+          "응급 시 119, 마약류 24시간 익명 상담 1342. 끊은 뒤 14일, 2시간 간격")
+    assert C.no_use_guidance(ok) is None
+    assert llm.EMERGENCY.search("친구가 깨워도 안 일어나요") and llm.EMERGENCY.search("오버도즈 같아요")

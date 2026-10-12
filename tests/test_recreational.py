@@ -132,6 +132,9 @@ def test_api_result_card_no_amounts_and_masked_audit(eng, monkeypatch, tmp_path)
     ctl = res["controlled"]
     assert ctl and ctl[0]["key"] == "ghb" and "향정신성" in ctl[0]["law"] and ctl[0]["signs"]
     assert not (res.get("dosing") or {}).get("ingredients")  # the typed amount was not checked or echoed
+    advice = res["summary"]["advice"]
+    assert not any("용량" in a for a in advice) and any("1342" in a for a in advice), advice
+    assert any(d["controlled"] for d in res["pathway"]["drugs"])  # body view: no repeated-dosing schedule
     log = (tmp_path / "audit").glob("*.jsonl")
     lines = [json.loads(x) for f in log for x in f.read_text(encoding="utf-8").splitlines()]
     assert lines and lines[-1]["drugs"] == ["[규제물질]", "술"]

@@ -52,7 +52,9 @@ export function PKChart({ levels, drugs, colorOf, title, mode, defaultView = "si
   const rows = (levels || []).filter((l) => l.fold && Math.abs(Math.log(l.fold)) > 0.05).slice(0, 2);
   const shown = rows.length ? rows : (drugs || []).filter((d) => d.kind === "drug").slice(0, 1).map((d) => ({ drug: d.key, fold: 1 }));
   const byKey = Object.fromEntries((drugs || []).map((d) => [d.key, d]));
-  const repeat = view === "repeat";
+  // a recreational / controlled substance: one use only - no repeated-dosing schedule (harm reduction, not a regimen)
+  const ctl = shown.some((l) => byKey[l.drug]?.controlled);
+  const repeat = view === "repeat" && !ctl;
   const models = shown.map((l) => ({ l, m: drugModel(byKey[l.drug], l) }));
   // time window: one dose -> until ~97% gone; repeated -> to steady state (and the wash-out after the last dose)
   const effH = Math.max(...models.map(({ m }) => m.H * (m.ke / m.keX)), 1);
@@ -90,7 +92,7 @@ export function PKChart({ levels, drugs, colorOf, title, mode, defaultView = "si
       <div className="bj-ptitle">{title}
         <span className="bj-ptabs">
           <button className={!repeat ? "on" : ""} onClick={() => setView("single")}>1회 복용</button>
-          <button className={repeat ? "on" : ""} onClick={() => setView("repeat")}>반복 복용</button>
+          {!ctl && <button className={repeat ? "on" : ""} onClick={() => setView("repeat")}>반복 복용</button>}
         </span>
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="bj-pk" key={`${view}${title}`}>
@@ -102,7 +104,7 @@ export function PKChart({ levels, drugs, colorOf, title, mode, defaultView = "si
         <line x1={L} x2={W - R} y1={y(MTC)} y2={y(MTC)} className="pk-lim tox" />
         <line x1={L} x2={W - R} y1={y(MEC)} y2={y(MEC)} className="pk-lim" />
         <text x={W - R - 2} y={y(MTC) - 3} className="pk-note tox" textAnchor="end">독성 범위</text>
-        <text x={W - R - 2} y={(y(MTC) + y(MEC)) / 2 + 3} className="pk-note ok" textAnchor="end">치료 범위</text>
+        <text x={W - R - 2} y={(y(MTC) + y(MEC)) / 2 + 3} className="pk-note ok" textAnchor="end">{ctl ? "보통 범위" : "치료 범위"}</text>
         {ticks.map((t) => (
           <g key={t}><line x1={x(t)} x2={x(t)} y1={H - B} y2={H - B + 3} className="pk-ax" />
             <text x={x(t)} y={H - B + 13} className="pk-tick" textAnchor="middle">{fmtT(t)}</text></g>

@@ -109,7 +109,7 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     if not keys or keys <= {g.key for p in base for g in p["ingredients"]}:
         return None  # already in the analysis ('타이레놀' asked about while 타이레놀정500 is analysed)
     new = {"input": name, "ingredients": ings, "product": info.get("product"), "release": info.get("release"),
-           "strength": info.get("strength"), "label_ko": info.get("label_ko")}
+           "strength": info.get("strength"), "label_ko": info.get("label_ko"), "controlled": info.get("controlled")}
     r = eng.predict([*base, *also, new], patient)
     s = r["summary"]
     names = [eng.ko(g) for g in ings]
