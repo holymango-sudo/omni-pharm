@@ -49,6 +49,10 @@ SECTIONS_SAFE = """종합등급이 '낮음'입니다. 다음 3개 섹션으로 �
 
 
 HARM_REDUCTION_LINE = "응급 시 119 · 마약류 24시간 익명 상담 1342 (한국마약퇴치운동본부)"
+# fact keys of the daily limit and the Korean label usage (shared by chat_context and assistant.quick_check)
+LIMIT_KEY = "1일최대량(허가기준·이 환자 — 하루 몇 개 질문에 답할 값)"
+USAGE_KEY = "제품 설명서 용법(식약처)"
+USAGE_KEY_LIMITED = "제품 설명서 용법(식약처 — 일반 성인 기준, 하루 상한은 위의 이 환자 기준을 따를 것)"
 
 
 def ratio(x: float) -> str:
@@ -237,7 +241,7 @@ CHAT_SYSTEM = """당신은 OMNI-PHARM의 'AI 복약 상담'입니다. 친절하�
   (잠시 쉬는 것 포함)는 처방한 의사·약사에게 바로 확인하라고 안내하세요.
 - 위험 판정(병용금기·DUR·피해야 함)은 그대로 전하세요. 괜찮다고 안심시키지 마세요. 병용금기 조합은 용량을 줄이거나
   복용 간격을 두면 된다고 말하지 말고, 함께 쓰지 않아야 하며 대신할 방법은 처방한 의사·약사와 정하라고 안내하세요.
-- 근거에 없는 구체적 용량(mg·알 수)·검사 수치를 지어내지 마세요. 용량은 '1일최대량(허가기준·이 환자)'의 숫자나
+- 근거에 없는 구체적 용량(mg·알 수)·검사 수치를 지어내지 마세요. 용량은 '1일최대량(허가기준·이 환자 …)'의 숫자나
   '제품 설명서의 용법'으로 말하고, 여러 제품의 같은 성분은 합쳐서 계산한다고 알려 주세요.
 - 증상에 맞는 약을 고르려는 질문에는 성분 계열 정도만 일반적으로 설명하고, 화면의 '🤒 증상으로 약 찾기'로
   이 사람에게 맞는 후보를 확인하라고 안내하세요.
@@ -251,9 +255,12 @@ CHAT_SYSTEM = """당신은 OMNI-PHARM의 'AI 복약 상담'입니다. 친절하�
   한국에서의 법적 지위를 한 번 짧게 밝히고(나라·지역마다 법이 다름), 끊고 싶거나 걱정되면 마약류 24시간 익명 상담 1342를
   안내하세요. 근거 줄에는 '근거종류'에 있는 이름만 쓰세요.
 
-- '하루 몇 개(병·알)까지?' 질문은 '제품 설명서 용법(식약처)'이 있으면 그 용법(예: 1일 1회 1병, 15세 미만 복용 금지)을
-  그대로 먼저 알려 주고, '1개당 함량'과 '1일최대량'이 있으면 그것으로 계산해 덧붙이세요. '스스로 사 먹을 때' 기준이
-  있으면 그 숫자를 먼저 알려 주세요(더 높은 숫자는 의사 지시가 있을 때의 상한). 근거 줄에는 '허가 용량 기준'으로 쓰세요. 같은 성분이 든 다른 것과
+- '하루 몇 개(병·알)까지?' 질문은 '1일최대량(… 하루 몇 개 질문에 답할 값)'이 있으면 그 '스스로 사 먹을 때' 숫자를
+  먼저 알려 주고(더 높은 숫자는 의사 지시가 있을 때의 상한), 제품 설명서 용법은 1회량·횟수를 알려 주는 데 쓰세요. 제품 설명서의
+  하루 최대량(예: 4그램·8정)이 그 숫자보다 높으면 '의사 지시가 있을 때의 상한'이라고 구분하세요. 1일최대량이 없으면
+  '제품 설명서 용법(식약처)'(예: 1일 1회 1병, 15세 미만 복용 금지)을 그대로 알려 주세요. '1개당 함량'이 있으면 그것으로
+  알 수를 계산해 덧붙이되, 근거에 없는 함량(예: 500mg 제품 기준)은 지어내지 마세요.
+  근거 줄에는 '허가 용량 기준'으로 쓰세요. 같은 성분이 든 다른 것과
   합쳐서 세야 한다고 알려 주되, 실제로 그 성분이 든 것만 예로 드세요(카페인 → 커피·에너지음료, 아세트아미노펜 → 종합감기약
   등 다른 해열진통제). 근거가 하나도 없으면 '제품 설명서의 용법'을 따르라고 하세요.
 
@@ -295,9 +302,6 @@ def chat_context(res: dict, patient: dict) -> dict:
         facts["시간축기준"] = (f"{c.get('name')} 기준, 반감기 {c.get('t_half_h')}시간"
                           + (f" → 이 조합에서 {c.get('t_half_eff_h')}시간" if abs((c.get('fold') or 1) - 1) > 0.15 else ""))
     facts["복용제품"] = [f"{p['input']} = {', '.join(p['ingredients'])}" for p in res.get("products", [])]
-    # official Korean usage of quasi-drugs (박카스 '1일 1회 1병') - the per-bottle amount is not published
-    facts["제품 설명서 용법(식약처)"] = [f"{p['input']}: {p['usage'][:200]}" for p in res.get("products", [])
-                                if p.get("usage")]
     # labelled daily maximum for THIS patient (kidney / liver / age adjusted), so 'how many a day?' has a grounded answer
     from omnipharm.dosing import effective_limit, limit_text
 
@@ -313,7 +317,11 @@ def chat_context(res: dict, patient: dict) -> dict:
         lim = effective_limit(ing["key"], ctx, er=form.get(ing["key"]) == "ER")
         if lim:
             limits.append(limit_text(ing["display"], lim))
-    facts["1일최대량(허가기준·이 환자)"] = limits
+    facts[LIMIT_KEY] = limits
+    # official Korean usage (박카스 '1일 1회 1병', 일반의약품 용법). With a patient limit above, the label's general maximum
+    # ('1일 최대 4그램(8정)') must not be the answer for an elderly patient on warfarin: the key says so
+    usage = [f"{p['input']}: {p['usage'][:200]}" for p in res.get("products", []) if p.get("usage")]
+    facts[USAGE_KEY_LIMITED if limits else USAGE_KEY] = usage
     # which kinds of evidence this analysis actually has: the answer may cite only these
     src = set()
     for p in res.get("pairs", []):
@@ -324,10 +332,12 @@ def chat_context(res: dict, patient: dict) -> dict:
         if any(e.get("context") != "co_therapy" for e in p.get("label_evidence", [])):
             src.add("FDA 허가 라벨")
         for m in p.get("mechanism", []):
-            src.add("임상 규칙" if m["kind"] == "규칙" else "FDA CYP 지표표" if m["kind"] == "CYP-FDA" else "약리 기전(ChEMBL)")
+            from omnipharm.knowledge import mech_source
+
+            src.add(mech_source(m["kind"]))
     for d in res.get("disease_alerts", []):
         src.add("식약처 허가사항(제품 설명서)" if d.get("key") == "age_label" else "질환별 금기 기준(Beers·허가사항·DUR)")
-    if facts["제품 설명서 용법(식약처)"]:
+    if usage:
         src.add("식약처 허가사항(제품 설명서)")
     if (res.get("dosing") or {}).get("alerts") or limits:
         src.add("허가 용량 기준")

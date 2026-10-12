@@ -698,7 +698,7 @@ class Journey:
             ks = [a.key, b.key]
             mech = r.get("mechanism") or []
             dur = r.get("dur") or {}
-            rule = next((m for m in mech if m["kind"] in ("규칙", "PD", "QT")), None)
+            rule = next((m for m in mech if m["kind"] in ("규칙", "식약처허가", "PD", "QT")), None)
             cyp = next((m for m in mech if m["kind"] in ("CYP-FDA", "CYP")), None)
             clash = next((c for c in clashes if {c["victim"], c["perpetrator"]} == set(ks)), None)
             mechanism = None
@@ -706,7 +706,8 @@ class Journey:
                 source, text = "식약처 DUR 병용금기", (dur.get("content") or "").strip(" -•·") or "병용금기 성분 조합"
                 sites = place(text + " " + (rule or {}).get("text", ""), ks)
             elif rule:
-                source, text = "임상 규칙" if rule["kind"] == "규칙" else "약리 기전", rule["text"]
+                source = {"규칙": "임상 규칙", "식약처허가": "식약처 허가사항"}.get(rule["kind"], "약리 기전")
+                text = rule["text"]
                 sites = place(text, ks)
             elif cyp:
                 # a CYP clash shows up where the accumulated drug does harm (simvastatin -> muscle)

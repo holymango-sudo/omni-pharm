@@ -12,6 +12,9 @@
   dur           MFDS DUR rules + quasi-drugs       chembl       CYP / hERG / mechanism pharmacology
   labelsearch   full-text index of all FDA labels   pk           Tmax / half-life from FDA labels (body view)
   stats         95% CIs, significance tests, baselines for the trained models (GPU, ~30 min)
+  kr-labels     Korean labels of every Korean medicine (용법·주의사항, API key)
+  offsides      OFFSIDES single-drug signals (confirms 'a drug's own risk' lines)
+  chembl-dump   ChEMBL 37 full dump: drug indications + pharmacology for every molecule (after download_data.py)
 """
 
 from __future__ import annotations
@@ -31,7 +34,8 @@ def main() -> None:
     ap.add_argument("stage", choices=["twosides", "faers", "canada", "structures", "extend", "mfds", "dur", "world", "strengths",
                                       "chembl", "chembl-drugs", "labelsearch", "pk",
                                       "labels", "fdalabels",
-                                      "train-pair", "train-patient", "mol3d", "stats", "all"])
+                                      "train-pair", "train-patient", "mol3d", "stats", "kr-labels", "offsides",
+                                      "chembl-dump", "all"])
     ap.add_argument("--faers-start", default="2004Q1")  # legacy AERS 2004Q1-2012Q3 + FAERS
     ap.add_argument("--epochs", type=int, default=None)
     ap.add_argument("--max-drugs", type=int, default=None)
@@ -104,6 +108,15 @@ def main() -> None:
         elif s == "stats":
             from omnipharm.pipeline import stats
             stats.build()
+        elif s == "kr-labels":
+            from omnipharm.pipeline import kr_labels
+            kr_labels.build()
+        elif s == "offsides":
+            from omnipharm.pipeline import offsides
+            offsides.build()
+        elif s == "chembl-dump":
+            from omnipharm.pipeline import chembl_dump
+            chembl_dump.build()
     log.info(f"done in {(time.time() - t0) / 60:.1f} min")
 
 

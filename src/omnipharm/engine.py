@@ -42,6 +42,7 @@ from omnipharm.knowledge import (
     DRUG_CLASSES,
     DRUG_DISEASE_RULES,
     DRUG_SYNONYMS,
+    EVENT_INDICATION,
     FOODS,
     KR_BRANDS,
     KR_INGREDIENTS,
@@ -54,6 +55,7 @@ from omnipharm.knowledge import (
     drug_class,
     drug_groups,
     food_key,
+    kr_avoid_targets,
     lab_name,
     normalize_ingredient,
     resolve_korean,
@@ -330,14 +332,28 @@ class Engine:
             parts.append(pd.read_parquet(p / "kr_products.parquet").assign(country="KR"))
         if (p / "world_products.parquet").exists():
             parts.append(pd.read_parquet(p / "world_products.parquet"))
-        self.label_ko: dict[str, dict] = {}  # 의약외품 item_seq -> Korean label (용법·주의사항·연령 제한)
+        # Korean label (용법·주의사항·연령 제한) per product: "Q:<item_seq>" 의약외품 (stage "dur"), "D:<item_seq>" 의약품
+        # (stage "kr-labels"; the two registries number their items separately). Texts are cut to what the chat and
+        # the age check read, so 42k prescription labels do not fill the memory.
+        self.label_ko: dict[str, dict] = {}
         if (p / "kr_quasi_products.parquet").exists():  # 의약외품 (stage "dur")
             q = pd.read_parquet(p / "kr_quasi_products.parquet").assign(country="KR")
             parts.append(q)
             if "usage" in q.columns:
-                self.label_ko = {str(r.item_seq): {"usage": r.usage, "cautions": r.cautions,
-                                                   "min_age": None if pd.isna(r.min_age) else int(r.min_age)}
+                self.label_ko = {f"Q:{r.item_seq}": {"usage": r.usage, "cautions": r.cautions, "kind": "의약외품",
+                                                     "min_age": None if pd.isna(r.min_age) else int(r.min_age)}
                                  for r in q.itertuples() if r.usage or r.cautions}
+        if (p / "kr_labels.parquet").exists():
+            for r in pd.read_parquet(p / "kr_labels.parquet").itertuples():
+                if not (r.usage or r.cautions):
+                    continue
+                rx = "전문" in r.kind
+                self.label_ko[f"D:{r.item_seq}"] = {
+                    # a prescription medicine is taken as prescribed: the label dose is the licensed range only
+                    "usage": ("(전문의약품 허가 용법 — 처방받은 용법이 우선) " if rx else "") + r.usage[:800],
+                    "cautions": r.cautions[:2000], "kind": r.kind,
+                    "min_age": None if pd.isna(r.min_age) else int(r.min_age),
+                    "avoid_with": list(r.avoid_with)}
         cols = ["country", "item_seq", "name", "base", "company", "kind", "status", "ingredients", "unresolved"]
         prod = pd.concat([d[cols] for d in parts], ignore_index=True) if parts else pd.DataFrame(columns=cols)
         # ingredients without a structure (herbal, vitamins, minerals, antibodies ...) stay in the product as
@@ -444,6 +460,15 @@ class Engine:
         self.patient_metrics = _load_json(art / "patient_model_metrics.json")
         self.ablation = _load_json(art / "patient_model_nopatient_metrics.json")
         self.stats = _load_json(art / "stats_metrics.json")  # CIs / significance / baselines (stage "stats")
+        # OFFSIDES single-drug signals meeting the Evans criteria (stage "offsides"): {(drug name, event)}
+        off = p / "offsides.parquet"  # research-use data like TWOSIDES: not in commercial-safe mode
+        self.offsides: set[tuple[str, str]] = (
+            {(r.drug, r.condition) for r in pd.read_parquet(off).itertuples() if r.evans}
+            if off.exists() and not settings.commercial_safe else set())
+        # what each drug is given for (ChEMBL drug_indication, stage "chembl-dump"): ingredient key -> terms
+        ind = p / "drug_indications.parquet"
+        self.indications: dict[str, str] = (
+            {r.name: " | ".join(r.indications) for r in pd.read_parquet(ind).itertuples()} if ind.exists() else {})
         self.pair_models: list[tuple[str, OmniPharmModel, torch.Tensor]] = []
         self.pair_thr_unseen, self.pair_seen = None, set()
         self.patient_model = None
@@ -534,8 +559,8 @@ class Engine:
                 return ings, {"product": row["name"], "country": row["country"], "release": release_of(row["name"]),
                               "unresolved": list(row["unresolved"]),
                               "strength": self.strengths.get((row["country"], str(row["item_seq"]))),
-                              "label_ko": (self.label_ko.get(str(row["item_seq"])) if row["kind"] == "의약외품"
-                                           else None)}
+                              "label_ko": (self.label_ko.get(f"{'Q' if row['kind'] == '의약외품' else 'D'}:"
+                                                             f"{row['item_seq']}") if row["country"] == "KR" else None)}
             b = bio_key(text)  # peptide / protein product (위고비프리필드펜, 보톡스주 ...)
             if b:
                 return [self._bio(b)], {**info, "product": text if text.lower() != b else None}
@@ -938,6 +963,21 @@ class Engine:
                                         "(FDA 지표 약물표)"})
         return out
 
+    def _kr_label(self, a: Ingredient, b: Ingredient, kr_avoid: dict[str, list[tuple]]) -> list[dict]:
+        """Korean OTC label of a product in this analysis: '이 약을 복용하는 동안 다음의 약을 복용하지 말 것: 진정제' and the
+        other ingredient belongs to that class (knowledge.KR_AVOID_TERMS). The text names the product (the rule is
+        the product's), and the summary shows it as it is."""
+        out = []
+        for x, y in ((a, b), (b, a)):
+            for product, item, targets, level, own in kr_avoid.get(x.key, []):
+                if y.key in own:  # the same product: an intended combination
+                    continue
+                if targets & (drug_groups(y.key) | {y.bare}):
+                    out.append({"kind": "식약처허가", "severe": level == "높음",
+                                "text": f"{product} 제품 설명서(식약처 허가사항)에 '이 약을 복용하는 동안 {item}을(를) 복용하지 "
+                                        f"말 것'으로 되어 있고, {self.ko(y)}은(는) 여기에 해당합니다"})
+        return list({m["text"]: m for m in out}.values())[:2]
+
     @staticmethod
     def _pair_rules(a: Ingredient, b: Ingredient) -> list[dict]:
         """Class-level interactions stated in labelling (knowledge.PAIR_RULES), e.g. GLP-1 + insulin."""
@@ -1040,6 +1080,16 @@ class Engine:
                 prods_of.setdefault(g.key, set()).add(prod["input"])
         U = list(seen.values())
         order = [p["input"] for p in products]
+        # Korean OTC labels: 'do not take with …' lists of the products in this analysis, per ingredient
+        # (one ingredient carries the product's list, so the finding is shown once per product, not once per ingredient)
+        kr_avoid: dict[str, list[tuple]] = {}
+        for prod in products:
+            own = {g.key for g in prod["ingredients"]}
+            for item in (prod.get("label_ko") or {}).get("avoid_with") or []:
+                t = kr_avoid_targets(item)
+                if t and prod["ingredients"]:
+                    kr_avoid.setdefault(prod["ingredients"][0].key, []).append(
+                        (prod.get("product") or prod["input"], item, t[0], t[1], own))
         for g in U:  # one entry per ingredient, listing every product that supplies it
             if len(prods_of[g.key]) > 1:
                 # vitamins / minerals / caffeine in two products (energy drink + painkiller) are not an overdose by
@@ -1135,11 +1185,14 @@ class Engine:
                       "patient_factor": p / max(float(p_ref[c]), 1e-6),
                       "best_single": float(p_single[:, c].max()),
                       "combo_excess": p - float(p_single[:, c].max())}
-                if p_loo is not None:
-                    contrib = p - p_loo[:, c]
-                    ev["driver"] = self.ko(V[int(contrib.argmax())])
-                else:  # one drug in the model (the rest are foods / biologics): that drug
-                    ev["driver"] = self.ko(V[0])
+                drv = V[int((p - p_loo[:, c]).argmax())] if p_loo is not None else V[0]  # one drug: that drug
+                ev["driver"] = self.ko(drv)
+                # the same drug-event signal in OFFSIDES (single-drug, propensity-matched): a confirmed own risk -
+                # unless the event is what the drug is given for (indication bias: cetirizine -> angioedema)
+                rx = EVENT_INDICATION.get(cm.condition[c])
+                given_for = self.indications.get(drv.key) or self.indications.get(drv.bare) or ""
+                ev["indication"] = bool(rx and given_for and rx.search(given_for))
+                ev["own_signal"] = (drv.bare, cm.condition[c]) in self.offsides and not ev["indication"]
                 events.append(ev)
             if p_loo is not None:
                 for d in range(n):
@@ -1204,7 +1257,7 @@ class Engine:
             # consistency caution, not a contraindication
             strong = any(SEVERE_LABEL.search(_about(e)) and not AMOUNT_ONLY.search(_about(e)) for e in own
                          if e["section"] in ("상호작용", "병용금기/금기", "박스 경고"))
-            mech = self._mechanism(A, B)
+            mech = self._mechanism(A, B) + self._kr_label(A, B, kr_avoid)
             # Pair-level statistics (TWOSIDES signals, pair model) are shown as information only: they are confounded
             # by indication (antihistamine + angioedema) and the pair model learned TWOSIDES, so their agreement is
             # not independent. Statistical evidence reaches the verdict through the patient model's ADDED risk.
@@ -1514,12 +1567,17 @@ class Engine:
                                            "의사·약사와 정하세요.")
             elif not own and r.get("mechanism"):
                 m = r["mechanism"][0]
+                src = {"규칙": "임상 규칙", "식약처허가": "식약처 허가사항"}.get(m["kind"], "약리 기전")
+                if m["kind"] == "식약처허가":  # a product's own label: the text already names both sides
+                    reasons.append({"sev": "mid", "icon": "📋", "text": f"{m['text']}."})
+                    continue
                 reasons.append({"sev": "mid", "icon": "📋" if m["kind"] == "규칙" else "🧬",
-                                "text": f"{r['a']} + {r['b']} ({'임상 규칙' if m['kind'] == '규칙' else '약리 기전'}): "
+                                "text": f"{r['a']} + {r['b']} ({src}): "
                                         f"{m['text']}."})
             elif own:
                 occasional = r["a_key"] in prn_keys or r["b_key"] in prn_keys
-                rule = next((m["text"] for m in r.get("mechanism", []) if m["kind"] in ("규칙", "CYP-FDA")), None)
+                rule = next((m["text"] for m in r.get("mechanism", []) if m["kind"] in ("규칙", "식약처허가", "CYP-FDA")),
+                            None)
                 if rule:  # the concrete consequence is more useful than "documented interaction"
                     text = f"{r['a']} + {r['b']}: {rule} (허가 문서에도 상호작용으로 기재)"
                 else:
@@ -1556,9 +1614,14 @@ class Engine:
             elif e["patient_factor"] >= 1.5:
                 text, sev = f"{organ} (AI 참고): 이 환자의 몸 상태에서 '{ev}' 보고가 평균보다 다소 많습니다.", "low"
             else:
+                # a drug's own risk: information, not an interaction warning - shown only when OFFSIDES (single-drug
+                # analysis against matched reports) finds the same signal; otherwise it may be confounding
+                # (acetaminophen 'seizure' / 'pancreatitis' came from the patients who take it, not from the drug)
+                if self.offsides and not e.get("own_signal"):
+                    continue
                 drv = f"{e['driver']} " if e.get("driver") else ""
-                # a drug's own known side effect: information, not an interaction warning
-                text, sev = f"{organ}: '{ev}'은(는) {drv}약 자체에 따르는 위험입니다 — 복용 중 증상을 살펴보세요.", "low"
+                text, sev = (f"{organ}: '{ev}'은(는) {drv}약 자체에 따르는 위험입니다 — 복용 중 증상을 살펴보세요"
+                             + (" (단일 약 보고 분석 OFFSIDES에서도 확인)." if self.offsides else "."), "low")
             reasons.append({"sev": sev, "icon": "📈", "text": text})
         cap = pa.get("capacity")
         if cap and cap["level"] in ("저하", "매우 저하"):

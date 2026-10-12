@@ -13,8 +13,8 @@ import re
 from omnipharm.clinical import Patient
 from omnipharm.dosing import effective_limit, fmt_mg, limit_text
 from omnipharm.engine import ResolveError
-from omnipharm.knowledge import FOOD_ALIAS
-from omnipharm.models.llm import HARM_REDUCTION_LINE
+from omnipharm.knowledge import FOOD_ALIAS, mech_source
+from omnipharm.models.llm import HARM_REDUCTION_LINE, LIMIT_KEY, USAGE_KEY, USAGE_KEY_LIMITED
 
 # endings stripped from a word before it is looked up ('박카스랑' -> '박카스', '타이레놀은' -> '타이레놀')
 _ENDING = re.compile(r"(이랑|랑|하고|이나|이요|에서|으로|까지|부터|처럼|이란|란|은|는|이|가|을|를|와|과|도|에|로|만|나|요|좀)$")
@@ -157,12 +157,15 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
         src.add("식약처 허가사항(제품 설명서)")
     if not src:  # checked, and no documented problem: that is the source of a '괜찮다' answer
         src.add("상호작용 검사(문서·규칙 근거 없음)")
+    usage = (lab.get("usage") or "")[:300] or None
+    # this patient's daily limit (kidney / liver / age / self-medication) comes first: a label's general maximum
+    # ('1일 최대 4그램(8정)') is higher than what an elderly patient on warfarin should take on their own
     return {"확인한 제품": f"{name} = {shown}", "함께 먹을 때 판정": verdict,
             "1개당 함량": f"{st.get('unit') or '1회 단위'}당 " + ", ".join(content) if content else None,
-            # Korean label of quasi-drugs (박카스 ...): the official '1일 1회 1병' answers '하루 몇 병?'
-            "제품 설명서 용법(식약처)": (lab.get("usage") or "")[:300] or None,
+            LIMIT_KEY: limits,
+            # Korean label (박카스 '1일 1회 1병', 일반의약품 용법): answers '하루 몇 병?' when no mg limit exists
+            (USAGE_KEY_LIMITED if limits else USAGE_KEY): usage,
             "제품 설명서 주의사항(요약)": label_cautions(lab.get("cautions") or "") or None,
-            "1일최대량(허가기준·이 환자)": limits,
             "이 제품 관련 이유": [x["text"] for x in s["reasons"] if x["sev"] != "low" and mine(x["text"])][:5],
             # not the FAERS 'drug's own risk' associations: they are report statistics, not known side effects
             "이 제품 관련 참고": [x["text"] for x in s["reasons"] if x["sev"] == "low" and mine(x["text"])
@@ -197,7 +200,7 @@ def _sources(r: dict, keys: set[str], names: list[str]) -> set[str]:
         if any(e.get("context") != "co_therapy" for e in p.get("label_evidence", [])):
             src.add("FDA 허가 라벨")
         for m in p.get("mechanism", []):
-            src.add("임상 규칙" if m["kind"] == "규칙" else "FDA CYP 지표표" if m["kind"] == "CYP-FDA" else "약리 기전(ChEMBL)")
+            src.add(mech_source(m["kind"]))
     for d in r.get("disease_alerts", []):
         if d.get("drug") in names:
             src.add("식약처 허가사항(제품 설명서)" if d.get("key") == "age_label"

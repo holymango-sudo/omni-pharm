@@ -49,7 +49,7 @@ export function printReport(res, patient, report, mode = "pro") {
     : e.context === "co_therapy" ? " <i>[병용 치료 안내 — 상호작용 아님]</i>" : e.combo ? " <i>[복합제 라벨]</i>" : "");
   const pairs = res.pairs.map((p) => `<div class="pair"><b>[${p.level}] ${esc(p.a)} + ${esc(p.b)}</b>
     ${p.dur ? `<div><b>식약처 DUR 병용금기</b>${p.dur.content ? `: ${esc(p.dur.content)}` : ""}${p.dur.date ? ` (고시 ${esc(p.dur.date)})` : ""}</div>` : ""}
-    ${(p.mechanism || []).map((m) => `<div>${m.kind === "규칙" ? "임상 규칙" : "약리 기전"}: ${esc(m.text)}</div>`).join("")}
+    ${(p.mechanism || []).map((m) => `<div>${m.kind === "규칙" ? "임상 규칙" : m.kind === "식약처허가" ? "식약처 허가사항" : "약리 기전"}: ${esc(m.text)}</div>`).join("")}
     ${p.label_evidence.map((e) => `<div>FDA 라벨(${esc(e.label_of)}, ${esc(e.section)}${e.via_class ? `, 계열 문구 “${esc(e.via_class)}”` : ""}${e.n_labels > 1 ? `, 라벨 ${e.n_labels}건` : ""})${tag(e)}: ${esc(e.excerpt)}</div>`).join("")}
     ${p.observed.length ? `<div>실제 병용 보고 신호(참고): ${p.observed.map((e) => esc(e.ko)).join(", ")}</div>` : ""}
     ${p.model.length ? `<div>AI 구조 예측(참고, 신호 점수): ${p.model.slice(0, 6).map((m) => `${esc(m.ko)} ${pct(m.prob, 0)}`).join(", ")}</div>` : ""}</div>`).join("");

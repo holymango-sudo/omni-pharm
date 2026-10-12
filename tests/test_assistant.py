@@ -148,7 +148,8 @@ def test_quasi_drug_label_reaches_chat_and_verdict(eng):
     kid = assistant.quick_check(eng, [], "박카스", Patient(age=12))
     assert kid["함께 먹을 때 판정"].startswith("위험") and any("15세 미만" in x for x in kid["이 제품 관련 이유"])
     adult = assistant.quick_check(eng, [], "박카스", Patient(**ADULT))
-    assert "1병" in adult["제품 설명서 용법(식약처)"] and "식약처 허가사항(제품 설명서)" in adult["근거종류"]
+    usage = adult.get(llm.USAGE_KEY) or adult.get(llm.USAGE_KEY_LIMITED)  # with a caffeine limit: the 'limited' key
+    assert "1병" in usage and "식약처 허가사항(제품 설명서)" in adult["근거종류"]
     assert not adult["함께 먹을 때 판정"].startswith("위험")
 
 
@@ -169,7 +170,7 @@ def test_quick_check_runs_the_engine_with_the_analysis(eng):
     assert assistant.quick_check(eng, base, "타이레놀", old) is None  # already in the analysis
     alone = assistant.quick_check(eng, [], "박카스", Patient(**ADULT))
     assert alone["확인한 제품"].startswith("박카스") and "하나만" in alone["함께 먹을 때 판정"]
-    assert any("카페인" in x and "400mg" in x for x in alone["1일최대량(허가기준·이 환자)"])  # '하루 몇 병?' is grounded
+    assert any("카페인" in x and "400mg" in x for x in alone[llm.LIMIT_KEY])  # '하루 몇 병?' is grounded
     assert assistant.lookups(eng, "오늘 날씨 어때?", base, old) == []
     # two items in one question are checked together: 타이레놀 + 게보린 = acetaminophen twice
     two = assistant.lookups(eng, "타이레놀이랑 게보린 같이 먹어도 되나요?", [], Patient(**ADULT))
@@ -184,6 +185,8 @@ def test_chat_context_is_grounded(eng):
     res = eng.predict(prods, Patient(**ADULT))
     res["products"] = [{"input": p["input"], "product": None, "ingredients": [eng.ko(g) for g in p["ingredients"]]} for p in prods]
     ctx = llm.chat_context(res, ADULT)
-    assert any("4,000mg" in x for x in ctx["1일최대량(허가기준·이 환자)"])
+    assert any("4,000mg" in x for x in ctx[llm.LIMIT_KEY])
     assert "식약처 DUR" not in ctx["근거종류(이것만 출처로 쓸 것)"]  # grapefruit is not a DUR item: may not be cited
     assert any("심바스타틴" in x and "반감기" in x for x in ctx["약동학(복용 후 시간)"])
+    keys = list(ctx)  # the patient's daily limit is put before the label's general usage
+    assert llm.USAGE_KEY not in keys or keys.index(llm.LIMIT_KEY) < keys.index(llm.USAGE_KEY)

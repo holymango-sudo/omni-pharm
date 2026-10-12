@@ -921,6 +921,87 @@ PAIR_RULES: list[tuple[str, str, str, str]] = [
 ]
 
 
+# Korean OTC labels (식약처 허가사항, stage "kr-labels"): '이 약을 복용하는 동안 다음의 약을 복용하지 말 것' items ->
+# (pattern, groups or ingredient names the other medicine must have, level). A label word names a CLASS loosely
+# ('진정제', '다른 감기약'), so these are '주의' - except MAO inhibitors, which every source treats as contraindicated.
+# Topical items ('외용 코르티코이드', '바셀린') and explanations are not matched.
+KR_AVOID_TERMS: list[tuple[re.Pattern, frozenset[str], str]] = [
+    (re.compile(r"MAO\s*억제"), frozenset({"maoi"}), "높음"),
+    (re.compile(r"감기약"), frozenset({"decongestant", "antitussive", "sedating_antihistamine"}), "주의"),
+    (re.compile(r"해열\s*진통제|비스테로이드성\s*소염진통제"), frozenset({"nsaid", "acetaminophen"}), "주의"),
+    (re.compile(r"진정제|수면제|안정제|중추신경\s*억제"), frozenset({"sedative", "gabapentinoid"}), "주의"),
+    (re.compile(r"항히스타민|멀미약|알레르기용약"), frozenset({"sedating_antihistamine", "antihistamine2"}), "주의"),
+    (re.compile(r"진해|거담|기침"), frozenset({"antitussive"}), "주의"),
+    (re.compile(r"테트라사이클린"), frozenset({"tetracycline"}), "주의"),
+    (re.compile(r"제산제|칼슘\s*(염|함유)|마그네슘\s*함유"), frozenset({"polyvalent_cation"}), "주의"),
+    (re.compile(r"교감신경|충혈\s*제거|암페타민|식욕\s*억제"), frozenset({"decongestant", "stimulant"}), "주의"),
+    (re.compile(r"항정신병"), frozenset({"dopamine_antagonist"}), "주의"),
+    (re.compile(r"삼환계\s*항우울"), frozenset({"amitriptyline", "imipramine", "nortriptyline", "clomipramine",
+                                           "desipramine", "doxepin"}), "주의"),
+    (re.compile(r"진경제"), frozenset({"anticholinergic"}), "주의"),
+    (re.compile(r"치아지드"), frozenset({"thiazide"}), "주의"),
+    (re.compile(r"알코올|음주|(^|[\s(])술($|[\s),])"), frozenset({"alcohol"}), "주의"),  # not 수술 / 기술
+    (re.compile(r"레보도파"), frozenset({"levodopa"}), "주의"),
+    (re.compile(r"아스피린"), frozenset({"aspirin"}), "주의"),
+    (re.compile(r"메토트렉세이트"), frozenset({"methotrexate"}), "주의"),
+    (re.compile(r"시클로스포린|사이클로스포린"), frozenset({"cyclosporine"}), "주의"),
+    (re.compile(r"타크로리무스"), frozenset({"tacrolimus"}), "주의"),
+    (re.compile(r"메칠도파|메틸도파"), frozenset({"methyldopa"}), "주의"),
+    (re.compile(r"(?<!외용 )코르티코(스테로이드|이드)"), frozenset({"corticosteroid"}), "주의"),
+]
+_KR_AVOID_SKIP = re.compile(r"외용|바셀린|레티노이드|디트라놀|^이 약은|필요하지 않다")
+
+# Indication bias: an event that is what the drug is GIVEN FOR is reported with it because of the disease, not caused by
+# it (cetirizine -> angioedema, ursodeoxycholic acid -> liver failure, warfarin -> stroke / pulmonary embolism).
+# event (modelled MedDRA term) -> pattern over the drug's ChEMBL indications (MeSH / EFO terms, stage "chembl-dump").
+# Events that are a drug's own pharmacology (INR rise on warfarin, hypoglycaemia on antidiabetics, bradycardia on
+# beta-blockers, somnolence on hypnotics) are deliberately absent: those ARE the drug's risk.
+_LIVER = r"liver|hepat|cirrho|cholang|cholesta|biliar|gallstone|cholelith"
+_KIDNEY = r"kidney|renal|nephr"
+EVENT_INDICATION: dict[str, re.Pattern] = {k: re.compile(v) for k, v in {
+    "Angioedema": r"angioedema|urticaria|hypersensitiv|allerg|anaphyla|pruritus", "Rash": r"urticaria|dermatitis|eczema|"
+    r"psoriasis|pruritus|allerg", "Hepatic failure": _LIVER, "Alanine aminotransferase increased": _LIVER,
+    "Aspartate aminotransferase increased": _LIVER, "Hepatic enzyme increased": _LIVER, "Jaundice": _LIVER,
+    "Liver function test abnormal": _LIVER, "Convulsion": r"epilep|seizure|convuls", "Tremor": r"tremor|parkinson",
+    "Atrial fibrillation": r"atrial fibrillation|atrial flutter|arrhythm", "Arrhythmia": r"arrhythm|atrial fibrillation|"
+    r"tachycardia", "Tachycardia": r"tachycardia|arrhythm", "Cardiac failure congestive": r"heart failure",
+    "Cerebrovascular accident": r"stroke|cerebrovascular|cerebral infarct|brain ischemia",
+    "Pulmonary embolism": r"pulmonary embol|venous thrombo|thromboembol|thrombosis",
+    "Myocardial infarction": r"myocardial infarction|coronary|angina", "Hypertension": r"hypertension",
+    "Hypotension": r"hypotension|shock", "Anaemia": r"anemia|anaemia", "Neutropenia": r"neutropenia",
+    "Thrombocytopenia": r"thrombocytopeni|purpura", "Renal failure": _KIDNEY, "Renal failure acute": _KIDNEY,
+    "Renal impairment": _KIDNEY, "Blood creatinine increased": _KIDNEY,
+    "Pneumonia": r"pneumonia|respiratory tract infection|lung infection|bacterial infection",
+    "Dyspnoea": r"asthma|pulmonary disease|copd|bronch|dyspnea", "Respiratory failure": r"asthma|pulmonary disease|copd",
+    "Nausea": r"nausea|vomiting|emesis", "Vomiting": r"nausea|vomiting|emesis", "Diarrhoea": r"diarrh",
+    "Constipation": r"constipation", "Abdominal pain": r"abdominal pain|irritable bowel|peptic|gastritis|dyspepsia",
+    "Headache": r"headache|migraine", "Dizziness": r"vertigo|dizziness|motion sickness",
+    "Confusional state": r"delirium|dementia|confusion", "Syncope": r"syncope",
+    "Gastrointestinal haemorrhage": r"hemorrhage|haemorrhage|bleeding", "Haemorrhage": r"hemorrhage|haemorrhage|bleeding",
+    "Pancreatitis": r"pancreat",
+}.items()}
+
+# where a mechanism / rule entry comes from (engine pair rows' "mechanism"[].kind -> source shown and cited)
+MECH_SOURCE = {"규칙": "임상 규칙", "CYP-FDA": "FDA CYP 지표표", "식약처허가": "식약처 허가사항(제품 설명서)"}
+
+
+def mech_source(kind: str) -> str:
+    return MECH_SOURCE.get(kind, "약리 기전(ChEMBL)")
+
+
+def kr_avoid_targets(item: str) -> tuple[frozenset[str], str] | None:
+    """One item of a Korean label's 'do not take with' list -> (groups / ingredient names, level), or None.
+    List items are short names ('진정제', '경구용 테트라사이클린계 제제'); a long sentence is an explanation that slipped
+    in from the next section ('…제산제와의 상호작용을 나타낸 연구는 없었다') and is not used."""
+    core = re.sub(r"\(.*?\)|\[.*?\]", "", item).strip()
+    if _KR_AVOID_SKIP.search(item) or len(core) > 20 or re.search(r"없었|없다|않는다|않았|연구|필요하지", item):
+        return None
+    hits = [(g, lv) for rx, g, lv in KR_AVOID_TERMS if rx.search(item)]
+    if not hits:
+        return None
+    return frozenset().union(*(g for g, _ in hits)), ("높음" if any(lv == "높음" for _, lv in hits) else "주의")
+
+
 # --------------------------------------------------------------------------- #
 # Ingredients without a small-molecule structure model ("lab:" keys): herbal extracts, vitamins and minerals,
 # antibodies and other biologics found in product databases or FDA labels. They are matched by name patterns
