@@ -405,6 +405,24 @@ async def stream_chat(ctx: dict, history: list[dict], question: str,
             return
 
 
+async def vision_json(prompt: str, schema: dict, image_b64: str) -> dict | None:
+    """Ask the local multimodal model about one image; the answer is forced into `schema` (Ollama structured output).
+    None when the model is not running or cannot read images."""
+    body = {"model": settings.llm_model, "stream": False, "keep_alive": "30m", "format": schema,
+            "options": {"temperature": 0, "num_ctx": 8192},
+            "messages": [{"role": "user", "content": prompt, "images": [image_b64]}]}
+    if await _thinks(settings.llm_model):
+        body["think"] = False
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(180.0, connect=3.0)) as c:
+            r = await c.post(f"{settings.ollama_url}/api/chat", json=body)
+            r.raise_for_status()
+            return json.loads(r.json()["message"]["content"])
+    except Exception as e:
+        log.warning(f"vision LLM unavailable ({type(e).__name__})")  # never log the image or the answer (patient data)
+        return None
+
+
 async def llm_available() -> bool:
     try:
         async with httpx.AsyncClient(timeout=2.0) as c:

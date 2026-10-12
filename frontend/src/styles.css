@@ -578,3 +578,19 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .sym-doctor { font-size: 11.5px; color: #9fd8e6; margin-top: 4px; }
 .sym-note { font-size: 12px; color: #ffe08a; }
 .sym-disc { font-size: 11px; color: #8fa9b4; line-height: 1.45; }
+.panel-title .sym-open + .sym-open { margin-right: 6px; }
+
+/* ---------------------------------------------------------------- 처방전·약봉투 사진 입력 */
+.rx-top { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 6px; }
+.rx-thumb { width: 120px; max-height: 110px; object-fit: contain; border: 1px solid var(--line); border-radius: 6px; background: #000; }
+.rx-help { flex: 1; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.rx-busy { font-size: 12.5px; color: #9fe6f5; margin: 6px 0; display: flex; gap: 8px; align-items: center; }
+.rx-list { display: flex; flex-direction: column; gap: 4px; }
+.rx-row { display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px; border-top: 1px dashed rgba(0, 229, 255, 0.14); cursor: pointer; }
+.rx-row input[type="checkbox"] { margin-top: 3px; accent-color: var(--cyan); }
+.rx-row.st-none { opacity: 0.85; }
+.rx-main { flex: 1; min-width: 0; }
+.rx-main select { background: #06141b; color: #e6f6fb; border: 1px solid var(--line2); border-radius: 4px; font-size: 12.5px;
+  max-width: 100%; padding: 2px 4px; font-family: var(--ko); }
+.rx-sub { font-size: 11.5px; color: #9db5bf; margin-top: 2px; word-break: keep-all; }
+.rx-dose { font-size: 12px; color: #c9f3ff; margin-top: 2px; }

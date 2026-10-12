@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from omnipharm import assistant, fhir, recommend, security
+from omnipharm import assistant, fhir, recommend, rx_photo, security
 from omnipharm.clinical import Patient, assess
 from omnipharm.config import VERSION, settings
 from omnipharm.dosing import Dose
@@ -62,13 +62,15 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http
 
 OPEN_PATHS = {"/api/v1/health", "/api/v1/login", "/api/v1/auth-mode"}
 MAX_BODY = 2_000_000  # bytes; a FHIR bundle of a real patient is far smaller
+MAX_PHOTO = 15_000_000  # /rx-photo: a phone photo as base64 (the browser shrinks it first; this is the ceiling)
 
 
 @app.middleware("http")
 async def limits_and_headers(request: Request, call_next):
     """Reject oversized bodies (memory exhaustion) and add basic browser security headers."""
     size = request.headers.get("content-length")
-    if size and size.isdigit() and int(size) > MAX_BODY:
+    limit = MAX_PHOTO if request.url.path == "/api/v1/rx-photo" else MAX_BODY
+    if size and size.isdigit() and int(size) > limit:
         return JSONResponse({"detail": {"message": "요청이 너무 큽니다."}}, status_code=413)
     resp = await call_next(request)
     resp.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -375,6 +377,29 @@ async def chat(req: ChatRequest, request: Request):
 
     return StreamingResponse(gen(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+class RxPhoto(BaseModel):
+    image: str = Field(..., min_length=100, max_length=MAX_PHOTO, description="사진 (base64 또는 data URL)")
+
+
+@app.post("/api/v1/rx-photo")
+async def rx_photo_read(req: RxPhoto, request: Request):
+    """처방전·약봉투 사진 -> medicine lines read by the local vision LLM, each matched to a product.
+    The photo stays in memory (never written, never logged); only the number of lines goes to the audit log."""
+    try:
+        img = await asyncio.to_thread(rx_photo.prepare_image, req.image)
+    except ValueError as e:
+        raise HTTPException(422, {"message": str(e)}) from None
+    t0 = time.time()
+    data = await llm.vision_json(rx_photo.PROMPT, rx_photo.SCHEMA, img)
+    if data is None:
+        raise HTTPException(503, {"message": "로컬 AI가 실행 중이 아니거나 사진을 읽을 수 없는 모델입니다. 프로그램을 다시 켠 뒤 시도하세요."})
+    items = await asyncio.to_thread(rx_photo.match_all, E["engine"], data.get("medicines") or [])
+    security.audit("rx_photo", _who(request), _client(request), lines=len(items),
+                   matched=sum(i["status"] != "none" for i in items))
+    return {"document": data.get("document") or "", "items": items, "elapsed_ms": round((time.time() - t0) * 1000),
+            "model": settings.llm_model}
 
 
 @app.get("/api/v1/symptoms")

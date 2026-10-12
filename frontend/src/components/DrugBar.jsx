@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api.js";
 import DoseEditor, { doseLabel } from "./DoseEditor.jsx";
+import RxPhoto from "./RxPhoto.jsx";
 import SymptomFinder from "./SymptomFinder.jsx";
 
 export const SCENARIOS = [
@@ -20,6 +21,7 @@ const isFood = (d) => d.molecules?.length > 0 && d.molecules.every((m) => m.cate
 export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario, onPredict, onDose, busy, patientPayload }) {
   const [q, setQ] = useState("");
   const [finder, setFinder] = useState(false);
+  const [photo, setPhoto] = useState(false);
   const [editing, setEditing] = useState(null);
   const [hits, setHits] = useState([]);
   const [focus, setFocus] = useState(false);
@@ -47,9 +49,15 @@ export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario,
   return (
     <div className="drugbar">
       <div className="panel-title"><span className="idx">02</span> 3D 약물 합성 — 약물 검색
-        <button className={`btn mini sym-open ${finder ? "on" : ""}`} onClick={() => setFinder(!finder)}
+        <button className={`btn mini sym-open ${finder ? "on" : ""}`} onClick={() => { setFinder(!finder); setPhoto(false); }}
           title="감기·두통 등 증상을 고르면 이 환자에게 맞는 일반의약품을 찾아 줍니다">🤒 증상으로 약 찾기</button>
+        <button className={`btn mini sym-open ${photo ? "on" : ""}`} onClick={() => { setPhoto(!photo); setFinder(false); }}
+          title="처방전·약봉투 사진을 올리면 이 PC의 AI가 약 이름과 용량을 읽어 입력합니다">📷 처방전·약봉투 사진</button>
       </div>
+      {photo && (
+        <RxPhoto existing={drugs.map((d) => d.name)} onClose={() => setPhoto(false)}
+          onAdd={(n, dose) => { onAdd(n); if (dose) onDose(n, dose); }} />
+      )}
       {finder && (
         <SymptomFinder patient={patientPayload} drugs={drugs.filter((d) => d.status === "ok").map((d) => d.name)}
           onAdd={(n) => onAdd(n)} onClose={() => setFinder(false)} />

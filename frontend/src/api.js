@@ -50,6 +50,7 @@ export const api = {
   // drugs: [{name, dose?}] - dose = {amount, unit, per_day, days, prn, weekly}
   predict: (drugs, patient) => req("predict", { method: "POST", body: JSON.stringify({ drugs, patient }) }),
   symptoms: () => req("symptoms"),
+  rxPhoto: (image) => req("rx-photo", { method: "POST", body: JSON.stringify({ image }) }),
   recommend: (symptoms, drugs, patient) => req("recommend", { method: "POST", body: JSON.stringify({ symptoms, drugs, patient }) }),
   /** AI 복약 상담: POST + streamed server-sent events; returns a function that stops the answer */
   chat(body, onToken, onDone, onChecked) {
