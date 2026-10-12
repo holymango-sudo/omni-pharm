@@ -63,8 +63,11 @@ function Molecule({ mol, index, count, cx, anim, level, label }) {
     bondsRef.current.instanceMatrix.needsUpdate = true;
   }, [atoms, bonds]);
 
-  const home = slot(index, count, cx);
+  // one Vector3 per slot: a new one on every render made react-three-fiber reset the group to `home` (dropping the
+  // float offset) whenever the page re-rendered -> visible up/down twitching
+  const home = useMemo(() => slot(index, count, cx), [index, count, cx]);
   const tmp = useMemo(() => new THREE.Vector3(), []);
+  const center = useMemo(() => new THREE.Vector3(cx, 0, 0), [cx]);
   useFrame((_, dt) => {
     const t = now();
     const g = group.current;
@@ -74,7 +77,7 @@ function Molecule({ mol, index, count, cx, anim, level, label }) {
     const { phase, t0 } = anim.current;
     if (phase === "colliding") {
       const p = Math.min(1, (t - t0) / IMPACT);
-      tmp.copy(home).lerp(new THREE.Vector3(cx, 0, 0), easeInCubic(p) * 0.92);
+      tmp.copy(home).lerp(center, easeInCubic(p) * 0.92);
       g.position.copy(tmp);
       const shake = p > 0.7 ? (p - 0.7) * 0.25 : 0;
       g.position.x += (Math.random() - 0.5) * shake;
@@ -214,7 +217,9 @@ function Stage({ molecules, anim, layout, level, pairLevelByKey }) {
   );
 }
 
-export default function MoleculeScene({ molecules, anim, layout, level, pairLevelByKey }) {
+export default React.memo(MoleculeScene);
+
+function MoleculeScene({ molecules, anim, layout, level, pairLevelByKey }) {
   return (
     <Canvas camera={{ position: [0, 0.6, 14], fov: 45 }} dpr={[1, 2]} gl={{ antialias: true }}>
       <color attach="background" args={["#02060a"]} />

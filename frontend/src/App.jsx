@@ -12,6 +12,9 @@ import { printReport } from "./print.js";
 
 const now = () => performance.now() / 1000;
 const LAYOUT = { centerFrac: 0.445, targetFrac: 0.8, focusY: 0.47 }; // must match the CSS grid columns
+// stable objects: the molecule stage must not re-render every second with the header clock (that made molecules twitch)
+const MOL_FULL = { full: true, ...LAYOUT };
+const MOL_INLINE = { full: false };
 
 function siren(on) {
   if (!on) return;
@@ -56,6 +59,8 @@ export default function App() {
   const [report, setReport] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [sim, setSim] = useState(false);  // 예측 시작 -> collision animation playing
+  const stageRef = useRef(null);
   const [error, setError] = useState(null);
   const [drawer, setDrawer] = useState(null);
   const [sound, setSound] = useState(() => { try { return localStorage.getItem("omnipharm.sound") === "1"; } catch { return false; } });
@@ -78,6 +83,7 @@ export default function App() {
   const centerRef = useRef(null);
   const hudRef = useRef(null);
   const [region, setRegion] = useState(null);
+  const bodyLayout = useMemo(() => ({ full: true, ...LAYOUT, region }), [region]);
   useLayoutEffect(() => {
     if (!showBody || !wide) return undefined;
     const measure = () => {
@@ -126,6 +132,7 @@ export default function App() {
   const resetResult = () => {
     stopStream.current?.();
     clearTimeout(bodyTimer.current);
+    setSim(false);
     setView("mol");
     setRes(null);
     setReport("");
@@ -190,6 +197,8 @@ export default function App() {
     resetResult();
     setError(null);
     setBusy(true);
+    setSim(true);  // the drug bar folds into one line so the collision on the 3D stage is not hidden behind it
+    if (!wide) stageRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     anim.current = { phase: "colliding", t0: now() };
     const minDelay = new Promise((r) => setTimeout(r, 1700));
     try {
@@ -197,7 +206,7 @@ export default function App() {
       setRes(r);
       anim.current = { phase: "done", t0: now() };
       // let the collision flash and the data stream play, then follow the drugs into the body
-      if (r.pathway) bodyTimer.current = setTimeout(() => setView("body"), 2300);
+      bodyTimer.current = setTimeout(() => { if (r.pathway) setView("body"); setSim(false); }, 2300);
       siren(sound && r.overall_level === "높음");
       setStreaming(true);
       setTimeout(() => {
@@ -205,6 +214,7 @@ export default function App() {
       }, 700);
     } catch (e) {
       setError(e.message);
+      setSim(false);
       anim.current = { phase: "idle", t0: now() };
     } finally {
       setBusy(false);
@@ -217,8 +227,8 @@ export default function App() {
       {wide && (
         <div className={`stage-bg ${showBody ? "body-on" : ""}`}>
           {showBody
-            ? <BodyScene pathway={res.pathway} stage={journey.stage} layout={{ full: true, ...LAYOUT, region }} />
-            : <MoleculeScene molecules={molecules} anim={anim} layout={{ full: true, ...LAYOUT }} level={level} pairLevelByKey={pairLevelByKey} />}
+            ? <BodyScene pathway={res.pathway} stage={journey.stage} layout={bodyLayout} />
+            : <MoleculeScene molecules={molecules} anim={anim} layout={MOL_FULL} level={level} pairLevelByKey={pairLevelByKey} />}
         </div>
       )}
       <header className="hud">
@@ -262,10 +272,10 @@ export default function App() {
         <PatientPanel p={patient} set={(p) => { setPatient(p); }} assessment={assessment} diseases={diseases} expert={expert} />
         <section className="center" ref={centerRef}>
           {!wide && (
-            <div className={`stage-inline ${showBody ? "body-on" : ""}`}>
+            <div ref={stageRef} className={`stage-inline ${showBody ? "body-on" : ""}`}>
               {showBody
-                ? <BodyScene pathway={res.pathway} stage={journey.stage} layout={{ full: false }} />
-                : <MoleculeScene molecules={molecules} anim={anim} layout={{ full: false }} level={level} pairLevelByKey={pairLevelByKey} />}
+                ? <BodyScene pathway={res.pathway} stage={journey.stage} layout={MOL_INLINE} />
+                : <MoleculeScene molecules={molecules} anim={anim} layout={MOL_INLINE} level={level} pairLevelByKey={pairLevelByKey} />}
               {showBody && <JourneyClock pathway={res.pathway} j={journey} compact />}
             </div>
           )}
@@ -280,12 +290,14 @@ export default function App() {
           )}
           {error && <div className="error">⚠ {error}</div>}
           {drugs.filter((d) => d.status === "error" && !d.candidates?.length).map((d) => <div key={d.name} className="error">“{d.name}”: {d.error}</div>)}
-          {showBody && wide ? (
-            // the body needs the room: the drug bar folds into one line while the journey plays
-            <div className="drugstrip">
+          {(showBody && wide) || sim ? (
+            // the body (and the collision before it) needs the room: the drug bar folds into one line meanwhile;
+            // open panels (증상으로 약 찾기, 처방전 사진) close with it
+            <div className={`drugstrip ${sim ? "sim" : ""}`}>
+              {sim && <span className="sim-tag"><i className="spin" /> 분석 중</span>}
               {drugs.filter((d) => d.status === "ok").map((d) => <span key={d.name} className="chip drug ok">{d.name}</span>)}
               <span className="grow" />
-              <button className="btn mini" onClick={() => setView("mol")}>✎ 약 추가·수정</button>
+              {!sim && <button className="btn mini" onClick={() => setView("mol")}>✎ 약 추가·수정</button>}
             </div>
           ) : (
             <DrugBar drugs={drugs} onAdd={addDrug} onRemove={removeDrug} onReplace={replaceDrug} onScenario={scenario}

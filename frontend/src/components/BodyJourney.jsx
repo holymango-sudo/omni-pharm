@@ -764,7 +764,10 @@ function Scene({ pathway, stage, layout }) {
   );
 }
 
-export default function BodyScene({ pathway, stage, layout }) {
+// memo: the 3D scene re-renders only when its own inputs change, not every second with the header clock
+export default React.memo(BodyScene);
+
+function BodyScene({ pathway, stage, layout }) {
   if (!pathway || !stage) return null;
   return (
     <Canvas camera={{ position: [0, 0.6, 16], fov: 45 }} dpr={[1, 2]} gl={{ antialias: true }}>
