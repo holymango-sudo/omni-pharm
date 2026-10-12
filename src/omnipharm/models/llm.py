@@ -225,8 +225,9 @@ CHAT_SYSTEM = """당신은 OMNI-PHARM의 'AI 복약 상담'입니다. 친절하�
   이 사람에게 맞는 후보를 확인하라고 안내하세요.
 - 모르는 것은 모른다고 하고 약사·의사에게 확인하라고 하세요.
 
-- '하루 몇 개(병·알)까지?' 질문은 [방금 확인한 결과]의 '1개당 함량'과 '1일최대량'으로 계산해 답하고, 커피 등 같은 성분을
-  함께 먹으면 합쳐서 세야 한다고 알려 주세요. 두 숫자가 없으면 '제품 설명서의 용법'을 따르라고 하세요.
+- '하루 몇 개(병·알)까지?' 질문은 '제품 설명서 용법(식약처)'이 있으면 그 용법(예: 1일 1회 1병, 15세 미만 복용 금지)을
+  그대로 먼저 알려 주고, '1개당 함량'과 '1일최대량'이 있으면 그것으로 계산해 덧붙이세요. 커피 등 같은 성분을 함께 먹으면
+  합쳐서 세야 한다고 알려 주세요. 근거가 하나도 없으면 '제품 설명서의 용법'을 따르라고 하세요.
 
 형식: 쉬운 말로 핵심부터. 짧은 질문에는 짧게, 보통 250단어 이내. 필요하면 짧은 불릿('- ').
 대화 중이므로 매 답변을 인사('안녕하세요')나 자기소개로 시작하지 말고, 자신의 말투·역할을 설명하지 마세요.
@@ -259,6 +260,9 @@ def chat_context(res: dict, patient: dict) -> dict:
         facts["시간축기준"] = (f"{c.get('name')} 기준, 반감기 {c.get('t_half_h')}시간"
                           + (f" → 이 조합에서 {c.get('t_half_eff_h')}시간" if abs((c.get('fold') or 1) - 1) > 0.15 else ""))
     facts["복용제품"] = [f"{p['input']} = {', '.join(p['ingredients'])}" for p in res.get("products", [])]
+    # official Korean usage of quasi-drugs (박카스 '1일 1회 1병') - the per-bottle amount is not published
+    facts["제품 설명서 용법(식약처)"] = [f"{p['input']}: {p['usage'][:200]}" for p in res.get("products", [])
+                                if p.get("usage")]
     # labelled daily maximum for THIS patient (kidney / liver / age adjusted), so 'how many a day?' has a grounded answer
     from omnipharm.dosing import effective_limit, fmt_mg
 
@@ -286,8 +290,10 @@ def chat_context(res: dict, patient: dict) -> dict:
             src.add("FDA 허가 라벨")
         for m in p.get("mechanism", []):
             src.add("임상 규칙" if m["kind"] == "규칙" else "FDA CYP 지표표" if m["kind"] == "CYP-FDA" else "약리 기전(ChEMBL)")
-    if res.get("disease_alerts"):
-        src.add("질환별 금기 기준(Beers·허가사항·DUR)")
+    for d in res.get("disease_alerts", []):
+        src.add("식약처 허가사항(제품 설명서)" if d.get("key") == "age_label" else "질환별 금기 기준(Beers·허가사항·DUR)")
+    if facts["제품 설명서 용법(식약처)"]:
+        src.add("식약처 허가사항(제품 설명서)")
     if (res.get("dosing") or {}).get("alerts") or limits:
         src.add("허가 용량 기준")
     if any(e.get("drives_verdict") for e in res.get("events", [])):

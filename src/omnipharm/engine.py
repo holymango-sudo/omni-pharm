@@ -13,6 +13,7 @@ patient, combine three independent kinds of evidence, never mixing them up:
 
 from __future__ import annotations
 
+import functools
 import itertools
 import json
 import logging
@@ -66,6 +67,14 @@ KO_NAME: dict[str, str] = {}
 for _k, _v in KR_INGREDIENTS.items():
     KO_NAME.setdefault(DRUG_SYNONYMS.get(_v, _v), _k)  # first (most common) Korean name wins
 REFERENCE_PATIENT = {"age": 45.0, "wt": 70.0}
+
+
+@functools.lru_cache(maxsize=4096)
+def _ko_prefix(bare: str) -> str | None:
+    """Korean name of a shortened herb key: 'ginkgo' -> 은행잎 (KR_INGREDIENTS says 'ginkgo biloba leaf extract')."""
+    if len(bare) < 4 or not bare.isascii():
+        return None
+    return next((k for k, v in KR_INGREDIENTS.items() if v.startswith(bare + " ")), None)
 MIN_P = 0.003  # absolute probability floor for calling an event "elevated"
 SIGNAL_P = 0.01  # an AI signal must reach this (1% of comparable reports) to change the verdict
 COMBO_X = 3.0  # ... and be this many times above the riskier single drug (unless the patient explains it)
@@ -311,8 +320,14 @@ class Engine:
             parts.append(pd.read_parquet(p / "kr_products.parquet").assign(country="KR"))
         if (p / "world_products.parquet").exists():
             parts.append(pd.read_parquet(p / "world_products.parquet"))
+        self.label_ko: dict[str, dict] = {}  # 의약외품 item_seq -> Korean label (용법·주의사항·연령 제한)
         if (p / "kr_quasi_products.parquet").exists():  # 의약외품 (stage "dur")
-            parts.append(pd.read_parquet(p / "kr_quasi_products.parquet").assign(country="KR"))
+            q = pd.read_parquet(p / "kr_quasi_products.parquet").assign(country="KR")
+            parts.append(q)
+            if "usage" in q.columns:
+                self.label_ko = {str(r.item_seq): {"usage": r.usage, "cautions": r.cautions,
+                                                   "min_age": None if pd.isna(r.min_age) else int(r.min_age)}
+                                 for r in q.itertuples() if r.usage or r.cautions}
         cols = ["country", "item_seq", "name", "base", "company", "kind", "status", "ingredients", "unresolved"]
         prod = pd.concat([d[cols] for d in parts], ignore_index=True) if parts else pd.DataFrame(columns=cols)
         # ingredients without a structure (herbal, vitamins, minerals, antibodies ...) stay in the product as
@@ -504,7 +519,9 @@ class Engine:
                 ings = [self._ext_ingredient(k) for k in row["ingredients"]]
                 return ings, {"product": row["name"], "country": row["country"], "release": release_of(row["name"]),
                               "unresolved": list(row["unresolved"]),
-                              "strength": self.strengths.get((row["country"], str(row["item_seq"])))}
+                              "strength": self.strengths.get((row["country"], str(row["item_seq"]))),
+                              "label_ko": (self.label_ko.get(str(row["item_seq"])) if row["kind"] == "의약외품"
+                                           else None)}
             b = bio_key(text)  # peptide / protein product (위고비프리필드펜, 보톡스주 ...)
             if b:
                 return [self._bio(b)], {**info, "product": text if text.lower() != b else None}
@@ -716,7 +733,7 @@ class Engine:
     def ko(self, ing: Ingredient) -> str:
         if ing.food:
             return FOODS[ing.bare]["ko"]
-        k = KO_NAME.get(ing.key) or KO_NAME.get(ing.bare)
+        k = KO_NAME.get(ing.key) or KO_NAME.get(ing.bare) or _ko_prefix(ing.bare)
         return f"{k}({ing.name})" if k else ing.name
 
     def molecule(self, ing: Ingredient) -> dict:
@@ -1229,6 +1246,14 @@ class Engine:
             notes.append(f"같은 복합제 안에 함께 배합된 성분끼리의 조합 {same_product}쌍은 의도된 배합이므로 상호작용 평가에서 제외했습니다.")
 
         disease_alerts = self._drug_disease(U, pa, patient)
+        # Korean product label (의약외품): '15세 미만은 복용하지 않는다' -> this product is not for this child
+        for p in products:
+            n = (p.get("label_ko") or {}).get("min_age")
+            if n and patient.age is not None and patient.age < n:
+                disease_alerts.append({
+                    "key": "age_label", "disease": f"{n}세 미만", "drug": p.get("product") or p["input"],
+                    "severity": "금기", "reason": f"제품 설명서(식약처 허가사항)에 {n}세 미만은 복용하지 않도록 되어 있습니다",
+                    "source": "식약처 허가사항", "evidence": (p.get("label_ko") or {}).get("usage")})
         if any(d["severity"] == "금기" for d in disease_alerts):
             overall = "높음"
         elif disease_alerts and overall == "낮음":
@@ -1519,7 +1544,9 @@ class Engine:
         supported = set(self.name_idx)
         ok = lambda v: (DRUG_SYNONYMS.get(v, v) in supported or f"ing:{v}" in self.ext_ing  # noqa: E731
                         or v in BIOLOGICS)
-        ko_ing = sorted(k for k, v in KR_INGREDIENTS.items() if ok(v))
+        # supplements / herbs have no structure (lab: keys) but are analysed by labels and rules - list them too
+        lab_ok = lambda v: structureless_category(v) != "기타" or len(drug_groups(v)) > 1  # noqa: E731
+        ko_ing = sorted(k for k, v in KR_INGREDIENTS.items() if ok(v) or lab_ok(v))
         ko_brand = sorted(k for k, v in KR_BRANDS.items() if all(ok(x) for x in v))
         return {"korean_brands": ko_brand, "korean_ingredients": ko_ing, "ingredients": sorted(supported),
                 "brands": sorted(b for b in self.brand if len(b) <= 40)}

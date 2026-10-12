@@ -277,7 +277,8 @@ async def _predict(req: PredictRequest) -> dict:
             unsupported.append({"input": d.name, "reason": err["message"], "candidates": err["candidates"]})
             continue
         products.append({"input": d.name, "ingredients": ings, "product": info["product"], "dose": d.dose,
-                         "strength": info.get("strength"), "release": info.get("release")})
+                         "strength": info.get("strength"), "release": info.get("release"),
+                         "label_ko": info.get("label_ko")})
         if info["unresolved"]:
             unsupported.append({"input": d.name, "reason": "분석 불가 성분: " + ", ".join(info["unresolved"]),
                                 "candidates": []})
@@ -290,7 +291,8 @@ async def _predict(req: PredictRequest) -> dict:
     res = await asyncio.to_thread(eng.predict, products, req.patient)
     res["unsupported"] = unsupported
     res["products"] = [{"input": p["input"], "product": p["product"],
-                        "ingredients": [eng.ko(g) for g in p["ingredients"]]} for p in products]
+                        "ingredients": [eng.ko(g) for g in p["ingredients"]],
+                        "usage": (p.get("label_ko") or {}).get("usage")} for p in products]
     res["elapsed_ms"] = round((time.time() - t0) * 1000)
     res["version"] = VERSION
     rid = uuid.uuid4().hex[:12]
@@ -353,7 +355,8 @@ async def chat(req: ChatRequest, request: Request):
             ings, info, err = await _resolve(name[:200])
             if not err:
                 base.append({"input": name, "ingredients": ings, "product": info["product"],
-                             "strength": info.get("strength"), "release": info.get("release")})
+                             "strength": info.get("strength"), "release": info.get("release"),
+                             "label_ko": info.get("label_ko")})
         ctx = llm.general_context(assess(patient), patient.model_dump())
         if base:
             ctx["입력한 약(아직 조합 분석 전)"] = [f"{p['input']} = {', '.join(eng.ko(g) for g in p['ingredients'])}"

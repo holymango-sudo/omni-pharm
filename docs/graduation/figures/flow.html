@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>OMNI-PHARM 판정 흐름</title>
+<style>
+  body { margin: 0; background: #fff; font-family: "Malgun Gothic", sans-serif; color: #1d2733; }
+  .page { width: 1560px; padding: 20px; display: flex; align-items: stretch; gap: 0; }
+  .col { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+  .h { font-weight: 700; font-size: 17px; text-align: center; padding: 8px; border-radius: 9px; color: #fff; }
+  .c1 .h { background: #2b8bd6; } .c2 .h { background: #1f9d7a; } .c3 .h { background: #8b6bd1; } .c4 .h { background: #d9822b; } .c5 .h { background: #1d2733; }
+  .b { border-radius: 9px; padding: 9px 10px; font-size: 14.5px; line-height: 1.45; background: #f3f7fb; border: 1px solid #c9d6e2; }
+  .b b { display: block; font-size: 15px; }
+  .ar { width: 34px; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #8aa0b4; }
+  .r { background: #fdecec; border-color: #f0b4b4; } .y { background: #fff6dd; border-color: #f0d68a; } .g { background: #e8f7ee; border-color: #a9dcbc; }
+</style></head>
+<body><div class="page">
+  <div class="col c1"><div class="h">1. 입력</div>
+    <div class="b"><b>약 이름</b>제품명(한·영·일), 성분명, '성분+성분', SMILES 구조식 · 최대 15개</div>
+    <div class="b"><b>복용량·기간 (선택)</b>1회량·하루 횟수·일수·필요시</div>
+    <div class="b"><b>환자 정보</b>나이·성별·키·몸무게·크레아티닌·AST/ALT·빌리루빈·기저질환·임신</div>
+    <div class="b"><b>음식·생활</b>술·자몽·우유·커피·녹색 채소·흡연</div>
+  </div>
+  <div class="ar">▶</div>
+  <div class="col c2"><div class="h">2. 해석 · 계산</div>
+    <div class="b"><b>성분 해석</b>제품 → 성분·1정당 함량·제형(서방형·장용형)</div>
+    <div class="b"><b>임상 계산</b>신기능(CKD-EPI·Cockcroft-Gault), 간 기능 등급, BMI → 약물 처리 능력</div>
+    <div class="b"><b>용량 합산</b>여러 제품의 같은 성분 하루 총량</div>
+  </div>
+  <div class="ar">▶</div>
+  <div class="col c3"><div class="h">3. 근거 수집 (4계층)</div>
+    <div class="b r"><b>① 공식 기준</b>식약처 DUR 병용·연령·임부 금기, 허가 라벨 금기·중대 문구</div>
+    <div class="b r"><b>② 임상 규칙</b>성분·계열 중복, 질환 금기(Beers 2023), FDA CYP 강한 억제제×민감 기질, 1일 최대량</div>
+    <div class="b y"><b>③ 약리 기전</b>ChEMBL CYP 억제·hERG·같은 표적</div>
+    <div class="b y"><b>④ AI 예측</b>환자-다약제 모델(FAERS), 약물쌍 구조 모델(TWOSIDES)</div>
+  </div>
+  <div class="ar">▶</div>
+  <div class="col c4"><div class="h">4. 판정 규칙</div>
+    <div class="b r"><b>위험</b>①·② 문서·규칙 근거가 있을 때만</div>
+    <div class="b y"><b>주의</b>라벨 기재(강한 표현 없음), DUR 노인·효능군중복, 약리 기전, AI 신호 중 조합·환자 때문에 1.5배 이상 늘어나는 중대 이상반응</div>
+    <div class="b g"><b>비교적 안전</b>위 어느 것도 없음</div>
+    <div class="b"><b>참고 정보</b>약 자체 부작용·약물쌍 통계 신호는 판정을 올리지 않음(경보 피로 방지)</div>
+  </div>
+  <div class="ar">▶</div>
+  <div class="col c5"><div class="h">5. 출력</div>
+    <div class="b"><b>신호등 판정</b>쉬운 이유·할 일, 전문가 보기(확률·배수·원문)</div>
+    <div class="b"><b>몸속 이동 화면</b>근거를 장기·시간축에 배치</div>
+    <div class="b"><b>AI 소견서 · 상담</b>로컬 LLM, 근거 출처 표시</div>
+    <div class="b"><b>연동 · 기록</b>FHIR R4 API, 감사 로그(환자 정보 제외)</div>
+  </div>
+</div></body></html>

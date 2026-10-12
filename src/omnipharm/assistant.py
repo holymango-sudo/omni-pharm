@@ -108,13 +108,13 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     if not keys or keys <= {g.key for p in base for g in p["ingredients"]}:
         return None  # already in the analysis ('타이레놀' asked about while 타이레놀정500 is analysed)
     new = {"input": name, "ingredients": ings, "product": info.get("product"), "release": info.get("release"),
-           "strength": info.get("strength")}
+           "strength": info.get("strength"), "label_ko": info.get("label_ko")}
     r = eng.predict([*base, *also, new], patient)
     s = r["summary"]
     names = [eng.ko(g) for g in ings]
 
-    def mine(text: str) -> bool:
-        return any(n in text for n in names)
+    def mine(text: str) -> bool:  # findings about this item: its ingredients, or the product itself (label age limit)
+        return any(n in text for n in [*names, name])
 
     pairs = [f"{p['a']} + {p['b']}: {p['level']}" + (f" — {p['mechanism'][0]['text']}" if p.get("mechanism") else "")
              + (" (식약처 DUR 병용금기)" if p.get("dur") else "")
@@ -145,14 +145,32 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
             limits.append(f"{eng.ko(g)}: 1일 최대 {fmt_mg(mx)}" + (f"(일반약 자가복용 기준 {fmt_mg(warn)})" if warn else "")
                           + (f", 1회 최대 {fmt_mg(single)}" if single else "") + (f" — {', '.join(why)} 반영" if why else "")
                           + " (다른 약·음료의 같은 성분과 합쳐서)")
+    lab = info.get("label_ko") or {}
+    src = _sources(r, keys, [*names, name]) | ({"허가 용량 기준"} if limits else set())
+    if lab:
+        src.add("식약처 허가사항(제품 설명서)")
     return {"확인한 제품": f"{name} = {shown}", "함께 먹을 때 판정": verdict,
             "1개당 함량": f"{st.get('unit') or '1회 단위'}당 " + ", ".join(content) if content else None,
+            # Korean label of quasi-drugs (박카스 ...): the official '1일 1회 1병' answers '하루 몇 병?'
+            "제품 설명서 용법(식약처)": (lab.get("usage") or "")[:300] or None,
+            "제품 설명서 주의사항(요약)": label_cautions(lab.get("cautions") or "") or None,
             "1일최대량(허가기준·이 환자)": limits,
             "이 제품 관련 이유": [x["text"] for x in s["reasons"] if x["sev"] != "low" and mine(x["text"])][:5],
             "이 제품 관련 참고": [x["text"] for x in s["reasons"] if x["sev"] == "low" and mine(x["text"])][:2],
             "할 일": s["advice"][:3], "상호작용": pairs,
-            "근거종류": sorted(_sources(r, keys, names) | ({"허가 용량 기준"} if limits else set())),
+            "근거종류": sorted(src),
             "_product": new}
+
+
+def label_cautions(text: str, limit: int = 420) -> str:
+    """The first articles of a Korean label's cautions (who must not take it, who should ask first), shortened."""
+    out, n = [], 0
+    for ln in text.splitlines():
+        if n + len(ln) > limit:
+            break
+        out.append(ln)
+        n += len(ln)
+    return "\n".join(out)
 
 
 def _sources(r: dict, keys: set[str], names: list[str]) -> set[str]:
@@ -167,6 +185,8 @@ def _sources(r: dict, keys: set[str], names: list[str]) -> set[str]:
             src.add("FDA 허가 라벨")
         for m in p.get("mechanism", []):
             src.add("임상 규칙" if m["kind"] == "규칙" else "FDA CYP 지표표" if m["kind"] == "CYP-FDA" else "약리 기전(ChEMBL)")
-    if any(d.get("drug") in names for d in r.get("disease_alerts", [])):
-        src.add("질환별 금기 기준(Beers·허가사항·DUR)")
+    for d in r.get("disease_alerts", []):
+        if d.get("drug") in names:
+            src.add("식약처 허가사항(제품 설명서)" if d.get("key") == "age_label"
+                    else "질환별 금기 기준(Beers·허가사항·DUR)")
     return src

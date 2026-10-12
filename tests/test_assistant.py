@@ -81,6 +81,23 @@ def test_fallback_shows_the_quick_checks_first():
     assert "[방금 확인한 결과]" in llm.lookup_block(found) and llm.lookup_block([]) == ""
 
 
+def test_quasi_drug_label_age_limits():
+    from omnipharm.pipeline.dur import doc_text, min_age
+
+    xml = ('<DOC><SECTION><ARTICLE title="(1)&amp;nbsp;다음과 같은 사람은 이 제품을 복용하지 말 것">'
+           '<PARAGRAPH><![CDATA[1)&nbsp;과민증 환자]]></PARAGRAPH><PARAGRAPH><![CDATA[2)&nbsp;15세 미만]]></PARAGRAPH>'
+           '</ARTICLE></SECTION></DOC>')
+    assert doc_text(xml).splitlines() == ["(1) 다음과 같은 사람은 이 제품을 복용하지 말 것", "1) 과민증 환자", "2) 15세 미만"]
+    assert min_age("", doc_text(xml)) == 15  # listed under '…복용하지 말 것'
+    assert min_age("15세 이상 성인 : 1일 1회 1병. 15세 미만은 복용하지 않는다.", "") == 15
+    assert min_age("", "2) 6세 이하의 어린이에게는 사용하지 마십시오.") == 7  # '이하' -> under 7
+    # not bans: a child dose, a supervision note, a warning, an application instruction
+    assert min_age("12세 미만 소아: 성인 용량의 1/2", "") is None
+    assert min_age("", "6세 이하의 어린이가 사용할 경우 삼키지 않도록 보호자의 지도하에 사용할 것") is None
+    assert min_age("", "1. 경고\n1) 만 6세 이하의 어린이가 복용할 경우 독성이 나타날 수 있다.") is None
+    assert min_age("※ 소아(만 12세 미만)에게 사용할 때는 소아가 직접 사용하지 말고 어른 손에 먼저 취한다.", "") is None
+
+
 def test_general_chat_needs_no_analysis():
     ctx = llm.general_context({"diseases": ["고혈압"]}, {"age": 70})
     assert "분석하지 않았" in ctx["상태"] and ctx["환자"]["age"] == 70
@@ -99,6 +116,40 @@ def test_items_named_in_a_question_are_found(eng):
     assert f(eng, "와파린 먹는데 아스피린 먹어도 돼요?") == ["와파린", "아스피린"]
     for q in ("감기약 먹어도 되나요?", "비타민 먹어도 돼요?", "언제 먹어야 해요?", "부작용이 뭐예요?", "오늘 날씨 어때?"):
         assert f(eng, q) == [], q
+    # supplements / herbs have no structure but are known to the rules: the chat must find them too
+    for w in ("홍삼", "은행잎", "오메가3", "유산균", "코엔자임Q10", "크랜베리", "밀크씨슬"):
+        assert f(eng, f"{w} 먹어도 돼요?") == [w], w
+    assert "홍삼" in eng.catalog()["korean_ingredients"] and eng.search("홍삼", 3)[0]["name"] == "홍삼"
+
+
+@needs_models
+@pytest.mark.slow
+def test_supplement_rules(eng):
+    from omnipharm import assistant
+
+    def check(drug, item):
+        return assistant.quick_check(eng, [{"input": drug, "ingredients": eng.resolve(drug)}], item, Patient(**ADULT))
+
+    for item, word in (("홍삼", "INR"), ("은행잎", "출혈"), ("오메가3", "출혈"), ("코엔자임Q10", "INR"), ("크랜베리", "INR")):
+        c = check("warfarin", item)
+        assert c["함께 먹을 때 판정"].startswith("주의") and any(word in x for x in c["상호작용"]), item
+    assert "은행잎(" in check("warfarin", "은행잎")["확인한 제품"]  # Korean name, not bare 'ginkgo'
+    c = check("amoxicillin", "유산균")
+    assert c["함께 먹을 때 판정"].startswith("주의") and any("2시간" in x for x in c["상호작용"])
+    assert any("저혈당" in x for x in check("glimepiride", "홍삼")["상호작용"])
+    assert check("warfarin", "루테인")["함께 먹을 때 판정"].startswith("비교적 안전")  # no documented interaction
+
+
+@needs_models
+@pytest.mark.slow
+def test_quasi_drug_label_reaches_chat_and_verdict(eng):
+    from omnipharm import assistant
+
+    kid = assistant.quick_check(eng, [], "박카스", Patient(age=12))
+    assert kid["함께 먹을 때 판정"].startswith("위험") and any("15세 미만" in x for x in kid["이 제품 관련 이유"])
+    adult = assistant.quick_check(eng, [], "박카스", Patient(**ADULT))
+    assert "1병" in adult["제품 설명서 용법(식약처)"] and "식약처 허가사항(제품 설명서)" in adult["근거종류"]
+    assert not adult["함께 먹을 때 판정"].startswith("위험")
 
 
 @needs_models

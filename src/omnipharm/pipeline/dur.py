@@ -14,6 +14,7 @@ Raw API pages are cached in data/raw/mfds_dur/ (re-run = no network).
 
 from __future__ import annotations
 
+import html
 import json
 import logging
 import re
@@ -152,6 +153,40 @@ def build_dur() -> dict:
     return out
 
 
+def doc_text(xml: str | None) -> str:
+    """MFDS XML document (EE/UD/NB_DOC_DATA) -> plain text, one line per article title / paragraph."""
+    if not xml:
+        return ""
+    s = re.sub(r"<ARTICLE title=\"([^\"]*)\"", lambda m: "\n" + m.group(1) + "\n<", xml)
+    s = re.sub(r"<!\[CDATA\[(.*?)\]\]>", lambda m: m.group(1) + "\n", s, flags=re.S)
+    s = html.unescape(html.unescape(re.sub(r"<[^>]*>", " ", s))).replace("\xa0", " ")
+    return "\n".join(ln for ln in (" ".join(x.split()) for x in s.splitlines()) if ln)
+
+
+def min_age(usage: str, cautions: str) -> int | None:
+    """'15세 미만은 복용하지 않는다' -> 15 (the product is labelled not for younger people)."""
+    age = re.compile(r"(\d{1,2})\s*세\s*(미만|이하)")
+    ban = re.compile(r"(복용|사용|투여|먹)(하)?지\s*(않|말|마)|금지|금한다")
+    # not bans: '6세 이하는 보호자 지도 하에', '2세 이상 ~ 12세 미만: …', '소아에게 사용할 때는 어른 손에 …', '지시 없이는'
+    soft = re.compile(r"주의|감독|지도|보호자|삼키|독성|경우|이상|할 때|때는|어른|직접|지시")
+    ages, ban_list = [], False
+    for ln in (usage + "\n" + cautions).splitlines():
+        if "다음" in ln and re.search(r"것\.?\s*$", ln) and not age.search(ln):  # article title
+            ban_list = bool(re.search(r"(복용|사용|투여)하지\s*말", ln))  # '…은 이 제품을 복용하지 말 것'
+            continue
+        if not age.search(ln) and (len(ln) > 40 or re.search(r"사항|이상반응|경고|보관", ln)):
+            ban_list = False  # the '…하지 말 것' list has ended
+            continue
+        for sent in re.split(r"(?<=[.。])\s+", ln):  # judge each sentence ('15세 이상 성인: 1병. 15세 미만은 …')
+            for m in age.finditer(sent):
+                if soft.search(sent):
+                    continue
+                # '15세 미만은 복용하지 않는다' / a short item under '다음 사람은 복용하지 말 것' ('2) 15세 미만')
+                if ban.search(sent[m.end():]) or (ban_list and len(ln) <= 40):
+                    ages.append(int(m[1]) + (m[2] == "이하"))
+    return max(ages) if ages else None
+
+
 def build_quasi() -> pd.DataFrame:
     rows = fetch_all("QdrgPrdtPrmsnInfoService03", "getQdrgPrdtPrmsnInfoInq03")
     kr = PROC / "kr_ingredient_names.json"
@@ -176,12 +211,17 @@ def build_quasi() -> pd.DataFrame:
             k = ko_key(p)
             (ings if k else un).append(k or p)
         # mapped English names from KR_INGREDIENTS are plain names: resolve them like other English names
+        usage, cautions = doc_text(r.get("UD_DOC_DATA")), doc_text(r.get("NB_DOC_DATA"))
         recs.append({"item_seq": str(r.get("ITEM_SEQ")), "name": name, "base": re.sub(r"\(.*?\)|\s", "", name),
                      "eng_name": "", "company": r.get("ENTP_NAME") or "", "kind": "의약외품",
                      "status": "정상" if (r.get("CANCEL_CODE_NAME") or "정상") == "정상" else "취소",
                      "category": r.get("CLASS_NO_NAME") or "", "ingredients_raw": r.get("MAIN_INGR") or "",
-                     "ingredients": list(dict.fromkeys(ings)), "unresolved": un})
+                     "ingredients": list(dict.fromkeys(ings)), "unresolved": un,
+                     # the Korean label: 용법용량 / 효능 / 사용상의 주의사항 (the per-bottle amount is not in this API)
+                     "usage": usage, "efficacy": doc_text(r.get("EE_DOC_DATA")), "cautions": cautions,
+                     "min_age": min_age(usage, cautions)})
     df = pd.DataFrame(recs)
+    df["min_age"] = df["min_age"].astype("Int64")
     mapper = Mapper()
     plain = {i for v in df["ingredients"] for i in v if ":" not in i}
     pm = mapper.map_all(plain) if plain else {}

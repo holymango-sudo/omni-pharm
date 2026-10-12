@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>OMNI-PHARM 시스템 구성도</title>
+<style>
+  body { margin: 0; background: #fff; font-family: "Malgun Gothic", sans-serif; color: #1d2733; }
+  .page { width: 1560px; padding: 20px; }
+  .layer { border: 2px solid #8aa0b4; border-radius: 12px; padding: 12px 14px 14px; margin-bottom: 14px; position: relative; }
+  .layer > .lt { position: absolute; top: -13px; left: 16px; background: #fff; padding: 0 8px; font-weight: 700; font-size: 17px; }
+  .ui { border-color: #2b8bd6; } .ui > .lt { color: #1b6fb0; }
+  .srv { border-color: #1f9d7a; } .srv > .lt { color: #13795d; }
+  .dat { border-color: #8b6bd1; } .dat > .lt { color: #6a4bb5; }
+  .row { display: flex; gap: 10px; }
+  .box { flex: 1; border-radius: 9px; padding: 9px 10px; font-size: 14.5px; line-height: 1.45; background: #f3f7fb; border: 1px solid #c9d6e2; }
+  .box b { display: block; font-size: 15.5px; margin-bottom: 3px; }
+  .ui .box { background: #eaf4fd; border-color: #b7d7f2; }
+  .srv .box { background: #e9f7f2; border-color: #b4e2d3; }
+  .dat .box { background: #f2eefb; border-color: #d4c8f0; }
+  .hot { background: #fff4e5 !important; border-color: #f2c48a !important; }
+  .red { background: #fdecec !important; border-color: #f0b4b4 !important; }
+  .arrow { text-align: center; font-size: 14px; color: #44576a; margin: -4px 0 10px; }
+  .arrow span { display: inline-block; padding: 2px 12px; border-radius: 99px; background: #eef2f6; border: 1px solid #d3dce5; }
+  .side { display: flex; gap: 14px; }
+  .side > .layer { margin-bottom: 0; }
+  .user { font-size: 15px; text-align: center; margin-bottom: 12px; }
+  .user span { display: inline-block; padding: 6px 16px; border-radius: 99px; background: #1d2733; color: #fff; font-weight: 700; }
+  .hw { margin-top: 12px; font-size: 14px; text-align: center; color: #44576a; }
+  .hw b { color: #1d2733; }
+  .sub { font-size: 13px; color: #55687a; }
+</style></head>
+<body><div class="page">
+  <div class="user"><span>사용자 — 환자·보호자 (기본 화면) / 의사·약사 (전문가 보기)</span> &nbsp; 웹 브라우저 http://localhost:8000 (PC·태블릿·휴대폰)</div>
+
+  <div class="layer ui"><div class="lt">① 화면 계층 — React 18 · React Three Fiber(Three.js) · Vite</div>
+    <div class="row">
+      <div class="box"><b>01 환자 정보</b>나이·성별·키·몸무게·신장(크레아티닌/eGFR)·간 수치·기저질환·임신 → 약물 처리 능력 실시간 표시</div>
+      <div class="box"><b>02 약 검색 · 3D 분자</b>6개국 제품명·성분명·SMILES 입력, 실제 분자 구조 3D 표시, 용량·횟수·기간, 음식·술·흡연</div>
+      <div class="box"><b>몸속 이동 시각화</b>X-ray 인체(성별)·장기·혈관, 복용→흡수→간 대사→혈류→표적→문제 장기→배출 7단계, 경과 시간·농도 곡선</div>
+      <div class="box"><b>03 판정 · 근거 · AI 소견</b>신호등 판정(위험/주의/비교적 안전), 이유·할 일, 근거 원문, 로컬 LLM 소견서</div>
+      <div class="box hot"><b>AI 복약 상담 · 증상으로 약 찾기</b>자유 질문(질문 속 약을 즉시 검사), 17개 증상별 일반의약품 후보 선별</div>
+    </div>
+  </div>
+  <div class="arrow"><span>▲▼ REST API (JSON) · SSE 토큰 스트리밍 — 환자 정보는 메모리에서만 처리, 디스크·로그 저장 안 함</span></div>
+
+  <div class="side">
+    <div class="layer srv" style="flex: 4.3"><div class="lt">② 분석 서버 — Python 3.11 · FastAPI · PyTorch(CUDA) · RDKit</div>
+      <div class="row" style="margin-bottom:10px">
+        <div class="box"><b>약 이름 해석 (engine.py)</b>제품 DB 12만 개 + 성분 별칭 + PubChem 조회 → 성분·함량·제형(서방형/장용형)</div>
+        <div class="box"><b>임상 계산 (clinical.py)</b>CKD-EPI 2021, Cockcroft-Gault, BMI, 간 수치 ULN 배수 → 약물 처리 능력</div>
+        <div class="box"><b>용량 점검 (dosing.py)</b>제품 간 성분 합산 하루 총량 vs 1일 최대량(신장·간·나이 보정), 사용 기간</div>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <div class="box red"><b>C0 식약처 DUR</b>병용금기 1,250쌍, 연령·임부·노인·효능군중복</div>
+        <div class="box red"><b>C 문서·규칙 근거</b>FDA 라벨 8.4만 건 전문 검색, CYP 지표표, 성분·계열 중복, 질환 규칙</div>
+        <div class="box"><b>D 약리 기전</b>ChEMBL CYP 억제·hERG·표적·작용기전</div>
+        <div class="box"><b>A 환자-다약제 모델</b>GINE + Transformer, 약물 집합 + 환자 → 52개 이상반응</div>
+        <div class="box"><b>B 약물쌍 구조 모델</b>GNN + Morgan 지문 앙상블, TWOSIDES</div>
+      </div>
+      <div class="row">
+        <div class="box hot" style="flex:2"><b>판정 규칙 (근거 계층)</b>'위험'은 DUR·허가 문서·임상 규칙·성분 중복·질환 금기·최대량 초과 등 <u>문서화된 근거로만</u> · AI 신호는 조합·환자로 늘어나는 위험(≥1.5배)일 때 '주의'까지</div>
+        <div class="box"><b>몸속 경로 (journey.py)</b>판정 근거를 장기·시간축에 배치, 라벨 Tmax·반감기</div>
+        <div class="box"><b>상담 보조 (assistant.py)</b>질문 속 약·음식을 찾아 현재 약과 함께 재검사</div>
+      </div>
+    </div>
+    <div class="layer srv" style="flex: 1"><div class="lt">③ 로컬 LLM</div>
+      <div class="box" style="margin-bottom:10px"><b>Ollama + Gemma 4 12B</b>RTX 5070 Ti에서 145 토큰/초</div>
+      <div class="box" style="margin-bottom:10px"><b>AI 전문가 소견서</b>근거 JSON → 문장, 근거 밖 용량·약명 생성 금지</div>
+      <div class="box"><b>AI 복약 상담</b>분석 결과 + 즉시 검사 결과로 답변, 응급 표현 → 119 우선 안내</div>
+    </div>
+  </div>
+  <div class="arrow" style="margin-top:10px"><span>▲ 학습된 모델 · 인덱스 · 데이터베이스 (Parquet · SQLite FTS5 · PyTorch 가중치)</span></div>
+
+  <div class="layer dat"><div class="lt">④ 데이터 계층 — 오프라인 파이프라인 (scripts/pipeline.py, 공개 데이터만 사용)</div>
+    <div class="row">
+      <div class="box"><b>FDA FAERS + 캐나다</b>이상사례 보고 1,583만 건 (2004–2026)</div>
+      <div class="box"><b>TWOSIDES</b>약물쌍 부작용 신호 17만 쌍</div>
+      <div class="box"><b>openFDA 허가 라벨</b>8.4만 건 전문 검색 DB, Tmax·반감기 1,147개 성분</div>
+      <div class="box"><b>식약처 (공공데이터포털)</b>의약품 허가·의약외품·DUR</div>
+      <div class="box"><b>ChEMBL · PubChem</b>약리 활성·작용기전·ATC, 분자 구조</div>
+      <div class="box"><b>각국 제품 DB</b>한국·미국·캐나다·EU·프랑스·일본 12만여 개</div>
+    </div>
+  </div>
+  <div class="hw">하드웨어: <b>AMD Ryzen 7 7800X3D · NVIDIA RTX 5070 Ti 16GB · Windows 11 Pro</b> — 외부 서버 없이 PC 한 대에서 동작, 실행 환경 전체를 외장 SSD 하나에 담아 이동 가능</div>
+</div></body></html>

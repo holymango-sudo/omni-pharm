@@ -194,7 +194,13 @@ KR_INGREDIENTS: dict[str, str] = {
     "마황": "ephedra herb", "세인트존스워트": "hypericum perforatum", "성요한풀": "hypericum perforatum",
     "밀크씨슬": "milk thistle", "실리마린": "silymarin", "쏘팔메토": "saw palmetto", "강황": "turmeric",
     "커큐민": "curcumin", "오메가3": "omega-3 fatty acids", "홍국": "red yeast rice", "마늘": "garlic",
-    "녹차추출물": "green tea extract", "가르시니아": "garcinia cambogia", "칼슘": "calcium carbonate",
+    "녹차추출물": "green tea extract", "녹차": "green tea extract", "카테킨": "green tea extract",
+    "흑마늘": "garlic", "울금": "turmeric", "흑삼": "ginseng", "오메가-3": "omega-3 fatty acids",
+    "오메가쓰리": "omega-3 fatty acids", "크릴오일": "krill oil", "피쉬오일": "fish oil", "어유": "fish oil",
+    "유산균": "probiotics", "프로바이오틱스": "probiotics", "락토바실러스": "lactobacillus", "비피더스": "bifidobacterium",
+    "코엔자임Q10": "ubidecarenone", "코큐텐": "ubidecarenone", "크랜베리": "cranberry", "루테인": "lutein",
+    "비오틴": "biotin", "프로폴리스": "propolis", "아르기닌": "arginine",
+    "가르시니아": "garcinia cambogia", "칼슘": "calcium carbonate",
     "마그네슘": "magnesium oxide", "철분": "ferrous sulfate", "아연": "zinc", "염화칼륨": "potassium chloride",
     "비타민C": "ascorbic acid", "비타민D": "cholecalciferol", "비타민E": "tocopherol", "비타민K": "phytonadione",
     "비타민B12": "cyanocobalamin", "엽산": "folic acid", "글루타치온": "glutathione", "히알루론산": "hyaluronic acid",
@@ -744,6 +750,13 @@ DRUG_GROUPS.update({
     "immunosuppressant": frozenset({"methotrexate", "azathioprine", "cyclosporine", "tacrolimus", "tofacitinib",
                                     "baricitinib", "upadacitinib", "mycophenolate mofetil"}),
 })
+# antibacterials (probiotics are taken at least 2 hours apart from them)
+DRUG_GROUPS["antibacterial"] = (DRUG_GROUPS["fluoroquinolone"] | DRUG_GROUPS["macrolide"] | DRUG_GROUPS["aminoglycoside"]
+                                | DRUG_GROUPS["tetracycline"] | frozenset({
+    "amoxicillin", "ampicillin", "penicillin v", "penicillin g", "clavulanic acid", "sultamicillin", "cefaclor",
+    "cefadroxil", "cephalexin", "cefuroxime", "cefuroxime axetil", "cefixime", "cefdinir", "cefpodoxime",
+    "cefditoren", "ceftriaxone", "cefazolin", "cefprozil", "clindamycin", "metronidazole", "sulfamethoxazole",
+    "trimethoprim", "nitrofurantoin", "fosfomycin", "vancomycin", "linezolid", "rifaximin", "rifampin"}))
 DISEASES.update({
     "thyroid_cancer": {"ko": "갑상선수질암·MEN2", "kw": ("갑상선수질암", "수질암", "men2", "medullary thyroid"),
                        "flag": None},
@@ -808,9 +821,16 @@ PAIR_RULES: list[tuple[str, str, str, str]] = [
     ("anticoagulant", "nsaid", "주의", "출혈(특히 위장관 출혈) 위험이 커집니다 — 검은 변·멍·잇몸 출혈을 살피세요"),
     ("anticoagulant", "ssri", "주의", "SSRI·SNRI는 혈소판 기능을 떨어뜨려 출혈 위험을 더합니다 — 출혈 징후를 살피세요"),
     ("nsaid", "ssri", "주의", "위장관 출혈 위험이 커집니다 — 속쓰림·검은 변이 생기면 상담하세요"),
-    ("bleeding_herb", "anticoagulant", "주의", "은행잎 성분이 출혈 위험을 더할 수 있습니다"),
-    ("bleeding_herb", "nsaid", "주의", "은행잎 성분이 출혈 위험을 더할 수 있습니다"),
+    ("bleeding_herb", "anticoagulant", "주의", "은행잎·마늘·강황 같은 성분은 혈액 응고를 늦춰 출혈 위험을 더할 수 있습니다"),
+    ("bleeding_herb", "nsaid", "주의", "은행잎·마늘·강황 같은 성분은 혈액 응고를 늦춰 출혈 위험을 더할 수 있습니다"),
     ("ginseng", "warfarin", "주의", "인삼이 와파린 효과(INR)를 떨어뜨릴 수 있습니다"),
+    ("ginseng", "insulin", "주의", "인삼이 혈당을 더 낮출 수 있습니다 — 저혈당 증상을 살피세요"),
+    ("ginseng", "sulfonylurea", "주의", "인삼이 혈당을 더 낮출 수 있습니다 — 저혈당 증상을 살피세요"),
+    # common supplements (product labelling and standard interaction references); never above '주의'
+    ("omega3", "anticoagulant", "주의", "오메가3를 많이(하루 3g 이상) 먹으면 출혈 경향이 커질 수 있습니다 — 멍·잇몸 출혈을 살피세요"),
+    ("coq10", "warfarin", "주의", "코엔자임Q10이 와파린 효과(INR)를 떨어뜨릴 수 있습니다 — 시작하거나 끊을 때 INR을 확인하세요"),
+    ("cranberry", "warfarin", "주의", "크랜베리 주스·농축 제품을 많이 먹으면 INR이 올라 출혈 위험이 생길 수 있습니다"),
+    ("probiotic", "antibacterial", "주의", "항생제가 유산균을 죽여 효과가 줄어듭니다 — 항생제와 2시간 이상 간격을 두고 드세요"),
     ("st_johns_wort", "immunosuppressant", "높음", "세인트존스워트가 면역억제제 농도를 크게 낮춰 거부반응 위험이 있습니다"),
     ("st_johns_wort", "oral_contraceptive", "주의", "세인트존스워트가 피임약 효과를 떨어뜨립니다"),
     ("st_johns_wort", "anticoagulant", "주의", "세인트존스워트가 항응고 효과를 떨어뜨립니다"),
@@ -836,7 +856,8 @@ HERB_RE = re.compile(r"root|rhizome|leaf|folium|\bherb|herba\b|bark|fruit|seed|f
                      r"licorice|liquorice|glycyrrhiz|jujube|ginger|poria|ephedra|cinnamon|cnidium|angelica|astragal|"
                      r"atractylod|platycod|schisandra|pueraria|bupleur|scutellaria|rehmannia|massa medicata|"
                      r"ramulus|spike|ssanghwa|tang\b|hwan\b|ginkgo|hypericum|valerian|silymarin|milk thistle|"
-                     r"zea mays|magnolia|artemisia|propolis|cordyceps|antler|placenta", re.I)
+                     r"zea mays|magnolia|artemisia|propolis|cordyceps|antler|placenta|garlic|turmeric|palmetto|"
+                     r"garcinia|cranberr|green tea", re.I)
 VITMIN_RE = re.compile(r"vitamin|tocopher|calciferol|retinol|cobalamin|thiamine|fursultiamine|benfotiamine|riboflavin|"
                        r"pyridox|nicotinamide|niacin|folic|biotin|pantothen|ascorb|calcium|magnesium|\bzinc|\biron\b|"
                        r"ferr|selenium|copper|manganese|chromium|iodine|potassium|taurine|inositol|carnitine|lysine|"
@@ -880,7 +901,12 @@ def structureless_category(name: str) -> str:
 NAME_GROUPS: list[tuple[re.Pattern, set[str]]] = [
     (re.compile(r"ephedra|마황", re.I), {"decongestant", "ephedra"}),
     (re.compile(r"glycyrrhiz|licorice|liquorice|감초", re.I), {"licorice"}),
-    (re.compile(r"ginkgo", re.I), {"bleeding_herb"}),
+    (re.compile(r"ginkgo|garlic|allium sativum|turmeric|curcum", re.I), {"bleeding_herb"}),
+    (re.compile(r"omega|fish oil|krill|icosapent|eicosapentaen|docosahexaen", re.I), {"omega3"}),
+    (re.compile(r"ubidecarenone|coenzyme q", re.I), {"coq10"}),
+    (re.compile(r"cranberr|vaccinium macrocarpon", re.I), {"cranberry"}),
+    (re.compile(r"probiotic|lactobacill|bifidobacter|streptococcus faec|enterococcus faec|bacillus subtilis|"
+                r"bacillus coagulans|clostridium butyricum", re.I), {"probiotic"}),
     (re.compile(r"panax|ginseng|인삼|홍삼", re.I), {"ginseng"}),
     (re.compile(r"hypericum|st\.? ?john", re.I), {"st_johns_wort"}),
     (re.compile(r"red yeast rice|monascus", re.I), {"statin"}),
