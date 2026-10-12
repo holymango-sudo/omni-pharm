@@ -14,7 +14,8 @@ STOP = re.compile(r"(복용|약|와파린|심바스타틴|처방약)[을를은�
                   r"(세요|십시오|셔도\s*(됩|괜찮))")
 ASK_PRO = re.compile(r"의사|약사|전문가|상의|상담")
 REASSURE = re.compile(r"(드셔도|먹어도|마셔도|복용하셔도|같이\s*드셔도)\s*(괜찮|됩니다|돼요|무방)|문제\s*없|안심하")
-AVOID = re.compile(r"피하|드시지\s*마|먹지\s*마|복용하지\s*마|마시지\s*마|금기|위험|안\s*됩니다|삼가")
+AVOID = re.compile(r"피하|드시지\s*마|먹지\s*마|복용하지\s*마|마시지\s*마|금기|위험|안\s*(됩니다|돼|되요)|삼가|"
+                   r"(복용|드시|드시지|드시는|먹지|마시지|함께\s*복용하지)\s*않는\s*것이\s*좋|않도록|제한")
 MG = re.compile(r"(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(mg|밀리그램|㎎)", re.I)
 SOURCES_LINE = re.compile(r"^\s*\**근거\**\s*[:：]\s*(.+)$", re.M)
 EMERGENCY_HEAD = "응급 신호일 수 있습니다"
@@ -50,6 +51,16 @@ def keeps_danger(answer: str, verdict: str) -> str | None:
     for s in _sentences(answer):
         if REASSURE.search(s) and not re.search(r"않|없|안\s|마세요|아니", s) and not AVOID.search(s):
             return f"위험 판정을 안심시키는 문장: {s.strip()[:60]}"
+    return None
+
+
+def contra_not_fixable(answer: str, contraindicated: bool) -> str | None:
+    """A contraindicated pair (DUR 병용금기 / label contraindication) must not be 'solved' by a lower dose."""
+    if not contraindicated:
+        return None
+    for s in _sentences(answer):
+        if re.search(r"(용량|양)을?\s*(줄이|조절|낮추)|간격을?\s*(조절|늘리|두)", s) and not re.search(r"않|없|안\s|별개|아니", s):
+            return f"병용금기를 용량 조절로 해결하는 문장: {s.strip()[:60]}"
     return None
 
 

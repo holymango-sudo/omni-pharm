@@ -149,6 +149,8 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     src = _sources(r, keys, [*names, name]) | ({"허가 용량 기준"} if limits else set())
     if lab:
         src.add("식약처 허가사항(제품 설명서)")
+    if not src:  # checked, and no documented problem: that is the source of a '괜찮다' answer
+        src.add("상호작용 검사(문서·규칙 근거 없음)")
     return {"확인한 제품": f"{name} = {shown}", "함께 먹을 때 판정": verdict,
             "1개당 함량": f"{st.get('unit') or '1회 단위'}당 " + ", ".join(content) if content else None,
             # Korean label of quasi-drugs (박카스 ...): the official '1일 1회 1병' answers '하루 몇 병?'

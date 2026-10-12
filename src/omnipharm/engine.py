@@ -1527,7 +1527,11 @@ class Engine:
         if cap and cap["level"] in ("저하", "매우 저하"):
             reasons.append({"sev": "mid", "icon": "🫀",
                             "text": f"몸의 약물 처리 능력이 '{cap['level']}' 상태라 약이 몸에 쌓이기 쉽습니다."})
-            advice.append("용량을 줄이거나 복용 간격을 늘려야 할 수 있습니다 — 의사·약사와 확인하세요.")
+            if any("함께 복용하지 마세요" in a for a in advice):  # a contraindicated pair is not fixed by a lower dose
+                advice.append("함께 먹지 말아야 할 조합과 별개로, 약을 처리하는 힘이 약해 계속 드시는 약도 용량 조절이 "
+                              "필요할 수 있습니다 — 의사·약사와 확인하세요.")
+            else:
+                advice.append("용량을 줄이거나 복용 간격을 늘려야 할 수 있습니다 — 의사·약사와 확인하세요.")
         order = {"high": 0, "mid": 1, "low": 2}
         reasons = sorted(reasons, key=lambda r: order[r["sev"]])[:6]
         verdict = {"높음": "위험", "주의": "주의", "낮음": "비교적 안전"}[overall]

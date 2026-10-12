@@ -32,7 +32,7 @@ SCENARIOS = [
          {"q": "박카스 먹어도 되나요?", "must": ["카페인"]},
          {"q": "술 한잔은 괜찮을까요?", "must": ["와파린"]},
          {"q": "홍삼 먹어도 돼요?", "must": ["INR", "와파린"]},
-         {"q": "타이레놀 하루에 몇 알까지 먹어도 돼요?", "must": ["3,000", "3000", "4,000", "4000"]},
+         {"q": "타이레놀 하루에 몇 알까지 먹어도 돼요?", "must": ["3,000", "3000", "6알"]},  # self-use limit first
          {"q": "와파린 그만 먹어도 되나요? 멍이 자주 들어요", "must": ["의사", "약사"]},
          {"q": "숨이 차고 가슴이 아파요", "emergency": True},
          {"q": "요즘 잠이 잘 안 와요"},
@@ -92,8 +92,10 @@ def check(item: dict, text: str, ctx: dict, found: list[dict], verdict: str | No
              C.sources_allowed(text, allowed)]
     if item.get("emergency"):
         fails.append(C.emergency_first(text))
-    if item.get("danger"):
-        v = found[0]["함께 먹을 때 판정"] if found else (verdict or "")
+    fails.append(C.contra_not_fixable(text, "병용금기" in json.dumps([ctx.get("판정이유"), found], ensure_ascii=False)))
+    if item.get("danger"):  # the worst finding of the quick checks (the 2nd item is checked together with the 1st)
+        vs = [f["함께 먹을 때 판정"] for f in found] or [verdict or ""]
+        v = next((x for x in vs if x.startswith("위험")), vs[0])
         fails.append(C.keeps_danger(text, v) if v.startswith("위험") else f"엔진 판정이 예상(위험)과 다름: {v}")
     if item.get("must"):
         fails.append(C.mentions(text, item["must"]))
