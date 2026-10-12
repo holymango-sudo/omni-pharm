@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from omnipharm import assistant, fhir, recommend, rx_photo, security
+from omnipharm import assistant, fhir, recommend, recreational, rx_photo, security
 from omnipharm.clinical import Patient, assess
 from omnipharm.config import VERSION, settings
 from omnipharm.dosing import Dose
@@ -241,13 +241,19 @@ async def molecule(d: DrugInput):
                  "per_unit": [{"name": eng.ko(g), "mg": st["mg"][g.key]} for g in ings if g.key in st["mg"]]} if st else None
     return {"input": d.name, "molecules": mols, "product": info["product"], "country": info["country"],
             "release": info.get("release") or release_of(info["product"] or d.name),
-            "unresolved": info["unresolved"], "dose_info": dose_info, "single": len(ings) == 1}
+            "unresolved": info["unresolved"], "dose_info": dose_info, "single": len(ings) == 1,
+            "controlled": info.get("controlled")}
+
+
+def _logged(name: str) -> str:
+    """Drug name as the audit log records it: controlled substances (대마, 엑스터시 ...) are not recorded by name."""
+    return recreational.mask(name)[:80]
 
 
 @app.post("/api/v1/predict")
 async def predict(req: PredictRequest, request: Request):
     res = await _predict(req)
-    security.audit("analysis", _who(request), _client(request), drugs=[d.name[:80] for d in req.drugs],
+    security.audit("analysis", _who(request), _client(request), drugs=[_logged(d.name) for d in req.drugs],
                    verdict=res["summary"]["verdict"], n_ingredients=len(res["ingredients"]))
     return res
 
@@ -265,20 +271,24 @@ async def fhir_assess(bundle: dict, request: Request):
     res = await _predict(req)
     res["fhir"] = {"warnings": warn, "parsed_patient": {k: v for k, v in patient.items() if k != "diagnosis"},
                    "parsed_drugs": [d["name"] for d in drugs], "detected_issues": fhir.detected_issues(res)}
-    security.audit("fhir_analysis", _who(request), _client(request), drugs=[d["name"][:80] for d in drugs],
+    security.audit("fhir_analysis", _who(request), _client(request), drugs=[_logged(d["name"]) for d in drugs],
                    verdict=res["summary"]["verdict"], n_ingredients=len(res["ingredients"]))
     return res
 
 
 async def _predict(req: PredictRequest) -> dict:
     eng: Engine = E["engine"]
-    products, unsupported = [], []
+    products, unsupported, controlled = [], [], []
     for d in req.drugs:
         ings, info, err = await _resolve(d.name)
         if err:
             unsupported.append({"input": d.name, "reason": err["message"], "candidates": err["candidates"]})
             continue
-        products.append({"input": d.name, "ingredients": ings, "product": info["product"], "dose": d.dose,
+        ctl = info.get("controlled")
+        if ctl:  # harm reduction: dangerous combinations yes, amounts never (no dose check for these)
+            controlled.append({**ctl, "input": d.name, "keys": [g.key for g in ings]})
+        products.append({"input": d.name, "ingredients": ings, "product": info["product"],
+                         "dose": None if ctl else d.dose,
                          "strength": info.get("strength"), "release": info.get("release"),
                          "label_ko": info.get("label_ko")})
         if info["unresolved"]:
@@ -292,6 +302,7 @@ async def _predict(req: PredictRequest) -> dict:
     t0 = time.time()
     res = await asyncio.to_thread(eng.predict, products, req.patient)
     res["unsupported"] = unsupported
+    res["controlled"] = controlled
     res["products"] = [{"input": p["input"], "product": p["product"],
                         "ingredients": [eng.ko(g) for g in p["ingredients"]],
                         "usage": (p.get("label_ko") or {}).get("usage")} for p in products]
@@ -365,7 +376,7 @@ async def chat(req: ChatRequest, request: Request):
                                          for p in base]
     found = await asyncio.to_thread(assistant.lookups, eng, req.question, base, patient, verdict)
     security.audit("chat", _who(request), _client(request), report_id=req.report_id, chars=len(req.question),
-                   checked=[f["확인한 제품"].split(" = ")[0][:60] for f in found])
+                   checked=[_logged(f["확인한 제품"].split(" = ")[0])[:60] for f in found])
 
     async def gen():
         if found:  # tell the UI which products were checked (shown as chips above the answer)

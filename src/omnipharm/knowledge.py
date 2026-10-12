@@ -481,7 +481,8 @@ CYP_FDA: dict[str, dict[str, frozenset[str]]] = {
 }
 MAOI = frozenset({"selegiline", "rasagiline", "safinamide", "phenelzine", "tranylcypromine", "isocarboxazid",
                   "moclobemide", "linezolid", "methylene blue", "procarbazine"})
-NITRATES = frozenset({"nitroglycerin", "isosorbide mononitrate", "isosorbide dinitrate", "nicorandil", "amyl nitrite"})
+NITRATES = frozenset({"nitroglycerin", "isosorbide mononitrate", "isosorbide dinitrate", "nicorandil", "amyl nitrite",
+                      "isobutyl nitrite"})
 SEROTONERGIC = frozenset({"sertraline", "fluoxetine", "paroxetine", "citalopram", "escitalopram", "fluvoxamine",
                           "venlafaxine", "desvenlafaxine", "duloxetine", "milnacipran", "vortioxetine", "trazodone",
                           "mirtazapine", "tramadol", "tapentadol", "fentanyl", "meperidine", "methadone", "lithium",
@@ -714,6 +715,14 @@ for _k, _v in BIOLOGICS.items():
 DRUG_CLASSES["glp1"] = ("GLP-1 계열 비만·당뇨 주사", frozenset(k for k, v in BIOLOGICS.items() if "glp1" in v["groups"]))
 DRUG_CLASSES["anticoagulant"] = (DRUG_CLASSES["anticoagulant"][0],
                                  DRUG_CLASSES["anticoagulant"][1] | {"enoxaparin", "heparin"})
+# opioids / benzodiazepines missing above, and the street ones (recreational.py)
+DRUG_CLASSES["opioid"] = (DRUG_CLASSES["opioid"][0], DRUG_CLASSES["opioid"][1] | {
+    "methadone", "buprenorphine", "meperidine", "heroin", "carfentanil", "isotonitazene"})
+DRUG_CLASSES["sedative"] = (DRUG_CLASSES["sedative"][0], DRUG_CLASSES["sedative"][1] | {"flunitrazepam"})
+DRUG_CLASSES["stimulant"] = ("중추신경 흥분제(암페타민·코카인 계열)", frozenset({
+    "cocaine", "methamphetamine", "amphetamine", "dextroamphetamine", "lisdexamfetamine", "methylphenidate",
+    "dexmethylphenidate", "phentermine", "phendimetrazine", "diethylpropion", "midomafetamine", "mda", "mephedrone",
+    "cathinone", "alpha-pvp"}))
 DRUG_GROUPS.update({
     "gabapentinoid": frozenset({"gabapentin", "pregabalin", "mirogabalin"}),
     "dabigatran": frozenset({"dabigatran", "dabigatran etexilate"}),
@@ -757,6 +766,26 @@ DRUG_GROUPS["antibacterial"] = (DRUG_GROUPS["fluoroquinolone"] | DRUG_GROUPS["ma
     "cefadroxil", "cephalexin", "cefuroxime", "cefuroxime axetil", "cefixime", "cefdinir", "cefpodoxime",
     "cefditoren", "ceftriaxone", "cefazolin", "cefprozil", "clindamycin", "metronidazole", "sulfamethoxazole",
     "trimethoprim", "nitrofurantoin", "fosfomycin", "vancomycin", "linezolid", "rifaximin", "rifampin"}))
+# recreational / controlled substances (recreational.py) and the medicines they combine dangerously with.
+# Ingredient names: database names, or the curated keys of recreational.SUBSTANCES.
+DRUG_GROUPS.update({
+    "maoi": MAOI | {"harmine"},  # harmine: the MAO-A inhibitor of ayahuasca
+    "serotonergic": SEROTONERGIC,
+    "hiv_booster": frozenset({"ritonavir", "cobicistat"}),
+    "street_stimulant": frozenset({"cocaine", "methamphetamine", "midomafetamine", "mda", "mephedrone", "cathinone",
+                                   "alpha-pvp"}),
+    "mdma_like": frozenset({"midomafetamine", "mda", "mephedrone"}),
+    "psychedelic": frozenset({"lysergide", "psilocybin", "psilocin", "dimethyltryptamine", "5-meo-dmt", "mescaline",
+                              "2c-b", "25i-nbome"}),
+    "dissociative": frozenset({"ketamine", "phencyclidine", "methoxetamine"}),
+    "ghb": frozenset({"sodium oxybate", "gamma-butyrolactone", "1,4-butanediol"}),
+    "cannabinoid": frozenset({"dronabinol", "nabilone", "cannabidiol"}),
+    "kratom": frozenset({"mitragynine"}),
+    "gaba_depressant": frozenset({"phenibut", "muscimol"}),
+    "harmala": frozenset({"harmine"}),
+    "synthetic_cannabinoid": frozenset({"jwh-018"}),
+})
+DRUG_GROUPS["qt_prolonging"] = DRUG_GROUPS["qt_prolonging"] | {"ibogaine"}
 DISEASES.update({
     "thyroid_cancer": {"ko": "갑상선수질암·MEN2", "kw": ("갑상선수질암", "수질암", "men2", "medullary thyroid"),
                        "flag": None},
@@ -774,6 +803,13 @@ DRUG_DISEASE_RULES += [
     ("heart_failure", "licorice", "주의", "몸에 물이 차게 해 심부전을 악화시킬 수 있습니다"),
     ("renal", "potassium_supplement", "주의", "콩팥이 칼륨을 못 내보내 고칼륨혈증 위험이 있습니다"),
     ("bleeding", "bleeding_herb", "주의", "출혈 경향을 더할 수 있습니다"),
+    # street stimulants (cocaine, methamphetamine, MDMA ...): coronary spasm, arrhythmia, seizures, placental harm
+    ("cardiac", "street_stimulant", "금기", "관상동맥을 수축시켜 심근경색·돌연사 위험이 큽니다"),
+    ("arrhythmia", "street_stimulant", "금기", "치명적인 부정맥을 일으킬 수 있습니다"),
+    ("hypertension", "street_stimulant", "주의", "혈압을 급격히 올려 뇌출혈 위험이 있습니다"),
+    ("epilepsy", "street_stimulant", "주의", "경련을 일으킬 수 있습니다"),
+    ("pregnancy", "street_stimulant", "금기", "태반 혈류를 줄여 조산·태반 조기박리·태아 성장 지연 위험이 있습니다"),
+    ("pregnancy", "cannabinoid", "주의", "태아 발달에 해로울 수 있어 임신 중에는 쓰지 않도록 권고됩니다"),
 ]
 DISEASE_LABEL_TERMS.update({"thyroid_cancer": r"medullary thyroid", "pancreatitis": r"pancreatitis"})
 
@@ -844,6 +880,43 @@ PAIR_RULES: list[tuple[str, str, str, str]] = [
     ("potassium_supplement", "k_sparing", "높음", "칼륨이 위험하게 올라갈 수 있습니다(고칼륨혈증)"),
     ("botulinum", "neuromuscular_blocker", "주의", "근육 마비 효과가 강해질 수 있습니다 (허가사항)"),
     ("tnf_inhibitor", "immunosuppressant", "주의", "면역 억제가 겹쳐 감염 위험이 커집니다"),
+    # recreational / controlled substances (recreational.py): combinations documented in labelling (oxybate, PDE5
+    # inhibitor, amphetamine labels), poison-centre / overdose-death reports and the harm-reduction literature
+    ("ghb", "alcohol", "높음", "GHB(물뽕)와 술을 함께 쓰면 의식 소실·호흡 정지로 사망할 수 있습니다 (옥시베이트 허가사항 병용금기)"),
+    ("ghb", "sedative", "높음", "GHB와 수면·진정제를 함께 쓰면 호흡 억제·혼수 위험이 큽니다 (옥시베이트 허가사항 병용금기)"),
+    ("ghb", "opioid", "높음", "GHB와 오피오이드를 함께 쓰면 호흡 억제·혼수·사망 위험이 큽니다 (옥시베이트 박스경고)"),
+    ("ghb", "dissociative", "높음", "GHB와 케타민 계열을 함께 쓰면 의식을 잃은 채 토해 질식하거나 호흡이 억제될 수 있습니다"),
+    ("ghb", "gabapentinoid", "주의", "진정·호흡 억제가 커집니다"),
+    ("dissociative", "alcohol", "높음", "케타민 계열과 술을 함께 쓰면 의식이 떨어진 채 토해 질식(흡인)하거나 호흡이 억제될 수 있습니다"),
+    ("dissociative", "opioid", "주의", "케타민 계열과 오피오이드를 함께 쓰면 호흡 억제가 커집니다 (허가사항)"),
+    ("dissociative", "sedative", "주의", "케타민 계열과 수면·진정제를 함께 쓰면 진정·호흡 억제가 커집니다 (허가사항)"),
+    ("cocaine", "alcohol", "높음", "코카인과 술을 함께 쓰면 몸속에서 코카에틸렌이 생겨 심장 독성·돌연사 위험이 커집니다"),
+    ("cocaine", "opioid", "높음", "코카인+오피오이드(스피드볼)는 흥분 효과가 먼저 끝나면 호흡 억제가 남아 과다복용 사망이 많습니다"),
+    ("street_stimulant", "opioid", "주의", "흥분제가 오피오이드의 진정을 가려 더 쓰게 만들고, 흥분 효과가 끝나면 호흡 억제가 남습니다"),
+    ("street_stimulant", "alcohol", "주의", "흥분제가 술 취한 느낌을 가려 과음하게 되고 탈수·체온 상승·심장 부담이 커집니다"),
+    ("stimulant", "maoi", "높음", "흥분제와 MAO 억제제를 함께 쓰면 고혈압 위기·고열로 위험합니다 (허가사항 병용금기 — 끊은 뒤 14일 간격)"),
+    ("mdma_like", "maoi", "높음", "MDMA 계열과 MAO 억제제를 함께 쓰면 세로토닌 증후군·고혈압 위기로 사망한 사례가 있습니다"),
+    ("mdma_like", "hiv_booster", "높음", "리토나비르·코비시스타트가 MDMA 분해를 막아 농도가 크게 올라 사망한 사례가 보고되었습니다"),
+    ("mdma_like", "serotonergic", "주의", "세로토닌 증후군(고열·근육 경직·혼돈) 위험이 있습니다 — SSRI 계열은 MDMA 효과를 줄여 "
+                                          "더 많이 쓰게 만들 수 있습니다"),
+    ("psychedelic", "lithium", "높음", "LSD·환각버섯 계열과 리튬을 함께 쓰면 경련(발작)·의식 저하가 여러 차례 보고되었습니다"),
+    ("psychedelic", "maoi", "주의", "MAO 억제제가 환각제(특히 DMT 계열)의 작용을 크게 키워 세로토닌 증후군·혈압 상승 위험이 있습니다"),
+    ("harmala", "serotonergic", "높음", "아야와스카의 하르민은 MAO 억제제라 항우울제(SSRI) 등 세로토닌 약과 함께 쓰면 세로토닌 증후군 "
+                                       "위험이 큽니다 (MAO 억제제 병용금기와 같은 이유)"),
+    ("synthetic_cannabinoid", "alcohol", "주의", "술과 함께 쓰면 구토·의식 저하·판단력 저하가 커집니다"),
+    ("psychedelic", "cannabinoid", "주의", "대마가 환각 작용을 예측할 수 없게 키워 공황·정신병적 반응이 생길 수 있습니다"),
+    ("cannabinoid", "warfarin", "주의", "대마 성분(THC·CBD)이 와파린 분해를 늦춰 INR이 오르고 출혈 위험이 생길 수 있습니다"),
+    ("cannabinoid", "sedative", "주의", "졸음·운동 능력 저하가 커집니다 — 운전하지 마세요"),
+    ("cannabinoid", "alcohol", "주의", "술과 함께 쓰면 어지러움·구토·판단력 저하가 커집니다 — 운전하지 마세요"),
+    ("nitrite", "pde5", "높음", "파퍼스(아질산 알킬)와 발기부전 치료제를 함께 쓰면 혈압이 급격히 떨어져 실신·심근경색·사망 위험이 "
+                              "있습니다 (허가사항 병용금기)"),
+    ("kratom", "opioid", "주의", "크라톰도 오피오이드 수용체에 작용해 호흡 억제가 더해집니다 — 사망 사례 대부분이 다른 약물과 함께 쓴 경우입니다"),
+    ("kratom", "sedative", "주의", "진정·호흡 억제가 커집니다"),
+    ("kratom", "alcohol", "주의", "진정·호흡 억제가 커집니다"),
+    ("xylazine", "opioid", "높음", "자일라진(트랑크)이 오피오이드의 진정·호흡 억제를 키우며 날록손으로 풀리지 않습니다 (미국 FDA 경고)"),
+    ("gaba_depressant", "alcohol", "주의", "진정·호흡 억제가 커집니다"),
+    ("gaba_depressant", "sedative", "주의", "진정·호흡 억제가 커집니다"),
+    ("gaba_depressant", "opioid", "주의", "진정·호흡 억제가 커집니다"),
 ]
 
 
@@ -913,6 +986,7 @@ NAME_GROUPS: list[tuple[re.Pattern, set[str]]] = [
     (re.compile(r"\bcalcium\b|\bmagnesium\b|\bferrous\b|\bferric\b|\biron\b|\bzinc\b|alumin|sucralfate|"
                 r"\bbismuth\b|sevelamer|lanthanum", re.I), {"polyvalent_cation"}),
     (re.compile(r"^potassium (chloride|citrate|gluconate|bicarbonate)", re.I), {"potassium_supplement"}),
+    (re.compile(r"\bnitrite\b", re.I), {"nitrite"}),  # amyl / isobutyl nitrite (poppers)
 ]
 
 

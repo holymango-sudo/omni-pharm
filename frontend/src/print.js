@@ -30,6 +30,9 @@ function patientHandout(res, patient) {
   ${warn.length ? `<h2>${s.verdict === "위험" ? "왜 위험한가요?" : "확인할 점"}</h2><ul>${warn.map((r) => `<li>${esc(r.text)}</li>`).join("")}</ul>`
     : `<h2>확인 결과</h2><p>함께 드셔서 문제가 되는 조합은 확인되지 않았습니다.</p>`}
   ${info.length ? `<h2>참고</h2><ul class="sub">${info.map((r) => `<li>${esc(r.text)}</li>`).join("")}</ul>` : ""}
+  ${(res.controlled || []).length ? `<h2>규제 물질 안내</h2><ul>${res.controlled.map((c) =>
+    `<li><b>${esc(c.input)}</b> — 한국: ${esc(c.law)}<br><span class="sub">위험 신호: ${esc(c.signs)}</span></li>`).join("")}
+    <li>혼자 쓰지 말고 여러 물질을 섞지 마세요. 응급 시 <b>119</b>, 마약류 24시간 익명 상담 <b>1342</b></li></ul>` : ""}
   <h2>이렇게 하세요</h2><div class="box"><ul>${s.advice.map((a) => `<li>${esc(a)}</li>`).join("")}
     <li>숨이 차거나, 검은 변·피가 섞인 변, 심한 어지러움, 가슴 두근거림, 피부 발진이 생기면 즉시 복용을 멈추고 병원에 연락하세요.</li></ul></div>
   <div class="foot">이 안내문은 컴퓨터 분석 결과를 쉽게 정리한 참고 자료입니다. 약을 끊거나 바꾸기 전에 반드시 의사·약사와 상의하세요.</div>
@@ -70,6 +73,9 @@ export function printReport(res, patient, report, mode = "pro") {
   ${(res.disease_alerts || []).length ? `<h4>질환별로 더 위험한 약</h4>` + res.disease_alerts.map((d) =>
     `<div>[${esc(d.severity)}] ${esc(d.disease)} + ${esc(d.drug)}: ${esc(d.reason)} <i>(${esc(d.source)})</i></div>`).join("") : ""}
   ${dups ? `<h4>같은 계열 약 중복</h4>${dups}` : ""}
+  ${(res.controlled || []).length ? `<h4>규제 물질 안내 (위해 감소 정보 · 용량은 안내하지 않음)</h4>` + res.controlled.map((c) =>
+    `<div>${esc(c.input)} (${esc(c.ko)}) — 한국: ${esc(c.law)}${c.abroad ? ` · 해외: ${esc(c.abroad)}` : ""}<br>위험 신호: ${esc(c.signs)}</div>`).join("")
+    + `<div>응급 시 119 · 마약류 24시간 익명 상담 1342</div>` : ""}
   ${(res.dosing?.ingredients || []).length ? `<h4>하루 복용량 점검</h4><table><tr><th>성분</th><th>하루 총량</th><th>1일 최대</th><th>기준</th><th>판정</th></tr>` +
     res.dosing.ingredients.map((r) => `<tr><td>${esc(r.display)}</td><td>${r.daily_mg}mg</td><td>${r.max_mg ?? "-"}${r.max_mg ? "mg" : ""}${r.why?.length ? ` (${esc(r.why.join(", "))})` : ""}</td><td>${esc(r.max_mg ? r.source || "" : "")}</td><td>${esc(r.status)}</td></tr>`).join("") + "</table>" : ""}
   ${(res.unsupported || []).length ? `<h4>분석하지 못한 입력</h4>${res.unsupported.map((u) => `<div>${esc(u.input)}: ${esc(u.reason)}</div>`).join("")}` : ""}

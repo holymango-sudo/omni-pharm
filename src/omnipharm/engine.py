@@ -58,6 +58,7 @@ from omnipharm.knowledge import (
     resolve_korean,
     structureless_category,
 )
+from omnipharm import recreational
 from omnipharm.models.gnn import FingerprintEncoder, OmniPharmModel, RegimenPatientModel
 from omnipharm.models.patient import MAX_DRUGS, PATIENT_DIM, patient_vector
 from omnipharm.release import RELEASE_KO, release_of
@@ -66,6 +67,8 @@ log = logging.getLogger(__name__)
 KO_NAME: dict[str, str] = {}
 for _k, _v in KR_INGREDIENTS.items():
     KO_NAME.setdefault(DRUG_SYNONYMS.get(_v, _v), _k)  # first (most common) Korean name wins
+for _k, _v in recreational.ingredient_names().items():
+    KO_NAME.setdefault(_k, _v)
 REFERENCE_PATIENT = {"age": 45.0, "wt": 70.0}
 
 
@@ -82,6 +85,13 @@ COMBO_X = 3.0  # ... and be this many times above the riskier single drug (unles
 
 def _combo(e: dict) -> float:
     return e["prob"] / max(e["best_single"], 1e-6)
+
+
+@functools.lru_cache(maxsize=128)
+def _curated_smiles(smiles: str) -> tuple[str, str]:
+    """Curated structure (recreational.SUBSTANCES) -> (canonical SMILES, InChIKey)."""
+    std = standardize(smiles)
+    return std.canonical_smiles, std.inchikey
 ALLERGY_CONTEXT = re.compile(r"asthma|urticaria|allerg|hypersensitiv|anaphyla|bronchospasm", re.I)
 ASK_DOCTOR = re.compile(r"ask a (doctor|pharmacist)", re.I)
 CYP_INHIBITION_P = 6.0 # pChEMBL >= 6 (IC50/Ki <= 1 uM in vitro) counts as a CYP inhibitor
@@ -496,6 +506,9 @@ class Engine:
         fk = food_key(text)  # 술, 자몽주스, 우유, 흡연 ...
         if fk:
             return [self._ext_ingredient(f"food:{fk}")], info
+        rk = recreational.key_of(text)  # 대마, 엑스터시, 물뽕, 파퍼스 ... (harm reduction; before products: 'cannabis'
+        if rk:                          # is also in the name of a cosmetic)
+            return self._controlled(rk), {**info, "controlled": recreational.info(rk)}
         smiles_like = text.isascii() and " " not in text and any(ch in text for ch in "()=#[]@0123456789")
         if smiles_like:
             return [self._from_smiles(text)], info
@@ -529,6 +542,18 @@ class Engine:
             if g is not None:
                 return [g], {**info, "product": f"{text} (PubChem)"}
             raise e
+
+    def _controlled(self, key: str) -> list[Ingredient]:
+        """A recreational / controlled substance -> its ingredients (database molecule or curated structure)."""
+        s = recreational.SUBSTANCES[key]
+        if "parts" in s:
+            return [g for p in s["parts"] for g in self._controlled(p)]
+        if "db" in s:
+            return [g for n in ([s["db"]] if isinstance(s["db"], str) else s["db"]) for g in self._resolve_names(n)]
+        smi = _curated_smiles(s["smiles"])
+        if smi[1] in self.inchikey_idx:
+            return [self._db(self.inchikey_idx[smi[1]])]
+        return [Ingredient(f"ing:{key}", key, smi[0], None)]
 
     @staticmethod
     def _bio(name: str) -> Ingredient:
@@ -693,6 +718,7 @@ class Engine:
         for v in FOODS.values():  # 술, 자몽주스, 우유, 흡연 ...
             if any(a.lower().startswith(ql) for a in v["aliases"]):
                 out.append({"name": v["aliases"][0], "type": "음식·생활", "sub": v["ko"]})
+        out += recreational.search(q)  # 대마, 엑스터시, 케타민 ...
         cat = self.catalog()
         for kind, names in (("제품", cat["korean_brands"]), ("성분", cat["korean_ingredients"]),
                             ("ingredient", cat["ingredients"]), ("brand", cat["brands"])):

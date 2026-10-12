@@ -96,7 +96,8 @@ export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario,
             {d.molecules?.some((m) => m.biologic) && <small className="novel" title="분자 구조가 없는 성분: 허가 문서·임상 규칙으로 평가">
               {" "}{[...new Set(d.molecules.filter((m) => m.biologic).map((m) => (m.category === "생물의약품" ? "바이오" : m.category?.split("·")[0])))].join("·")}</small>}
             {d.unresolved?.length > 0 && <small className="warnc"> +{d.unresolved.length} 분석불가</small>}
-            {d.status === "ok" && !isFood(d) && (
+            {d.controlled && <small className="ctl-tag" title={`${d.controlled.ko} — 한국: ${d.controlled.law}`}>규제</small>}
+            {d.status === "ok" && !isFood(d) && !d.controlled && (
               <button className={`dose-btn ${d.dose ? "set" : ""}`} onClick={() => setEditing(editing === d.name ? null : d.name)}
                 title="복용량·횟수·기간 입력">{d.dose ? doseLabel(d.dose, d.dose_info) : "＋용량"}</button>
             )}

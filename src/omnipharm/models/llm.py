@@ -33,6 +33,8 @@ SYSTEM = """당신은 병원 임상약제부의 수석 임상약사입니다. �
 - '판정이유'·'권고'는 이 시스템의 결론입니다. 소견서는 이와 어긋나지 않게 쓰세요.
 - 식약처 DUR 병용금기나 허가 문서 병용금기가 있으면 권고는 '병용을 피하고 대체 약물 검토'로 쓰세요(감량으로 해결된다고 쓰지 마세요).
 - 근거 출처는 [분석 근거]에 실제로 있는 것만 밝히세요(예: '식약처DUR병용금기' 항목이 없으면 DUR을 언급하지 마세요).
+- '규제물질'이 있으면 훈계하지 말고 위해 감소 관점으로 쓰세요: 위험한 조합과 위험 신호를 분명히, 한국 법적 지위는 한 줄로.
+  사용 방법이나 양(용량)은 절대 쓰지 마세요. 권고 끝에 '응급 시 119, 마약류 24시간 익명 상담 1342'를 넣으세요.
 - 형식: 마크다운. 섹션 제목은 '### '로 시작. 불릿은 '- '. 전체 300단어 이내."""
 
 SECTIONS = """다음 4개 섹션으로 작성하세요:
@@ -44,6 +46,9 @@ SECTIONS_SAFE = """종합등급이 '낮음'입니다. 다음 3개 섹션으로 �
 ### 1. 결론 (의미 있는 상호작용이 확인되지 않았다는 점, 근거가 있으면 그 근거)
 ### 2. 참고 사항 (각 약의 흔한 부작용이나 '참고사항' 중 알아둘 것 1~3개 — 불안을 키우지 않게)
 ### 3. 복약 안내 (정해진 용법·용량 지키기, 새 증상이 생기면 상담 — 불릿 목록)"""
+
+
+HARM_REDUCTION_LINE = "응급 시 119 · 마약류 24시간 익명 상담 1342 (한국마약퇴치운동본부)"
 
 
 def ratio(x: float) -> str:
@@ -105,8 +110,15 @@ def fact_sheet(res: dict, patient: dict) -> dict:
              "용량점검": [f"{r['display']} 하루 {r['daily_mg']:g}mg (1일 최대 {r['max_mg']:g}mg, {r['status']})"
                       for r in (res.get("dosing") or {}).get("ingredients", []) if r.get("max_mg")]
                      + [f"[{a['sev']}] {a['text']}" for a in (res.get("dosing") or {}).get("alerts", [])],
-             "주요이상반응(환자모델)": top, "약물조합": pairs}
+             "주요이상반응(환자모델)": top, "약물조합": pairs,
+             "규제물질": controlled_lines(res.get("controlled"))}
     return _prune(facts)
+
+
+def controlled_lines(controlled: list[dict] | None) -> list[str]:
+    """Recreational / controlled substances of the analysis: legal status and danger signs (never amounts)."""
+    return [f"{c['input']} = {c['ko']}: 한국 {c['law']}" + (f" / 해외: {c['abroad']}" if c.get("abroad") else "")
+            + f" / 위험 신호: {c['signs']}" for c in controlled or []]
 
 
 def _prune(x):
@@ -142,6 +154,9 @@ def template_report(facts: dict) -> str:
                      f"표준 환자 대비 {e['표준환자대비']}) — FAERS 보고 기반 추정치(실제 발생률 아님)")
     lines.append("### 4. 권고 사항")
     lines += [f"- {a}" for a in facts.get("권고", [])] or ["- 정해진 용법·용량을 지키세요."]
+    if facts.get("규제물질"):
+        lines += [f"- 규제 물질: {c}" for c in facts["규제물질"]]
+        lines.append(f"- {HARM_REDUCTION_LINE}")
     lines += ["", "_로컬 LLM이 실행 중이 아니어서 규칙 기반 요약으로 대체되었습니다._"]
     return "\n".join(lines)
 
@@ -227,6 +242,11 @@ CHAT_SYSTEM = """당신은 OMNI-PHARM의 'AI 복약 상담'입니다. 친절하�
 - 증상에 맞는 약을 고르려는 질문에는 성분 계열 정도만 일반적으로 설명하고, 화면의 '🤒 증상으로 약 찾기'로
   이 사람에게 맞는 후보를 확인하라고 안내하세요.
 - 모르는 것은 모른다고 하고 약사·의사에게 확인하라고 하세요.
+- 대마·케타민·코카인·MDMA 같은 규제 물질('규제물질' 또는 [방금 확인한 결과]의 '규제 물질')에 대한 질문은 거절하거나
+  훈계하지 말고 위해 감소 관점으로 답하세요: 확인된 위험한 조합과 이유, 위험 신호와 응급 대처(119, 혼자 쓰지 않기,
+  의식이 없으면 옆으로 눕히기)를 알려 주세요. 사용 방법·양(용량)·구하는 방법·검사를 피하는 방법은 알려 주지 마세요.
+  한국에서의 법적 지위를 한 번 짧게 밝히고(나라·지역마다 법이 다름), 끊고 싶거나 걱정되면 마약류 24시간 익명 상담 1342를
+  안내하세요. 근거 줄에는 '근거종류'에 있는 이름만 쓰세요.
 
 - '하루 몇 개(병·알)까지?' 질문은 '제품 설명서 용법(식약처)'이 있으면 그 용법(예: 1일 1회 1병, 15세 미만 복용 금지)을
   그대로 먼저 알려 주고, '1개당 함량'과 '1일최대량'이 있으면 그것으로 계산해 덧붙이세요. '스스로 사 먹을 때' 기준이
@@ -241,7 +261,8 @@ LaTeX 수식($...$)은 쓰지 말고 화살표는 '→'로 쓰세요.
 [분석 결과]·[방금 확인한 결과] 같은 자료 묶음 이름도 쓰지 말 것)
 일반 지식으로 답한 부분은 '일반 복약 상식'이라고 쓰세요. 일상 대화에는 근거 줄을 쓰지 마세요."""
 EMERGENCY = re.compile(r"숨[이을]? ?(차|막|못)|호흡곤란|의식|정신을 잃|경련|발작|가슴[이 ]*(아프|통증|조여)|흉통|피를 토|토혈|"
-                       r"검은 ?변|혈변|입술.*부|혀.*부|목이 붓|과다 ?복용|많이 먹었|한꺼번에.*먹|통째로.*먹었|죽고 싶|자살|자해")
+                       r"검은 ?변|혈변|입술.*부|혀.*부|목이 붓|과다 ?복용|많이 먹었|한꺼번에.*먹|통째로.*먹었|죽고 싶|자살|자해|"
+                       r"깨워도|안 ?깨어|입술이 ?파|숨을 ?안 ?쉬|숨이 ?멈|오버 ?도즈|과다 ?투약|overdose")
 EMERGENCY_TEXT = ("**⚠ 응급 신호일 수 있습니다.** 지금 숨이 차거나, 의식이 흐리거나, 경련·가슴 통증·피를 토하거나 검은 변, "
                   "입술·혀가 붓는 증상, 또는 약을 너무 많이 먹었다면 **바로 119에 전화하거나 응급실로 가세요.** "
                   "(약 중독 상담: 119 구급상황관리센터)\n\n")
@@ -250,6 +271,8 @@ EMERGENCY_TEXT = ("**⚠ 응급 신호일 수 있습니다.** 지금 숨이 차�
 def chat_context(res: dict, patient: dict) -> dict:
     """What the chat may rely on: the report facts + the time course / release form / suggestions of this analysis."""
     facts = fact_sheet(res, patient)
+    # controlled substances: no amounts or dosing frequency anywhere in what the chat may quote
+    ctl = {k for c in res.get("controlled") or [] for k in c.get("keys", [])}
     j = res.get("pathway") or {}
     pk = []
     for d in j.get("drugs", []):
@@ -257,8 +280,9 @@ def chat_context(res: dict, patient: dict) -> dict:
         rel = {"ER": "서방형", "DR": "장용형"}.get(d.get("release"), "")
         name = f"{d['name']}({rel})" if rel else d["name"]
         freq = "주 1회" if r.get("weekly") else f"하루 {r.get('per_day')}회"
-        pk.append(f"{name}: 복용 후 최고 농도 약 {p.get('tmax_h')}시간, 반감기 약 {p.get('t_half_h')}시간, "
-                  f"{freq}({r.get('source', '')}) [{p.get('source', '')}]")
+        freq = "" if d.get("key") in ctl else f", {freq}({r.get('source', '')})"
+        pk.append(f"{name}: 복용 후 최고 농도 약 {p.get('tmax_h')}시간, 반감기 약 {p.get('t_half_h')}시간"
+                  f"{freq} [{p.get('source', '')}]")
     facts["약동학(복용 후 시간)"] = pk
     facts["몸속단계"] = [f"{s['title']}: {(s.get('time') or {}).get('label', '')} — {s['text'][:160]}" for s in j.get("stages", [])]
     c = j.get("clock") or {}
@@ -279,6 +303,8 @@ def chat_context(res: dict, patient: dict) -> dict:
     form = {d["key"]: d.get("release") for d in j.get("drugs", [])}
     limits = []
     for ing in res.get("ingredients", []):
+        if ing["key"] in ctl:
+            continue
         lim = effective_limit(ing["key"], ctx, er=form.get(ing["key"]) == "ER")
         if lim:
             limits.append(limit_text(ing["display"], lim))

@@ -100,6 +100,25 @@ function DiseaseAlerts({ list }) {
   );
 }
 
+// recreational / controlled substances: legal status and danger signs - harm reduction, never amounts
+function Controlled({ list }) {
+  if (!list?.length) return null;
+  return (
+    <div className="ctl">
+      <h5>⚖️ 규제 물질 안내 <small className="muted">위험을 줄이기 위한 정보 · 사용을 권하지 않으며 용량은 안내하지 않습니다</small></h5>
+      {list.map((c) => (
+        <div key={c.input} className="ctl-row">
+          <b>{c.input}</b> <span className="muted">({c.ko})</span>
+          <div>🇰🇷 한국: {c.law}</div>
+          {c.abroad && <div>🌐 해외: {c.abroad}</div>}
+          <div>🚨 위험 신호: {c.signs}</div>
+        </div>
+      ))}
+      <div className="ctl-foot">혼자 쓰지 말고 여러 물질을 섞지 마세요 · 응급 시 <b>119</b> · 마약류 24시간 익명 상담 <b>1342</b></div>
+    </div>
+  );
+}
+
 export default function ResultPanel({ res, report, streaming, onDetail, onPrint, showReport, expert }) {
   const [showLLM, setShowLLM] = useState(true);
   if (!res) {
@@ -120,6 +139,7 @@ export default function ResultPanel({ res, report, streaming, onDetail, onPrint,
       <Reasons s={res.summary} />
       <DoseCheck dosing={res.dosing} />
       <DiseaseAlerts list={res.disease_alerts} />
+      <Controlled list={res.controlled} />
       <div className="split">
         <BodyMap organs={res.organs} expert={expert} />
         <Symptoms events={res.events} expert={expert} />

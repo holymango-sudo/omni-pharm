@@ -14,6 +14,7 @@ from omnipharm.clinical import Patient
 from omnipharm.dosing import effective_limit, fmt_mg, limit_text
 from omnipharm.engine import ResolveError
 from omnipharm.knowledge import FOOD_ALIAS
+from omnipharm.models.llm import HARM_REDUCTION_LINE
 
 # endings stripped from a word before it is looked up ('박카스랑' -> '박카스', '타이레놀은' -> '타이레놀')
 _ENDING = re.compile(r"(이랑|랑|하고|이나|이요|에서|으로|까지|부터|처럼|이란|란|은|는|이|가|을|를|와|과|도|에|로|만|나|요|좀)$")
@@ -130,15 +131,17 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     if base and also:
         verdict += f" — 질문의 {together}도 함께 넣어 확인"
     shown = ", ".join(names[:5]) + (f" 외 {len(names) - 5}개" if len(names) > 5 else "")
+    ctl = info.get("controlled")
     # how much is in one unit and the labelled daily maximum for this patient: '하루 몇 병?' gets a grounded answer
-    st = info.get("strength") or {}
+    # (never for a controlled substance: harm reduction names the dangerous combinations, not amounts)
+    st = {} if ctl else info.get("strength") or {}
     content = [f"{eng.ko(g)} {fmt_mg(st['mg'][g.key])}" for g in ings if (st.get("mg") or {}).get(g.key)]
     pa = r.get("patient") or {}
     lctx = {"crcl": (pa.get("kidney") or {}).get("clearance"), "age": patient.age,
             "sex": (patient.sex or "").upper()[:1] or None, "weight": patient.weight_kg,
             "hepatic": bool((pa.get("flags") or {}).get("hepatic"))}
     limits = []
-    for g in ings:
+    for g in [] if ctl else ings:
         lim = effective_limit(g.key, lctx, er=info.get("release") == "ER")
         if lim:
             limits.append(limit_text(eng.ko(g), lim) + " (다른 약·음료의 같은 성분과 합쳐서)")
@@ -157,6 +160,9 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
             "이 제품 관련 이유": [x["text"] for x in s["reasons"] if x["sev"] != "low" and mine(x["text"])][:5],
             "이 제품 관련 참고": [x["text"] for x in s["reasons"] if x["sev"] == "low" and mine(x["text"])][:2],
             "할 일": s["advice"][:3], "상호작용": pairs,
+            "규제 물질": (f"{ctl['ko']} — 한국: {ctl['law']}" + (f" / 해외: {ctl['abroad']}" if ctl.get("abroad") else "")
+                       + f" / 위험 신호: {ctl['signs']} / 상담: {HARM_REDUCTION_LINE} / 용량·사용법은 안내하지 않음")
+                      if ctl else None,
             "근거종류": sorted(src),
             "_product": new}
 
