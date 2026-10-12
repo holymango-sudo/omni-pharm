@@ -91,11 +91,17 @@ def _base(s: str) -> str:
 
 
 def _score(raw: str, cand: str) -> float:
+    """Similarity of the PRODUCT names (brackets removed): a shared '(레보드로프로피진)' must not make 레보스정 look like
+    레보투스정. The bracketed ingredient only adds a small bonus when the candidate contains it."""
     rb, cb = _base(raw), _base(cand)
-    s = max(difflib.SequenceMatcher(None, rb, cb).ratio(), difflib.SequenceMatcher(None, _norm(raw), _norm(cand)).ratio())
+    s = difflib.SequenceMatcher(None, rb, cb).ratio() if rb and cb else \
+        difflib.SequenceMatcher(None, _norm(raw), _norm(cand)).ratio()
     if rb and cb.startswith(rb) and len(rb) >= 3:  # '노바스크' -> '노바스크정5밀리그람': a short name on a medicine bag
         s = max(s, 0.82)
-    return s
+    inner = [_norm(x) for x in re.findall(r"\(([^)]*)\)", raw) if len(x.strip()) >= 3]
+    if any(i[:4] in _norm(cand) for i in inner):
+        s += 0.05
+    return min(s, 1.0)
 
 
 def match_name(eng, raw: str) -> dict:
