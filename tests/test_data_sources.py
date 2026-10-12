@@ -106,6 +106,18 @@ def test_korean_label_evidence_in_the_result(eng):
 
 @needs_models
 @pytest.mark.slow
+def test_dur_age_rule_only_for_its_dosage_form(eng):
+    """MFDS DUR '아세트아미노펜 12세 미만' covers extended-release tablets only - not a children's syrup."""
+    def alerts(names, age):
+        return [(d["severity"], d["disease"]) for d in _predict(eng, names, age)["disease_alerts"]
+                if "12세 미만" in d["disease"]]
+    assert alerts(["어린이타이레놀현탁액", "세티리진"], 6) == []
+    assert alerts(["타이레놀8시간이알서방정", "세티리진"], 10) == [("금기", "연령(12세 미만)")]
+    assert alerts(["아세트아미노펜", "세티리진"], 6) == [("주의", "연령(12세 미만)")]  # form unknown: a note
+
+
+@needs_models
+@pytest.mark.slow
 def test_own_risk_lines_need_offsides(eng):
     if not eng.offsides:
         pytest.skip("OFFSIDES not built (stage offsides)")

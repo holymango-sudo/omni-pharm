@@ -1325,7 +1325,12 @@ class Engine:
         if same_product:
             notes.append(f"같은 복합제 안에 함께 배합된 성분끼리의 조합 {same_product}쌍은 의도된 배합이므로 상호작용 평가에서 제외했습니다.")
 
-        disease_alerts = self._drug_disease(U, pa, patient)
+        # the products each ingredient comes in (DUR age rules can be limited to a dosage form: '서방정')
+        forms: dict[str, list[tuple[str | None, str]]] = {}
+        for p in products:
+            for g in p["ingredients"]:
+                forms.setdefault(g.key, []).append((p.get("product"), p.get("release") or "IR"))
+        disease_alerts = self._drug_disease(U, pa, patient, forms)
         # Korean product label (의약외품): '15세 미만은 복용하지 않는다' -> this product is not for this child
         for p in products:
             n = (p.get("label_ko") or {}).get("min_age")
@@ -1417,9 +1422,12 @@ class Engine:
         }
 
     # ------------------------------------------------------------------ drug-disease + plain summary
-    def _drug_disease(self, U: list[Ingredient], pa: dict, patient: Patient) -> list[dict]:
+    def _drug_disease(self, U: list[Ingredient], pa: dict, patient: Patient,
+                      forms: dict[str, list[tuple[str | None, str]]] | None = None) -> list[dict]:
         """Which of these drugs are especially dangerous for THIS patient's diseases / age / kidneys.
-        Curated rules (Beers 2023 drug-disease table, labelling) + FDA label contraindication / boxed text."""
+        Curated rules (Beers 2023 drug-disease table, labelling) + FDA label contraindication / boxed text.
+        forms = ingredient key -> [(product name or None, release form)] of the products in this analysis."""
+        forms = forms or {}
         dis = set(pa["diseases"])
         kid = pa.get("kidney") or {}
         found: dict[tuple[str, str], dict] = {}
@@ -1473,9 +1481,22 @@ class Engine:
         for g in U:
             b = g.bare
             for r in self.dur_by.get("age", {}).get(b, []):
-                if patient.age is not None and _age_hit(r.get("age_base"), patient.age):
-                    add(f"연령({r['age_base']})", g, "금기",
-                        f"식약처 DUR 특정연령대금기 — {r.get('content') or '이 연령대에서 쓰지 않습니다'}", "식약처 DUR")
+                if patient.age is None or not _age_hit(r.get("age_base"), patient.age):
+                    continue
+                why = f"식약처 DUR 특정연령대금기 — {r.get('content') or '이 연령대에서 쓰지 않습니다'}"
+                form = (r.get("form") or "").strip()
+                if form:  # the rule covers some dosage forms only (acetaminophen: 서방정 — not a children's syrup)
+                    toks = [t.strip() for t in form.split("/") if t.strip()]
+                    mine = forms.get(g.key, [])
+                    hit = any(n and any(t in n.replace(" ", "") for t in toks) for n, _ in mine) or (
+                        "서방" in form and any(rel == "ER" for _, rel in mine))
+                    if not hit:
+                        if mine and all(n for n, _ in mine):  # known products, none of that form: not concerned
+                            continue
+                        add(f"연령({r['age_base']})", g, "주의", f"{why} ({form}에만 해당 — 제품의 제형을 확인하세요)",
+                            "식약처 DUR")
+                        continue
+                add(f"연령({r['age_base']})", g, "금기", why, "식약처 DUR")
             if "pregnancy" in dis:
                 for r in self.dur_by.get("pregnancy", {}).get(b, [])[:1]:
                     one = "1" in (r.get("grade") or "")
