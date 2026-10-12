@@ -579,6 +579,15 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .sym-note { font-size: 12px; color: #ffe08a; }
 .sym-disc { font-size: 11px; color: #8fa9b4; line-height: 1.45; }
 .panel-title .sym-open + .sym-open { margin-right: 6px; }
+.sym-panel { clear: both; }  /* never squeezed beside the floating title buttons */
+@media (max-width: 640px) {
+  .panel-title .sym-open { float: none; margin: 6px 6px 0 0; }
+  .rx-top { flex-direction: column; }
+  .sym-head { flex-wrap: wrap; }
+  .sym-head b { flex: 1; }
+  .sym-head small { order: 3; flex-basis: 100%; }
+  .rx-thumb { width: 100%; max-height: 160px; }
+}
 
 /* ---------------------------------------------------------------- 처방전·약봉투 사진 입력 */
 .rx-top { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 6px; }
