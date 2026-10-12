@@ -118,6 +118,18 @@ def test_documented_dangerous_combinations(eng, a, b, level):
 
 @needs_models
 @pytest.mark.slow
+def test_frail_patient_advice_never_suggests_an_amount(eng):
+    from omnipharm.clinical import Patient
+
+    ings, info = eng.resolve_full("대마")
+    prods = [{"input": "대마", "ingredients": ings, "product": None, "controlled": info["controlled"]},
+             {"input": "자낙스", "ingredients": eng.resolve("자낙스"), "product": None}]
+    advice = eng.predict(prods, Patient(age=78, sex="F", weight_kg=48, scr=1.6))["summary"]["advice"]
+    assert not any("용량을 줄이" in a for a in advice) and any("1342" in a for a in advice), advice
+
+
+@needs_models
+@pytest.mark.slow
 def test_api_result_card_no_amounts_and_masked_audit(eng, monkeypatch, tmp_path):
     monkeypatch.setitem(api.E, "engine", eng)
     monkeypatch.setattr(settings, "logs_dir", tmp_path)

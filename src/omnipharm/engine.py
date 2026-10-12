@@ -1563,7 +1563,10 @@ class Engine:
         if cap and cap["level"] in ("저하", "매우 저하"):
             reasons.append({"sev": "mid", "icon": "🫀",
                             "text": f"몸의 약물 처리 능력이 '{cap['level']}' 상태라 약이 몸에 쌓이기 쉽습니다."})
-            if any("함께 복용하지 마세요" in a for a in advice):  # a contraindicated pair is not fixed by a lower dose
+            if ctl_keys:  # a recreational substance: say what it means for the body, never an amount for it
+                advice.append("몸이 약을 처리하는 힘이 약해 같은 물질도 더 강하고 오래 작용할 수 있습니다 — 처방약의 용량은 "
+                              "의사·약사와 확인하세요.")
+            elif any("함께 복용하지 마세요" in a for a in advice):  # a contraindicated pair is not fixed by a lower dose
                 advice.append("함께 먹지 말아야 할 조합과 별개로, 약을 처리하는 힘이 약해 계속 드시는 약도 용량 조절이 "
                               "필요할 수 있습니다 — 의사·약사와 확인하세요.")
             else:
