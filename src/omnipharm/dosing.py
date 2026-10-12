@@ -211,6 +211,16 @@ def fmt_mg(x: float) -> str:
     return f"{x:,.0f}mg" if x >= 10 else f"{x:.3g}mg"
 
 
+def limit_text(display: str, lim: tuple) -> str:
+    """One line for the AI 상담: the self-medication (OTC) limit first, the prescription maximum second."""
+    mx, warn, single, why = lim
+    parts = ([f"스스로 사 먹을 때(일반약 기준) 하루 {fmt_mg(warn)}까지", f"의사 지시가 있을 때 하루 최대 {fmt_mg(mx)}"]
+             if warn else [f"하루 최대 {fmt_mg(mx)}"])
+    if single:
+        parts.append(f"1회 최대 {fmt_mg(single)}")
+    return f"{display}: {' · '.join(parts)}" + (f" — {', '.join(why)} 반영" if why else "")
+
+
 def check_doses(items: list[dict], ctx: dict, groups_of, display_of) -> dict:
     """items: [{"input": product name, "keys": [ingredient keys], "dose": Dose | None,
                 "strength": {"unit", "per", "mg": {key: mg}} | None}]

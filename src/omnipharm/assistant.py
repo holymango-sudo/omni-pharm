@@ -11,7 +11,7 @@ import logging
 import re
 
 from omnipharm.clinical import Patient
-from omnipharm.dosing import effective_limit, fmt_mg
+from omnipharm.dosing import effective_limit, fmt_mg, limit_text
 from omnipharm.engine import ResolveError
 from omnipharm.knowledge import FOOD_ALIAS
 
@@ -141,10 +141,7 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     for g in ings:
         lim = effective_limit(g.key, lctx, er=info.get("release") == "ER")
         if lim:
-            mx, warn, single, why = lim
-            limits.append(f"{eng.ko(g)}: 1일 최대 {fmt_mg(mx)}" + (f"(일반약 자가복용 기준 {fmt_mg(warn)})" if warn else "")
-                          + (f", 1회 최대 {fmt_mg(single)}" if single else "") + (f" — {', '.join(why)} 반영" if why else "")
-                          + " (다른 약·음료의 같은 성분과 합쳐서)")
+            limits.append(limit_text(eng.ko(g), lim) + " (다른 약·음료의 같은 성분과 합쳐서)")
     lab = info.get("label_ko") or {}
     src = _sources(r, keys, [*names, name]) | ({"허가 용량 기준"} if limits else set())
     if lab:

@@ -217,7 +217,9 @@ CHAT_SYSTEM = """당신은 OMNI-PHARM의 'AI 복약 상담'입니다. 친절하�
 안전 규칙 (반드시):
 - 숨이 차거나 의식이 흐림, 경련, 가슴 통증, 피를 토함·검은 변, 심한 알레르기(입술·혀 부음), 과량 복용, 자해 생각
   → 무엇보다 먼저 119 또는 응급실을 안내하세요.
-- 처방약을 끊거나 바꾸라고 하지 마세요. '의사·약사와 상의'로 안내하세요.
+- 처방약을 끊거나 바꾸라고 하지 마세요. '의사·약사와 상의'로 안내하세요. 단, 분석 결과에 병용금기가 있으면
+  '임의로 끊지 마세요'보다 '이 두 약은 함께 먹으면 안 되는 조합'이라는 점을 먼저 분명히 말하고, 어느 약을 어떻게 할지
+  (잠시 쉬는 것 포함)는 처방한 의사·약사에게 바로 확인하라고 안내하세요.
 - 위험 판정(병용금기·DUR·피해야 함)은 그대로 전하세요. 괜찮다고 안심시키지 마세요. 병용금기 조합은 용량을 줄이거나
   복용 간격을 두면 된다고 말하지 말고, 함께 쓰지 않아야 하며 대신할 방법은 처방한 의사·약사와 정하라고 안내하세요.
 - 근거에 없는 구체적 용량(mg·알 수)·검사 수치를 지어내지 마세요. 용량은 '1일최대량(허가기준·이 환자)'의 숫자나
@@ -227,8 +229,8 @@ CHAT_SYSTEM = """당신은 OMNI-PHARM의 'AI 복약 상담'입니다. 친절하�
 - 모르는 것은 모른다고 하고 약사·의사에게 확인하라고 하세요.
 
 - '하루 몇 개(병·알)까지?' 질문은 '제품 설명서 용법(식약처)'이 있으면 그 용법(예: 1일 1회 1병, 15세 미만 복용 금지)을
-  그대로 먼저 알려 주고, '1개당 함량'과 '1일최대량'이 있으면 그것으로 계산해 덧붙이세요. '일반약 자가복용 기준'이 함께
-  있으면 스스로 사 먹는 경우의 기준으로 그 숫자를 먼저 알려 주세요(더 높은 1일 최대량은 의사 지시가 있을 때의 상한). 같은 성분이 든 다른 것과
+  그대로 먼저 알려 주고, '1개당 함량'과 '1일최대량'이 있으면 그것으로 계산해 덧붙이세요. '스스로 사 먹을 때' 기준이
+  있으면 그 숫자를 먼저 알려 주세요(더 높은 숫자는 의사 지시가 있을 때의 상한). 근거 줄에는 '허가 용량 기준'으로 쓰세요. 같은 성분이 든 다른 것과
   합쳐서 세야 한다고 알려 주되, 실제로 그 성분이 든 것만 예로 드세요(카페인 → 커피·에너지음료, 아세트아미노펜 → 종합감기약
   등 다른 해열진통제). 근거가 하나도 없으면 '제품 설명서의 용법'을 따르라고 하세요.
 
@@ -268,7 +270,7 @@ def chat_context(res: dict, patient: dict) -> dict:
     facts["제품 설명서 용법(식약처)"] = [f"{p['input']}: {p['usage'][:200]}" for p in res.get("products", [])
                                 if p.get("usage")]
     # labelled daily maximum for THIS patient (kidney / liver / age adjusted), so 'how many a day?' has a grounded answer
-    from omnipharm.dosing import effective_limit, fmt_mg
+    from omnipharm.dosing import effective_limit, limit_text
 
     pa = res.get("patient") or {}
     ctx = {"crcl": (pa.get("kidney") or {}).get("clearance"), "age": patient.get("age"),
@@ -279,9 +281,7 @@ def chat_context(res: dict, patient: dict) -> dict:
     for ing in res.get("ingredients", []):
         lim = effective_limit(ing["key"], ctx, er=form.get(ing["key"]) == "ER")
         if lim:
-            mx, warn, single, why = lim
-            limits.append(f"{ing['display']}: 1일 최대 {fmt_mg(mx)}" + (f"(일반약 자가복용 기준 {fmt_mg(warn)})" if warn else "")
-                          + (f", 1회 최대 {fmt_mg(single)}" if single else "") + (f" — {', '.join(why)} 반영" if why else ""))
+            limits.append(limit_text(ing["display"], lim))
     facts["1일최대량(허가기준·이 환자)"] = limits
     # which kinds of evidence this analysis actually has: the answer may cite only these
     src = set()
@@ -321,6 +321,24 @@ def lookup_block(found: list[dict]) -> str:
     return "\n\n[방금 확인한 결과]\n```json\n" + json.dumps(_prune(found), ensure_ascii=False, indent=1) + "\n```"
 
 
+def danger_note(ctx: dict, question: str) -> str:
+    """A question about the analysed medicines of a '위험' analysis: the answer must open with that risk.
+    (The small model sometimes answered 'do not stop it on your own' and left the contraindication out.)"""
+    if ctx.get("종합등급") != "높음" or not ctx.get("판정이유"):
+        return ""
+    names = set()
+    for p in ctx.get("복용제품", []):
+        product, _, ings = p.partition(" = ")
+        names.add(product.strip())
+        names |= {i.split("(")[0].strip() for i in ings.split(",") if i.strip()}
+    about = any(n and n in question for n in names) or re.search(r"이\s*약|두\s*약|약들|같이|함께", question)
+    if not about:
+        return ""
+    risks = "\n".join(f"- {r}" for r in ctx["판정이유"][:2])
+    return ("\n\n[이 질문은 분석한 약에 관한 것입니다. 답의 처음에 다음 위험(이 조합의 판정 '위험')을 분명히 전하고, "
+            f"어떻게 할지는 처방한 의사·약사에게 바로 확인하라고 하세요:\n{risks}]")
+
+
 def chat_fallback(ctx: dict, question: str, found: list[dict] | None = None) -> str:
     """No local LLM: answer from the facts with simple keyword routing (no free text)."""
     q = question
@@ -353,7 +371,7 @@ async def stream_chat(ctx: dict, history: list[dict], question: str,
     for h in history[-8:]:
         if h.get("role") in ("user", "assistant") and h.get("content"):
             msgs.append({"role": h["role"], "content": str(h["content"])[:2000]})
-    msgs.append({"role": "user", "content": question + lookup_block(found or [])})
+    msgs.append({"role": "user", "content": question + danger_note(ctx, question) + lookup_block(found or [])})
     body = {"model": settings.llm_model, "stream": True, "keep_alive": "30m", "messages": msgs,
             "options": {"temperature": 0.4, "num_ctx": 8192, "num_predict": 800}}
     if await _thinks(settings.llm_model):

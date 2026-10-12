@@ -59,7 +59,10 @@ def contra_not_fixable(answer: str, contraindicated: bool) -> str | None:
     if not contraindicated:
         return None
     for s in _sentences(answer):
-        if re.search(r"(용량|양)을?\s*(줄이|조절|낮추)|간격을?\s*(조절|늘리|두)", s) and not re.search(r"않|없|안\s|별개|아니", s):
+        if (re.search(r"(용량|양)을?\s*(줄이|줄여|조절|낮추|낮춰)|간격을?\s*(조절|늘리|늘려|두)", s)
+                and not re.search(r"않|없|안\s|별개|아니|마세요|마십시오|말고|말아", s)
+                # a dose change decided with the doctor / pharmacist, or an alternative drug, is fine
+                and not ASK_PRO.search(s) and not re.search(r"대체|대신", s)):
             return f"병용금기를 용량 조절로 해결하는 문장: {s.strip()[:60]}"
     return None
 
@@ -79,9 +82,13 @@ def sources_allowed(answer: str, allowed: set[str]) -> str | None:
     m = SOURCES_LINE.findall(answer)
     if not m:
         return None  # small talk may omit it
-    ok = {re.sub(r"\s+", "", a) for a in allowed | {"일반 복약 상식"}}
-    for part in re.split(r"[,·/]|\s및\s", m[-1].strip().rstrip(".")):
-        p = re.sub(r"[*\s]|\(.*?\)", "", part)
+    def norm(s: str) -> str:  # 'FDA 라벨' = 'FDA 허가 라벨'
+        return re.sub(r"[*\s]|\(.*?\)|허가", "", s)
+
+    ok = {norm(a) for a in allowed | {"일반 복약 상식"}}
+    line = re.sub(r"\(.*?\)", "", m[-1].strip().rstrip("."))  # '상호작용 검사(문서·규칙 근거 없음)' is one name
+    for part in re.split(r"[,·/]|\s및\s", line):
+        p = norm(part)
         if p and not any(p in a or a in p for a in ok):
             return f"없는 근거 인용: {part.strip()}"
     return None
