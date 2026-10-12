@@ -32,6 +32,9 @@ def test_prepare_image():
     from PIL import Image
 
     assert max(Image.open(io.BytesIO(out)).size) == rx_photo.MAX_SIDE
+    meta: dict = {}  # a small photo is enlarged for the vision model, and the UI is told so
+    small = base64.b64decode(rx_photo.prepare_image(_png(800, 600), meta))
+    assert max(Image.open(io.BytesIO(small)).size) == rx_photo.MAX_SIDE and meta == {"enlarged": True}
     with pytest.raises(ValueError):
         rx_photo.prepare_image("data:image/png;base64," + "A" * 300)  # not an image
     with pytest.raises(ValueError):

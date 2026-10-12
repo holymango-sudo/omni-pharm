@@ -443,6 +443,7 @@ class Engine:
         self.pair_metrics = _load_json(art / "pair_metrics.json")
         self.patient_metrics = _load_json(art / "patient_model_metrics.json")
         self.ablation = _load_json(art / "patient_model_nopatient_metrics.json")
+        self.stats = _load_json(art / "stats_metrics.json")  # CIs / significance / baselines (stage "stats")
         self.pair_models: list[tuple[str, OmniPharmModel, torch.Tensor]] = []
         self.pair_thr_unseen, self.pair_seen = None, set()
         self.patient_model = None

@@ -11,6 +11,7 @@
   chembl-drugs  approved drugs: names, ATC         strengths    per-unit ingredient amounts
   dur           MFDS DUR rules + quasi-drugs       chembl       CYP / hERG / mechanism pharmacology
   labelsearch   full-text index of all FDA labels   pk           Tmax / half-life from FDA labels (body view)
+  stats         95% CIs, significance tests, baselines for the trained models (GPU, ~30 min)
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ def main() -> None:
     ap.add_argument("stage", choices=["twosides", "faers", "canada", "structures", "extend", "mfds", "dur", "world", "strengths",
                                       "chembl", "chembl-drugs", "labelsearch", "pk",
                                       "labels", "fdalabels",
-                                      "train-pair", "train-patient", "mol3d", "all"])
+                                      "train-pair", "train-patient", "mol3d", "stats", "all"])
     ap.add_argument("--faers-start", default="2004Q1")  # legacy AERS 2004Q1-2012Q3 + FAERS
     ap.add_argument("--epochs", type=int, default=None)
     ap.add_argument("--max-drugs", type=int, default=None)
@@ -100,6 +101,9 @@ def main() -> None:
         elif s == "mol3d":
             from omnipharm.pipeline import mol3d
             mol3d.build()
+        elif s == "stats":
+            from omnipharm.pipeline import stats
+            stats.build()
     log.info(f"done in {(time.time() - t0) / 60:.1f} min")
 
 

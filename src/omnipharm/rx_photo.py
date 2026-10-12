@@ -31,10 +31,12 @@ SCHEMA = {"type": "object", "required": ["medicines"], "properties": {
         "days": {"type": "number"}, "timing": {"type": "string"}}}}}}
 
 
-def prepare_image(data: str) -> str:
-    """Base64 / data-URL image -> base64 JPEG, upright (EXIF orientation applied), at most MAX_SIDE px, no EXIF.
-    Raises ValueError for anything that is not an image."""
-    from PIL import Image, ImageOps, UnidentifiedImageError
+def prepare_image(data: str, meta: dict | None = None) -> str:
+    """Base64 / data-URL image -> base64 JPEG, upright (EXIF orientation applied), MAX_SIDE px, no EXIF.
+    A smaller photo is enlarged and lightly sharpened (meta["enlarged"] = True): on the photo evaluation set
+    (scripts/eval_rx_photo.py, tuned on the dev set) this raised the lines read from photos taken from far away
+    from 62% to 93%. Raises ValueError for anything that is not an image."""
+    from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
 
     raw = data.split(",", 1)[1] if data.startswith("data:") else data
     try:
@@ -44,6 +46,12 @@ def prepare_image(data: str) -> str:
         raise ValueError("사진 파일을 읽을 수 없습니다 (JPG·PNG 사진을 올려 주세요)") from e
     if min(img.size) < 200:
         raise ValueError("사진이 너무 작습니다 — 약 이름이 크게 보이게 다시 찍어 주세요")
+    if max(img.size) < MAX_SIDE:  # a small photo (taken from far away, or a messenger thumbnail): enlarge the text
+        f = MAX_SIDE / max(img.size)
+        img = img.resize((round(img.width * f), round(img.height * f)), Image.LANCZOS)
+        img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=80, threshold=2))
+        if meta is not None:
+            meta["enlarged"] = True
     img.thumbnail((MAX_SIDE, MAX_SIDE))
     out = io.BytesIO()
     img.save(out, "JPEG", quality=88)  # re-encoding drops EXIF (location, device)

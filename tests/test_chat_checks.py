@@ -72,3 +72,10 @@ def test_controlled_substance_answers_give_no_amounts():
           "응급 시 119, 마약류 24시간 익명 상담 1342. 끊은 뒤 14일, 2시간 간격")
     assert C.no_use_guidance(ok) is None
     assert llm.EMERGENCY.search("친구가 깨워도 안 일어나요") and llm.EMERGENCY.search("오버도즈 같아요")
+
+
+def test_pregnancy_answers_give_no_maximum_and_no_report_statistics():
+    assert C.no_amount("하루 최대 1,200mg을 넘지 않도록 하세요.")
+    assert C.no_amount("드시기 전에 담당 의사와 먼저 상의하세요.") is None
+    assert C.forbids("드물게 경련이나 췌장염이 생길 수 있어요.", ["경련", "췌장염"])
+    assert C.forbids("임신 중에도 비교적 많이 쓰는 약입니다.", ["경련", "췌장염"]) is None

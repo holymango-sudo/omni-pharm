@@ -210,7 +210,8 @@ def catalog():
 @app.get("/api/v1/metrics")
 def metrics():
     eng: Engine = E["engine"]
-    return {"pair": eng.pair_metrics, "patient": eng.patient_metrics, "ablation_no_patient": eng.ablation}
+    return {"pair": eng.pair_metrics, "patient": eng.patient_metrics, "ablation_no_patient": eng.ablation,
+            "stats": eng.stats}  # 95% CIs, significance tests and baselines (pipeline stage "stats")
 
 
 @app.post("/api/v1/assess")
@@ -398,8 +399,9 @@ class RxPhoto(BaseModel):
 async def rx_photo_read(req: RxPhoto, request: Request):
     """처방전·약봉투 사진 -> medicine lines read by the local vision LLM, each matched to a product.
     The photo stays in memory (never written, never logged); only the number of lines goes to the audit log."""
+    meta: dict = {}
     try:
-        img = await asyncio.to_thread(rx_photo.prepare_image, req.image)
+        img = await asyncio.to_thread(rx_photo.prepare_image, req.image, meta)
     except ValueError as e:
         raise HTTPException(422, {"message": str(e)}) from None
     t0 = time.time()
@@ -410,7 +412,7 @@ async def rx_photo_read(req: RxPhoto, request: Request):
     security.audit("rx_photo", _who(request), _client(request), lines=len(items),
                    matched=sum(i["status"] != "none" for i in items))
     return {"document": data.get("document") or "", "items": items, "elapsed_ms": round((time.time() - t0) * 1000),
-            "model": settings.llm_model}
+            "model": settings.llm_model, "small_photo": bool(meta.get("enlarged"))}
 
 
 @app.get("/api/v1/symptoms")

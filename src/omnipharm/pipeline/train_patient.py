@@ -94,20 +94,18 @@ def _sensitivity(model, G, d: _Data, C: int, organs: list[str], cap: int = 200_0
     return out
 
 
-def train(epochs: int | None = None, no_patient: bool = False) -> dict:
-    epochs = epochs or 12
-    OUT.mkdir(parents=True, exist_ok=True)
-    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    torch.manual_seed(0)
-    master = pd.read_parquet(PROC / "drug_master.parquet").reset_index(drop=True)
-    cm = pd.read_parquet(PROC / "condition_mapping.parquet")
-    C, names = len(cm), cm["condition"].tolist()
-    A = dict(np.load(PROC / "faers_reports.npz"))
+def report_features(A: dict, no_patient: bool = False) -> np.ndarray:
+    """Patient vector of every report (all zeros for the no-patient ablation)."""
     nd = (A["drugs"] >= 0).sum(1)
     X = patient_matrix(A["age"], A["sex"], A["wt"], A["flags"], nd + A["n_unmapped"].astype(np.int64))
     if no_patient:
         X[:] = 0
+    return X
 
+
+def report_splits(A: dict, master: pd.DataFrame) -> tuple[dict[str, np.ndarray], int, np.ndarray]:
+    """Report rows of every split (deterministic, seed 0) -> (rows, first test quarter, Canada mask).
+    Shared with the statistics stage (stats.py), which must evaluate on exactly these reports."""
     cold = np.flatnonzero(master["name"].isin(cold_drugs(master)).to_numpy())
     has_cold = np.isin(A["drugs"], cold).any(1)
     q = A["quarter"].astype(int)
@@ -126,6 +124,21 @@ def train(epochs: int | None = None, no_patient: bool = False) -> dict:
     if ca_test.any():
         rows["test_canada"] = np.flatnonzero(ca_test)
     log.info(f"{len(q):,} reports | " + " | ".join(f"{k} {len(v):,}" for k, v in rows.items()))
+    return rows, int(q_cut), ca
+
+
+def train(epochs: int | None = None, no_patient: bool = False) -> dict:
+    epochs = epochs or 12
+    OUT.mkdir(parents=True, exist_ok=True)
+    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    torch.manual_seed(0)
+    master = pd.read_parquet(PROC / "drug_master.parquet").reset_index(drop=True)
+    cm = pd.read_parquet(PROC / "condition_mapping.parquet")
+    C, names = len(cm), cm["condition"].tolist()
+    A = dict(np.load(PROC / "faers_reports.npz"))
+    X = report_features(A, no_patient)
+    rows, q_cut, ca = report_splits(A, master)
+    q = A["quarter"]
     D = {k: _Data(A, v, X, dev) for k, v in rows.items()}
     prevalence = _labels_np(D["val"], C).mean(0)
 

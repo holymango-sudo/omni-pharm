@@ -242,6 +242,9 @@ CHAT_SYSTEM = """당신은 OMNI-PHARM의 'AI 복약 상담'입니다. 친절하�
 - 증상에 맞는 약을 고르려는 질문에는 성분 계열 정도만 일반적으로 설명하고, 화면의 '🤒 증상으로 약 찾기'로
   이 사람에게 맞는 후보를 확인하라고 안내하세요.
 - 모르는 것은 모른다고 하고 약사·의사에게 확인하라고 하세요.
+- 임신 중이거나, 이 사람의 질환 때문에 그 약에 경고(질환별 금기·주의)가 있으면 최대 용량을 안내하지 말고(먹어도 된다는
+  뜻으로 들립니다) 먹기 전에 의사·약사와 먼저 상의하라고 하세요.
+- 'AI 참고'나 '약 자체 위험'으로 표시된 이상반응은 부작용 보고 통계일 뿐 그 약의 알려진 부작용이 아니므로 부작용처럼 말하지 마세요.
 - 대마·케타민·코카인·MDMA 같은 규제 물질('규제물질' 또는 [방금 확인한 결과]의 '규제 물질')에 대한 질문은 거절하거나
   훈계하지 말고 위해 감소 관점으로 답하세요: 확인된 위험한 조합과 이유, 위험 신호와 응급 대처(119, 혼자 쓰지 않기,
   의식이 없으면 옆으로 눕히기)를 알려 주세요. 사용 방법·양(용량)·구하는 방법·검사를 피하는 방법은 알려 주지 마세요.
@@ -271,6 +274,8 @@ EMERGENCY_TEXT = ("**⚠ 응급 신호일 수 있습니다.** 지금 숨이 차�
 def chat_context(res: dict, patient: dict) -> dict:
     """What the chat may rely on: the report facts + the time course / release form / suggestions of this analysis."""
     facts = fact_sheet(res, patient)
+    # FAERS 'drug's own risk' associations are report statistics: the chat must not present them as side effects
+    facts["참고사항"] = [x for x in facts.get("참고사항", []) if not re.search(r"약 자체에 따르는 위험|\(AI 참고\)", x)]
     # controlled substances: no amounts or dosing frequency anywhere in what the chat may quote
     ctl = {k for c in res.get("controlled") or [] for k in c.get("keys", [])}
     j = res.get("pathway") or {}

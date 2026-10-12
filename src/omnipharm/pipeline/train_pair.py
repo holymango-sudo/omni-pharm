@@ -89,14 +89,8 @@ def _fit(kind: str, enc_input, C: int, tr, va, vc, dev, epochs: int, log_prefix:
     return model, predict
 
 
-def train(epochs: int | None = None) -> dict:
-    epochs = epochs or 80
-    OUT.mkdir(parents=True, exist_ok=True)
-    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    master = pd.read_parquet(PROC / "drug_master.parquet").reset_index(drop=True)
-    cm = pd.read_parquet(PROC / "condition_mapping.parquet")
-    ds = pd.read_parquet(PROC / "twosides_pairs.parquet")
-    C, names = len(cm), cm["condition"].tolist()
+def pair_splits(master: pd.DataFrame, ds: pd.DataFrame, C: int) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+    """(drug i, drug j, labels, split -> pair rows), deterministic (seed 0). Shared with stats.py."""
     idx = {str(r): k for k, r in enumerate(master["rxcui"].astype(str))}
     i = ds["drug_1"].astype(str).map(idx).to_numpy()
     j = ds["drug_2"].astype(str).map(idx).to_numpy()
@@ -118,6 +112,22 @@ def train(epochs: int | None = None) -> dict:
     log.info(f"{len(master)} drugs (cold val {len(cold_val)}, cold test {len(cold_test)}), {C} events | "
              f"train {len(tr):,} val {len(va):,} cold-val {len(vc):,} test {len(te):,} | "
              f"unseen-drug test pairs: one {len(one):,}, both {len(both):,}")
+    return i, j, y, {"train": tr, "val": va, "cold_val": vc, "test_random_split": te, "test_unseen_one_drug": one,
+                     "test_unseen_both_drugs": both, "n_cold": len(cold)}
+
+
+def train(epochs: int | None = None) -> dict:
+    epochs = epochs or 80
+    OUT.mkdir(parents=True, exist_ok=True)
+    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    master = pd.read_parquet(PROC / "drug_master.parquet").reset_index(drop=True)
+    cm = pd.read_parquet(PROC / "condition_mapping.parquet")
+    ds = pd.read_parquet(PROC / "twosides_pairs.parquet")
+    C, names = len(cm), cm["condition"].tolist()
+    i, j, y, S = pair_splits(master, ds, C)
+    tr, va, vc, te = S["train"], S["val"], S["cold_val"], S["test_random_split"]
+    one, both = S["test_unseen_one_drug"], S["test_unseen_both_drugs"]
+    cold_n = S["n_cold"]
 
     sel = lambda s: (i[s], j[s], y[s])  # noqa: E731
     G = all_graphs(master, dev)
@@ -144,7 +154,7 @@ def train(epochs: int | None = None) -> dict:
     thresholds_unseen = f1_thresholds(y[vc], preds["gnn"]["cold_val"])
     seen = sorted(set(master["name"].iloc[np.unique(np.concatenate([i[tr], j[tr]]))]))
     metrics = {
-        "trained_at": time.strftime("%Y-%m-%d %H:%M"), "n_drugs": len(master), "n_cold_drugs": len(cold),
+        "trained_at": time.strftime("%Y-%m-%d %H:%M"), "n_drugs": len(master), "n_cold_drugs": cold_n,
         "n_classes": C, "classes": names, "n_pairs": len(ds),
         "split": {"train": len(tr), "val": len(va), "cold_val": len(vc), "test": len(te), "unseen_one": len(one),
                   "unseen_both": len(both)},

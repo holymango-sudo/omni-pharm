@@ -216,8 +216,8 @@ def limit_text(display: str, lim: tuple) -> str:
     mx, warn, single, why = lim
     parts = ([f"스스로 사 먹을 때(일반약 기준) 하루 {fmt_mg(warn)}까지", f"의사 지시가 있을 때 하루 최대 {fmt_mg(mx)}"]
              if warn else [f"하루 최대 {fmt_mg(mx)}"])
-    if single:
-        parts.append(f"1회 최대 {fmt_mg(single)}")
+    if single:  # with an OTC ceiling the single maximum is the prescription one ('1회 800mg' is not self-medication)
+        parts.append(f"{'의사 지시가 있을 때 ' if warn else ''}1회 최대 {fmt_mg(single)}")
     return f"{display}: {' · '.join(parts)}" + (f" — {', '.join(why)} 반영" if why else "")
 
 

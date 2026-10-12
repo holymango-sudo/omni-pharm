@@ -81,6 +81,9 @@ export default function RxPhoto({ existing, onAdd, onClose }) {
         <div className="rx-list">
           <div className="sym-disc">{res.document && <b>{res.document} · </b>}{rows.length}개 줄을 읽었습니다
             ({(res.elapsed_ms / 1000).toFixed(1)}초). <b>실제 종이와 꼭 비교해</b> 맞는 것만 체크하세요.</div>
+          {res.small_photo && (
+            <div className="sym-disc">📏 사진이 작아 글자를 잘못 읽었을 수 있습니다 — 약 목록 부분을 <b>가까이서 크게</b> 다시 찍으면 더 정확합니다.</div>
+          )}
           {rows.map((r, i) => (
             <label key={r.raw} className={`rx-row st-${r.status}`}>
               <input type="checkbox" checked={r.use} disabled={!r.choice} onChange={(e) => set(i, { use: e.target.checked })} />

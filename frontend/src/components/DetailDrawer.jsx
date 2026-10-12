@@ -141,8 +141,64 @@ function Validation() {
           <p className="muted small">★ 배포 규칙: 학습에 포함된 약물끼리는 앙상블, 학습에 없던 분자(신규 SMILES·최신 약물)가 끼면 새 구조 일반화가 가장 좋은 GNN 단독을 사용합니다.</p>
         </>
       )}
+      <Stats s={m.stats} />
       {!pair && !patient && <p className="muted">학습된 모델 지표가 없습니다.</p>}
     </div>
+  );
+}
+
+// 95% confidence intervals, significance tests and baselines (artifacts/v2/stats_metrics.json, stage "stats")
+const TEST_KO = { test_time: "미래 시점", test_unseen: "처음 보는 약물 포함", test_canada: "캐나다 외부" };
+const MODEL_KO = {
+  full: "★ 환자 맞춤 모델 (구조 GNN + 환자 정보)", no_patient: "같은 모델 · 환자 정보 제외",
+  logistic: "기준선: 로지스틱 회귀 (약 원-핫 + 환자 정보)", drug_frequency: "기준선: 약물별 이상반응 빈도",
+};
+const f3 = (x) => (x == null ? "-" : x.toFixed(3));
+const ciText = (c) => (c ? `${f3(c[0])}–${f3(c[1])}` : "");
+const pText = (d) => (d.p_is_upper_bound ? `p < ${(1 / d.n_boot).toFixed(3)}` : `p = ${d.p_value.toFixed(3)}`);
+const ciPct = (c) => `${Math.round(c[0] * 100)}–${Math.round(c[1] * 100)}%`;
+
+function Stats({ s }) {
+  if (!s?.patient) return null;
+  const tests = Object.keys(TEST_KO).filter((t) => s.patient[t]);
+  const diff = (d) => d && <>{d.difference >= 0 ? "+" : ""}{f3(d.difference)} <small>[{ciText(d.ci95)}] {pText(d)}</small></>;
+  const pu = s.pair?.test_unseen_one_drug;
+  const au = s.clinical?.audit;
+  const dur = s.clinical?.dur_external;
+  return (
+    <>
+      <h5>C. 통계 검증 — macro AUROC와 95% 신뢰구간 (평가 자료를 1,000회 다시 뽑는 부트스트랩)</h5>
+      <table className="tbl"><thead><tr><th>모델</th>{tests.map((t) => (
+        <th key={t}>{TEST_KO[t]} <small>({s.patient[t].n.toLocaleString()}건
+          {s.patient[t].n_clusters ? ` · 처음 보는 약 ${s.patient[t].n_clusters}개 단위로 재표본` : ""})</small></th>))}</tr></thead>
+        <tbody>
+          {Object.keys(MODEL_KO).map((k) => (
+            <tr key={k}><td>{MODEL_KO[k]}</td>{tests.map((t) => {
+              const m = s.patient[t].models[k];
+              return <td key={t} className="mono">{f3(m?.macro_auroc)} <small>[{ciText(m?.macro_auroc_ci95)}]</small></td>;
+            })}</tr>
+          ))}
+          <tr><td>환자 정보의 효과 (차이)</td>{tests.map((t) => <td key={t} className="mono">{diff(s.patient[t].full_vs_no_patient)}</td>)}</tr>
+          <tr><td>└ 이상반응별 DeLong 검정 (Holm 보정 p&lt;0.05)</td>{tests.map((t) => {
+            const d = s.patient[t].delong_full_vs_no_patient;
+            return <td key={t}>{d ? `${d.events}개 중 향상 ${d.better} · 저하 ${d.worse}` : <small className="muted">해당 없음(약물 단위 자료)</small>}</td>;
+          })}</tr>
+          <tr><td>기준선(로지스틱) 대비 차이</td>{tests.map((t) => <td key={t} className="mono">{diff(s.patient[t].full_vs_logistic)}</td>)}</tr>
+        </tbody></table>
+      {pu && (
+        <p className="small">약물쌍 모델, 신규 약물 1개 포함 ({pu.n.toLocaleString()}쌍, 신규 약물 {pu.n_clusters}개 단위 재표본): GNN {f3(pu.models.gnn.macro_auroc)}
+          <small> [{ciText(pu.models.gnn.macro_auroc_ci95)}]</small> vs Morgan 지문 {f3(pu.models.fingerprint.macro_auroc)}
+          <small> [{ciText(pu.models.fingerprint.macro_auroc_ci95)}]</small> — 차이 {diff(pu.gnn_vs_fingerprint)}</p>
+      )}
+      {au && (
+        <p className="small">임상 감사(규칙 판정, Wilson 95% 신뢰구간): 처음 보는 세트 첫 측정 {au.holdout_first_measurement.k}/{au.holdout_first_measurement.n}
+          ({ciPct(au.holdout_first_measurement.ci95)}) · 중대 조합 {au.holdout_major_first.k}/{au.holdout_major_first.n} ({ciPct(au.holdout_major_first.ci95)})
+          {dur && <> · 식약처 DUR 병용금기 {dur.n.toLocaleString()}쌍(DUR 끔) '위험' {Math.round(dur["위험"].rate * 100)}% ({ciPct(dur["위험"].ci95)})</>}</p>
+      )}
+      <p className="muted small">차이의 95% 신뢰구간이 0을 포함하지 않으면 우연이 아닌 차이로 봅니다. 처음 보는 약물 평가는 보고·쌍이 소수의 약물을
+        공유하므로 보고가 아니라 약물을 다시 뽑아 신뢰구간을 구했습니다(더 넓고 보수적). 기준선은 분자 구조를 쓰지 않아 처음 보는 약물에 대해
+        아무것도 배우지 못한 상태입니다. 개발에 쓴 감사 세트(109개)는 독립 평가가 아니라 회귀 검사용입니다.</p>
+    </>
   );
 }
 

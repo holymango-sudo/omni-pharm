@@ -24,6 +24,7 @@ _GENERIC = {"약", "약물", "알약", "영양제", "비타민", "감기약", "�
             "정도", "얼마나", "조금", "많이", "한잔", "한", "잔", "병", "알", "개", "번", "후", "전", "같은", "다른", "그럼", "그리고",
             "이거", "저거", "그거", "제가", "저는", "우리", "아이", "엄마", "아빠", "임신", "운전", "운동", "공복", "식후", "식전"}
 MAX_NEW = 2
+_REPORT_STAT = re.compile(r"약 자체에 따르는 위험|\(AI 참고\)")  # FAERS associations shown as information only
 log = logging.getLogger(__name__)
 
 
@@ -140,8 +141,13 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     lctx = {"crcl": (pa.get("kidney") or {}).get("clearance"), "age": patient.age,
             "sex": (patient.sex or "").upper()[:1] or None, "weight": patient.weight_kg,
             "hepatic": bool((pa.get("flags") or {}).get("hepatic"))}
+    # a pregnancy alert or a contraindication for this person's disease: no maximum dose (it reads as permission) -
+    # the answer is 'ask the doctor / pharmacist first'
+    own_alert = any(d.get("drug") in names and (d.get("severity") == "금기" or d.get("key") == "pregnancy"
+                                                 or re.search(r"임신|임부", str(d.get("disease"))))
+                    for d in r.get("disease_alerts", []))
     limits = []
-    for g in [] if ctl else ings:
+    for g in [] if ctl or own_alert else ings:
         lim = effective_limit(g.key, lctx, er=info.get("release") == "ER")
         if lim:
             limits.append(limit_text(eng.ko(g), lim) + " (다른 약·음료의 같은 성분과 합쳐서)")
@@ -158,7 +164,9 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
             "제품 설명서 주의사항(요약)": label_cautions(lab.get("cautions") or "") or None,
             "1일최대량(허가기준·이 환자)": limits,
             "이 제품 관련 이유": [x["text"] for x in s["reasons"] if x["sev"] != "low" and mine(x["text"])][:5],
-            "이 제품 관련 참고": [x["text"] for x in s["reasons"] if x["sev"] == "low" and mine(x["text"])][:2],
+            # not the FAERS 'drug's own risk' associations: they are report statistics, not known side effects
+            "이 제품 관련 참고": [x["text"] for x in s["reasons"] if x["sev"] == "low" and mine(x["text"])
+                            and not _REPORT_STAT.search(x["text"])][:2],
             "할 일": s["advice"][:3], "상호작용": pairs,
             "규제 물질": (f"{ctl['ko']} — 한국: {ctl['law']}" + (f" / 해외: {ctl['abroad']}" if ctl.get("abroad") else "")
                        + f" / 위험 신호: {ctl['signs']} / 상담: {HARM_REDUCTION_LINE} / 용량·사용법은 안내하지 않음")
