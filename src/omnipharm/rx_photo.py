@@ -73,7 +73,7 @@ def parse_dose(item: dict) -> dict | None:
 
 
 def dose_text(item: dict) -> str:
-    parts = [str(item["per_dose"]) if item.get("per_dose") else None,
+    parts = [f"1회 {item['per_dose']}" if item.get("per_dose") else None,
              f"하루 {item['times_per_day']:g}회" if item.get("times_per_day") else None,
              f"{item['days']:g}일" if item.get("days") else None, item.get("timing") or None]
     return " · ".join(p for p in parts if p)
