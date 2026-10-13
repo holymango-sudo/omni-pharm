@@ -17,6 +17,11 @@ export const SCENARIOS = [
 // food, drink and smoking: checked against labels and rules like any medicine
 const LIFESTYLE = [["🍺", "술"], ["🍊", "자몽주스"], ["🥛", "우유"], ["☕", "커피"], ["🥬", "녹색채소"], ["🚬", "흡연"]];
 const isFood = (d) => d.molecules?.length > 0 && d.molecules.every((m) => m.category === "음식·생활");
+// what a food contains per 100 g / 100 mL (식약처 식품영양성분DB): only the nutrients that change a medicine's effect
+const NUTR = [["caffeine_mg", "카페인", "mg"], ["vitamin_k_ug", "비타민K", "μg"], ["potassium_mg", "칼륨", "mg"],
+  ["calcium_mg", "칼슘", "mg"], ["magnesium_mg", "마그네슘", "mg"]];
+const nutrText = (n) => `${n.per}당 ` + NUTR.filter(([k]) => n[k] != null).map(([k, ko, u]) => `${ko} ${n[k]}${u}`).join(", ")
+  + (n.n > 1 ? ` (같은 이름 ${n.n}개 제품의 중앙값)` : "") + " — 식약처 식품영양성분DB";
 
 export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario, onPredict, onDose, busy, patientPayload }) {
   const [q, setQ] = useState("");
@@ -97,6 +102,7 @@ export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario,
               {" "}{[...new Set(d.molecules.filter((m) => m.biologic).map((m) => (m.category === "생물의약품" ? "바이오" : m.category?.split("·")[0])))].join("·")}</small>}
             {d.unresolved?.length > 0 && <small className="warnc"> +{d.unresolved.length} 분석불가</small>}
             {d.controlled && <small className="ctl-tag" title={`${d.controlled.ko} — 한국: ${d.controlled.law}`}>규제</small>}
+            {d.nutrients && <small className="rel-tag" title={nutrText(d.nutrients)}>영양성분</small>}
             {d.status === "ok" && !isFood(d) && !d.controlled && (
               <button className={`dose-btn ${d.dose ? "set" : ""}`} onClick={() => setEditing(editing === d.name ? null : d.name)}
                 title="복용량·횟수·기간 입력">{d.dose ? doseLabel(d.dose, d.dose_info) : "＋용량"}</button>

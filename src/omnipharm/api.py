@@ -243,7 +243,7 @@ async def molecule(d: DrugInput):
     return {"input": d.name, "molecules": mols, "product": info["product"], "country": info["country"],
             "release": info.get("release") or release_of(info["product"] or d.name),
             "unresolved": info["unresolved"], "dose_info": dose_info, "single": len(ings) == 1,
-            "controlled": info.get("controlled")}
+            "controlled": info.get("controlled"), "nutrients": info.get("nutrients")}
 
 
 def _logged(name: str) -> str:
@@ -291,7 +291,7 @@ async def _predict(req: PredictRequest) -> dict:
         products.append({"input": d.name, "ingredients": ings, "product": info["product"],
                          "dose": None if ctl else d.dose, "controlled": ctl,
                          "strength": info.get("strength"), "release": info.get("release"),
-                         "label_ko": info.get("label_ko")})
+                         "label_ko": info.get("label_ko"), "nutrients": info.get("nutrients")})
         if info["unresolved"]:
             unsupported.append({"input": d.name, "reason": "분석 불가 성분: " + ", ".join(info["unresolved"]),
                                 "candidates": []})
@@ -306,7 +306,9 @@ async def _predict(req: PredictRequest) -> dict:
     res["controlled"] = controlled
     res["products"] = [{"input": p["input"], "product": p["product"],
                         "ingredients": [eng.ko(g) for g in p["ingredients"]],
-                        "usage": (p.get("label_ko") or {}).get("usage")} for p in products]
+                        "usage": (p.get("label_ko") or {}).get("usage"), "kind": (p.get("label_ko") or {}).get("kind"),
+                        "nutrients": p.get("nutrients")}
+                       for p in products]
     res["elapsed_ms"] = round((time.time() - t0) * 1000)
     res["version"] = VERSION
     rid = uuid.uuid4().hex[:12]

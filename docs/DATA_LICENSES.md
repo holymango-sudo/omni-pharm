@@ -18,6 +18,8 @@
 | 식약처 의약품 제품 허가정보 (공공데이터포털, 목록 + 상세) | 한국 제품, 함량, 한글 허가사항(용법·주의사항·연령 제한·'함께 복용하지 말 것') | 공공데이터포털 이용허락 조건에 따름(출처 표시) |
 | 식약처 의약품안전사용서비스(DUR) 성분정보 | 병용·연령·임부 금기, 용량·기간·노인 주의, 효능군중복 | 이용허락범위 제한 없음 (공공데이터포털) |
 | 식약처 의약외품 제품 허가 정보 | 의약외품 제품 | 공공데이터포털 이용허락 조건에 따름 |
+| 식약처 건강기능식품정보 (공공데이터포털 15056760) | 건강기능식품 제품, 기능성 원료, '의약품 복용 시 섭취 주의' 표시 | 이용허락범위 제한 없음 (공공데이터포털) |
+| 식약처 식품영양성분DB정보 (공공데이터포털 15127578) | 음식·음료의 카페인·비타민K·칼륨·칼슘·마그네슘 함량(100g/100mL당) | 이용허락범위 제한 없음 (공공데이터포털) |
 | Health Canada Drug Product Database | 캐나다 제품 | Open Government Licence – Canada |
 | EMA Medicines report | 유럽 제품 | EMA 재사용 정책(출처 표시) |
 | BDPM (ANSM, 프랑스) | 프랑스 제품 | Licence Ouverte / Open Licence (Etalab) |
@@ -36,5 +38,5 @@
 | Noto Sans KR, Orbitron, JetBrains Mono (폰트) | SIL Open Font License |
 
 ## 출처 표시 문구 (배포 시)
-> 본 프로그램은 식품의약품안전처(의약품·의약외품 허가정보, DUR), 미국 FDA(FAERS·openFDA), Health Canada(Canada Vigilance), Tatonetti Lab(TWOSIDES·OFFSIDES), EMBL-EBI ChEMBL, NCBI PubChem, Health Canada,
+> 본 프로그램은 식품의약품안전처(의약품·의약외품 허가정보, DUR, 건강기능식품정보, 식품영양성분DB), 미국 FDA(FAERS·openFDA), Health Canada(Canada Vigilance), Tatonetti Lab(TWOSIDES·OFFSIDES), EMBL-EBI ChEMBL, NCBI PubChem, Health Canada,
 > European Medicines Agency, ANSM(BDPM), 후생노동성, KEGG의 공개 자료를 이용했습니다.

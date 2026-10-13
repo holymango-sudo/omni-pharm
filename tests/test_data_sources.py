@@ -63,6 +63,33 @@ def test_do_not_take_with_mapping():
         assert kr_avoid_targets(not_an_item) is None, not_an_item
 
 
+def test_health_functional_food_parsing():
+    from omnipharm.pipeline.supplements import declared_ingredients, medicines_to_watch
+
+    hongsam = {"PRDUCT": "6년근 고려홍삼정 PREMIUM", "INTAKE_HINT1": "[홍삼제품]의약품(당뇨치료제, 혈액항응고제) 복용 시 섭취에 주의",
+               "BASE_STANDARD": "② 진세노사이드 Rg1, Rb1 및 Rg3의 합 : 표시량의 80% 이상"}
+    assert declared_ingredients(hongsam) == ["ginseng"]
+    assert medicines_to_watch(hongsam["INTAKE_HINT1"]) == ["당뇨치료제", "혈액항응고제"]
+    k2 = {"PRDUCT": "MK-7 비타민K2&비타민D3", "INTAKE_HINT1": "[비타민K] 항응고제 복용 시 섭취에 주의", "BASE_STANDARD": ""}
+    assert declared_ingredients(k2)[:2] == ["menaquinone", "cholecalciferol"]  # K2 is not K1 (phytonadione)
+    assert medicines_to_watch("2. 임신 중이거나 간 질환이 있거나\n항응고제를 복용하는 경우 섭취에 주의") == ["항응고제"]
+    assert kr_avoid_targets("당뇨치료제") == (frozenset({"antidiabetic"}), "주의")
+    assert kr_avoid_targets("혈액항응고제")[0] == frozenset({"anticoagulant"})
+
+
+def test_food_nutrient_keys():
+    from omnipharm.pipeline.food_nutrients import _num, keys_of, norm
+
+    keys = dict(keys_of("커피_아메리카노 아이스(ICED)", "메가커피", drink=True))
+    assert {"커피아메리카노아이스(iced)", "아메리카노", "메가커피아메리카노"} <= set(keys)
+    assert all(norm(label) == key for key, label in keys.items())  # every suggested name resolves to its key
+    assert [k for k, _ in keys_of("샐러드_감자", None)] == ["샐러드감자"]  # potato salad is not '감자'
+    assert [k for k, _ in keys_of("시금치, 생것", None)] == ["시금치생것", "시금치"]
+    assert "상추" in [k for k, _ in keys_of("상추, 잎상추, 뚝섬적축면, 적색, 생것", None)]
+    assert "녹차" not in [k for k, _ in keys_of("녹차, 말린것", None)]  # tea leaves are not the drink
+    assert _num("1,214.000") == 1214.0 and _num("") is None
+
+
 def test_indication_patterns():
     assert EVENT_INDICATION["Angioedema"].search("urticaria | rhinitis, allergic")
     assert EVENT_INDICATION["Cerebrovascular accident"].search("stroke | venous thrombosis")
@@ -102,6 +129,42 @@ def test_korean_label_evidence_in_the_result(eng):
     child = _predict(eng, ["게보린정", "타이레놀정500밀리그람"], age=10)
     assert child["summary"]["verdict"] == "위험"
     assert any("15세 미만" in d["disease"] and d.get("key") == "age_label" for d in child["disease_alerts"])
+
+
+@needs_models
+@pytest.mark.slow
+def test_health_functional_foods_in_the_result(eng):
+    if not any(k.startswith("H:") for k in eng.label_ko):
+        pytest.skip("health functional foods not built (stage supplements)")
+    r = _predict(eng, ["6년근 고려홍삼정 PREMIUM", "메트포르민"])
+    assert any("당뇨치료제" in x["text"] for x in r["summary"]["reasons"])
+    pair = next(p for p in r["pairs"] if {p["a_key"], p["b_key"]} == {"lab:ginseng", "metformin"}
+                or "metformin" in (p["a_key"], p["b_key"]))
+    assert pair["level"] == "주의" and any(m["kind"] == "식약처표시" and "건강기능식품정보" in m["text"]
+                                         for m in pair["mechanism"])  # the product's own label, cited as such
+    k2 = _predict(eng, ["MK-7 비타민K2&비타민D3", "와파린"])
+    assert any("비타민K 영양제" in x["text"] for x in k2["summary"]["reasons"])
+    hits = eng.search("고려홍삼정", 5)
+    assert hits and hits[0]["type"] == "건강기능식품" and "lab:" not in hits[0]["sub"]
+
+
+@needs_models
+@pytest.mark.slow
+def test_foods_by_name_with_their_nutrients(eng):
+    if not eng.food_nutr:
+        pytest.skip("food nutrient DB not built (stage food-nutrients)")
+    ings, info = eng.resolve_full("아메리카노")
+    assert [g.key for g in ings] == ["caffeine"] and info["nutrients"]["caffeine_mg"] >= 20
+    assert info["strength"]["unit"] == "mL" and info["strength"]["mg"]["caffeine"] > 0.2  # per mL: '355 mL' adds up
+    hits = [h for h in eng.search("아메리카노", 10) if h["type"] == "음식·영양성분"]
+    assert hits and "카페인" in hits[0]["sub"]
+    banana = _predict(eng, ["바나나", "스피로노락톤"])
+    assert banana["summary"]["verdict"] == "주의" and any("고칼륨" in x["text"] for x in banana["summary"]["reasons"])
+    assert eng.resolve_full("타이레놀")[1].get("nutrients") is None  # a medicine name never becomes a food
+    spinach, sp = eng.resolve_full("시금치")  # a known food word also gets what the DB says it contains
+    assert {g.key for g in spinach} == {"food:vitamin k foods", "food:potassium-rich foods"}
+    assert None not in sp["nutrients"].values()  # missing values are left out (NaN is not valid JSON)
+    assert "food:calcium-rich foods" not in {g.key for g in eng.resolve_full("낫토")[0]}  # magnesium alone: shown only
 
 
 @needs_models

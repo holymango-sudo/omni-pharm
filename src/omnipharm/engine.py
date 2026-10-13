@@ -46,6 +46,7 @@ from omnipharm.knowledge import (
     FOODS,
     KR_BRANDS,
     KR_INGREDIENTS,
+    KR_LABEL_KINDS,
     ORGANS,
     PAIR_RULES,
     PRODRUGS_ACTIVATED_BY,
@@ -80,6 +81,7 @@ def _ko_prefix(bare: str) -> str | None:
     if len(bare) < 4 or not bare.isascii():
         return None
     return next((k for k, v in KR_INGREDIENTS.items() if v.startswith(bare + " ")), None)
+_LABEL_PREFIX = {"의약외품": "Q", "건강기능식품": "H"}  # Korean label keys; other Korean products are medicines ("D")
 MIN_P = 0.003  # absolute probability floor for calling an event "elevated"
 SIGNAL_P = 0.01  # an AI signal must reach this (1% of comparable reports) to change the verdict
 COMBO_X = 3.0  # ... and be this many times above the riskier single drug (unless the patient explains it)
@@ -343,6 +345,13 @@ class Engine:
                 self.label_ko = {f"Q:{r.item_seq}": {"usage": r.usage, "cautions": r.cautions, "kind": "의약외품",
                                                      "min_age": None if pd.isna(r.min_age) else int(r.min_age)}
                                  for r in q.itertuples() if r.usage or r.cautions}
+        if (p / "kr_hff_products.parquet").exists():  # 건강기능식품 (stage "supplements"): "H:<품목제조번호>"
+            h = pd.read_parquet(p / "kr_hff_products.parquet").assign(country="KR")
+            parts.append(h)
+            for r in h.itertuples():
+                self.label_ko[f"H:{r.item_seq}"] = {"usage": r.usage[:400], "cautions": r.cautions[:1500],
+                                                    "kind": "건강기능식품", "min_age": None,
+                                                    "avoid_with": list(r.avoid_with)}
         if (p / "kr_labels.parquet").exists():
             for r in pd.read_parquet(p / "kr_labels.parquet").itertuples():
                 if not (r.usage or r.cautions):
@@ -465,6 +474,12 @@ class Engine:
         self.offsides: set[tuple[str, str]] = (
             {(r.drug, r.condition) for r in pd.read_parquet(off).itertuples() if r.evans}
             if off.exists() and not settings.commercial_safe else set())
+        # foods by name with what they contain per 100 g / 100 mL (MFDS food nutrient DB, stage "food-nutrients")
+        fn = p / "food_nutrients.parquet"
+        self.food_nutr: dict[str, dict] = (  # a value the DB does not give is None (NaN is not valid JSON)
+            {r["key"]: {k: (None if isinstance(v, float) and v != v else v) for k, v in r.items()}
+             for r in pd.read_parquet(fn).to_dict("records")} if fn.exists() else {})
+        self._food_keys = sorted(self.food_nutr)  # prefix search (autocomplete)
         # what each drug is given for (ChEMBL drug_indication, stage "chembl-dump"): ingredient key -> terms
         ind = p / "drug_indications.parquet"
         self.indications: dict[str, str] = (
@@ -531,7 +546,12 @@ class Engine:
         info: dict = {"product": None, "country": None, "unresolved": [], "strength": None}
         fk = food_key(text)  # 술, 자몽주스, 우유, 흡연 ...
         if fk:
-            return [self._ext_ingredient(f"food:{fk}")], info
+            ings = [self._ext_ingredient(f"food:{fk}")]
+            food = self._food(text)  # what the nutrient DB adds: '시금치' is a vitamin K food and also rich in potassium
+            if food:
+                ings += [g for g in food[0] if g.key not in {x.key for x in ings}]
+                return ings, {**info, "nutrients": food[1]["nutrients"]}
+            return ings, info
         rk = recreational.key_of(text)  # 대마, 엑스터시, 물뽕, 파퍼스 ... (harm reduction; before products: 'cannabis'
         if rk:                          # is also in the name of a cosmetic)
             return self._controlled(rk), {**info, "controlled": recreational.info(rk)}
@@ -553,14 +573,17 @@ class Engine:
                 k = self.kr_names.get(KO_SALT.sub("", re.sub(r"^(dl|d|l)-", "", text.replace(" ", ""))))
                 if k and (k in self.name_idx or k in self.ext_ing or k.startswith(("bio:", "lab:"))):
                     return [self._ext_ingredient(k)], info
+            food = self._food(text)  # 아메리카노, 스타벅스 아메리카노, 시금치, 바나나 ... (by what they contain)
+            if food:
+                return food[0], {**info, **food[1]}
             row = self._product_lookup(text)  # raises ResolveError with candidates if ambiguous
             if row is not None:
                 ings = [self._ext_ingredient(k) for k in row["ingredients"]]
                 return ings, {"product": row["name"], "country": row["country"], "release": release_of(row["name"]),
                               "unresolved": list(row["unresolved"]),
                               "strength": self.strengths.get((row["country"], str(row["item_seq"]))),
-                              "label_ko": (self.label_ko.get(f"{'Q' if row['kind'] == '의약외품' else 'D'}:"
-                                                             f"{row['item_seq']}") if row["country"] == "KR" else None)}
+                              "label_ko": (self.label_ko.get(f"{_LABEL_PREFIX.get(row['kind'], 'D')}:{row['item_seq']}")
+                                           if row["country"] == "KR" else None)}
             b = bio_key(text)  # peptide / protein product (위고비프리필드펜, 보톡스주 ...)
             if b:
                 return [self._bio(b)], {**info, "product": text if text.lower() != b else None}
@@ -568,6 +591,57 @@ class Engine:
             if g is not None:
                 return [g], {**info, "product": f"{text} (PubChem)"}
             raise e
+
+    def _food_search(self, q: str, limit: int = 4) -> list[dict]:
+        """Foods whose lookup name starts with q, with what they contain (shortest names first)."""
+        import bisect
+
+        from omnipharm.pipeline.food_nutrients import KO, THRESHOLD, norm
+
+        k = norm(q)
+        if len(k) < 2 or not self._food_keys:
+            return []
+        i = bisect.bisect_left(self._food_keys, k)
+        hits = []
+        while i < len(self._food_keys) and self._food_keys[i].startswith(k) and len(hits) < 40:
+            hits.append(self._food_keys[i])
+            i += 1
+        out = []
+        for key in sorted(hits, key=len)[:limit]:
+            r = self.food_nutr[key]
+            parts = [f"{KO[c][0]} {r[c]:g}{KO[c][1]}" for c, t in THRESHOLD.items() if (r.get(c) or 0) >= t]
+            out.append({"name": q if key == k else r.get("label") or r["name"], "type": "음식·영양성분",
+                        "sub": f"{r['basis']}당 " + ", ".join(parts)})
+        return out
+
+    def _food(self, text: str) -> tuple[list[Ingredient], dict] | None:
+        """A food / drink of the MFDS nutrient DB, as the ingredients that matter for medicines: caffeine (with its amount
+        per mL / g, so '355 mL twice a day' is added to the caffeine of painkillers), vitamin K foods, potassium-rich and
+        calcium-rich foods. None when the name is unknown or the food contains none of them."""
+        from omnipharm.pipeline.food_nutrients import THRESHOLD, norm
+
+        r = self.food_nutr.get(norm(text))
+        if not r:
+            return None
+        has = {c: (r.get(c) or 0) >= t for c, t in THRESHOLD.items()}
+        ings: list[Ingredient] = []
+        strength = None
+        if has["caffeine_mg"] and "caffeine" in self.name_idx:
+            ings.append(self._db(self.name_idx["caffeine"]))
+            unit = "mL" if r["basis"] == "100mL" else "g"
+            strength = {"unit": unit, "per": unit, "mg": {"caffeine": r["caffeine_mg"] / 100}}
+        if has["vitamin_k_ug"]:
+            ings.append(self._ext_ingredient("food:vitamin k foods"))
+        if has["potassium_mg"]:
+            ings.append(self._ext_ingredient("food:potassium-rich foods"))
+        if has["calcium_mg"]:  # (magnesium is shown only: food amounts are far below an antacid's)
+            ings.append(self._ext_ingredient("food:calcium-rich foods"))
+        if not ings:
+            return None
+        nutrients = {k: r[k] for k in THRESHOLD if r.get(k) is not None}
+        label = r["name"] + (f" ({r['maker']})" if r.get("maker") else "")
+        return ings, {"product": f"{label} · 식약처 식품영양성분DB", "strength": strength,
+                      "nutrients": {"per": r["basis"], **nutrients, "n": int(r.get("n") or 1)}}
 
     def _controlled(self, key: str) -> list[Ingredient]:
         """A recreational / controlled substance -> its ingredients (database molecule or curated structure)."""
@@ -606,6 +680,8 @@ class Engine:
     @staticmethod
     def _kind(r) -> str:
         if r["country"] == "KR":
+            if r["kind"] in _LABEL_PREFIX:  # 의약외품 / 건강기능식품 (they were shown as '전문약')
+                return r["kind"]
             return "일반약" if r["otc"] else "전문약"
         return f"{r['country']} {'OTC' if r['otc'] else 'Rx' if r['kind'] else ''}".strip()
 
@@ -701,8 +777,8 @@ class Engine:
         return Ingredient(f"ing:{name}", name, std.canonical_smiles, None)
 
     def _display_key(self, key: str) -> str:
-        bare = key.removeprefix("ing:").removeprefix("bio:")
-        return KO_NAME.get(key) or KO_NAME.get(bare) or bare
+        bare = key.removeprefix("ing:").removeprefix("bio:").removeprefix("lab:")  # 'lab:ginseng' -> 인삼
+        return KO_NAME.get(key) or KO_NAME.get(bare) or _ko_prefix(bare) or bare
 
     def _resolve_names(self, text: str) -> list[Ingredient]:
         """Curated Korean names, 'a+b' ingredient lists, English generic/brand names."""
@@ -745,6 +821,7 @@ class Engine:
             if any(a.lower().startswith(ql) for a in v["aliases"]):
                 out.append({"name": v["aliases"][0], "type": "음식·생활", "sub": v["ko"]})
         out += recreational.search(q)  # 대마, 엑스터시, 케타민 ...
+        out += self._food_search(q)  # 아메리카노, 시금치 ... (MFDS food nutrient DB)
         cat = self.catalog()
         for kind, names in (("제품", cat["korean_brands"]), ("성분", cat["korean_ingredients"]),
                             ("ingredient", cat["ingredients"]), ("brand", cat["brands"])):
@@ -969,13 +1046,14 @@ class Engine:
         the product's), and the summary shows it as it is."""
         out = []
         for x, y in ((a, b), (b, a)):
-            for product, item, targets, level, own in kr_avoid.get(x.key, []):
+            for product, item, targets, level, own, hff in kr_avoid.get(x.key, []):
                 if y.key in own:  # the same product: an intended combination
                     continue
                 if targets & (drug_groups(y.key) | {y.bare}):
-                    out.append({"kind": "식약처허가", "severe": level == "높음",
-                                "text": f"{product} 제품 설명서(식약처 허가사항)에 '이 약을 복용하는 동안 {item}을(를) 복용하지 "
-                                        f"말 것'으로 되어 있고, {self.ko(y)}은(는) 여기에 해당합니다"})
+                    said = (f"제품 표시사항(식약처 건강기능식품정보)에 '의약품({item}) 복용 시 섭취에 주의'" if hff else
+                            f"제품 설명서(식약처 허가사항)에 '이 약을 복용하는 동안 {item}을(를) 복용하지 말 것'")
+                    out.append({"kind": "식약처표시" if hff else "식약처허가", "severe": level == "높음",
+                                "text": f"{product} {said}로 되어 있고, {self.ko(y)}은(는) 여기에 해당합니다"})
         return list({m["text"]: m for m in out}.values())[:2]
 
     @staticmethod
@@ -1085,11 +1163,13 @@ class Engine:
         kr_avoid: dict[str, list[tuple]] = {}
         for prod in products:
             own = {g.key for g in prod["ingredients"]}
-            for item in (prod.get("label_ko") or {}).get("avoid_with") or []:
+            lab = prod.get("label_ko") or {}
+            for item in lab.get("avoid_with") or []:
                 t = kr_avoid_targets(item)
                 if t and prod["ingredients"]:
+                    hff = lab.get("kind") == "건강기능식품"  # '…복용 시 섭취에 주의': a caution, never more
                     kr_avoid.setdefault(prod["ingredients"][0].key, []).append(
-                        (prod.get("product") or prod["input"], item, t[0], t[1], own))
+                        (prod.get("product") or prod["input"], item, t[0], "주의" if hff else t[1], own, hff))
         for g in U:  # one entry per ingredient, listing every product that supplies it
             if len(prods_of[g.key]) > 1:
                 # vitamins / minerals / caffeine in two products (energy drink + painkiller) are not an overdose by
@@ -1589,7 +1669,7 @@ class Engine:
             elif not own and r.get("mechanism"):
                 m = r["mechanism"][0]
                 src = {"규칙": "임상 규칙", "식약처허가": "식약처 허가사항"}.get(m["kind"], "약리 기전")
-                if m["kind"] == "식약처허가":  # a product's own label: the text already names both sides
+                if m["kind"] in KR_LABEL_KINDS:  # a product's own label: the text already names both sides
                     reasons.append({"sev": "mid", "icon": "📋", "text": f"{m['text']}."})
                     continue
                 reasons.append({"sev": "mid", "icon": "📋" if m["kind"] == "규칙" else "🧬",
@@ -1597,7 +1677,7 @@ class Engine:
                                         f"{m['text']}."})
             elif own:
                 occasional = r["a_key"] in prn_keys or r["b_key"] in prn_keys
-                rule = next((m["text"] for m in r.get("mechanism", []) if m["kind"] in ("규칙", "식약처허가", "CYP-FDA")),
+                rule = next((m["text"] for m in r.get("mechanism", []) if m["kind"] in ("규칙", *KR_LABEL_KINDS, "CYP-FDA")),
                             None)
                 if rule:  # the concrete consequence is more useful than "documented interaction"
                     text = f"{r['a']} + {r['b']}: {rule} (허가 문서에도 상호작용으로 기재)"

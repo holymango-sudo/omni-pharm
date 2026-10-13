@@ -14,7 +14,15 @@ from omnipharm.clinical import Patient
 from omnipharm.dosing import effective_limit, fmt_mg, limit_text
 from omnipharm.engine import ResolveError
 from omnipharm.knowledge import FOOD_ALIAS, mech_source
-from omnipharm.models.llm import HARM_REDUCTION_LINE, LIMIT_KEY, USAGE_KEY, USAGE_KEY_LIMITED
+from omnipharm.models.llm import (
+    HARM_REDUCTION_LINE,
+    LIMIT_KEY,
+    NUTRIENT_KEY,
+    USAGE_KEY,
+    USAGE_KEY_LIMITED,
+    nutrient_text,
+)
+from omnipharm.pipeline.food_nutrients import norm as food_norm
 
 # endings stripped from a word before it is looked up ('박카스랑' -> '박카스', '타이레놀은' -> '타이레놀')
 _ENDING = re.compile(r"(이랑|랑|하고|이나|이요|에서|으로|까지|부터|처럼|이란|란|은|는|이|가|을|를|와|과|도|에|로|만|나|요|좀)$")
@@ -23,6 +31,9 @@ _GENERIC = {"약", "약물", "알약", "영양제", "비타민", "감기약", "�
             "같이", "함께", "먹어도", "마셔도", "되나요", "돼요", "괜찮", "괜찮아요", "언제", "몇", "시간", "하루", "지금", "오늘", "어제",
             "정도", "얼마나", "조금", "많이", "한잔", "한", "잔", "병", "알", "개", "번", "후", "전", "같은", "다른", "그럼", "그리고",
             "이거", "저거", "그거", "제가", "저는", "우리", "아이", "엄마", "아빠", "임신", "운전", "운동", "공복", "식후", "식전"}
+# a verb / adjective in the question ('먹으면', '마셔도', '괜찮을까요'): never a product, whatever names start with it
+_VERB = re.compile(r"(으면|하면|는데|어요|아요|해요|나요|까요|어도|아도|니까|지만|으니|면서|습니다|세요|던데|는지|을까)$")
+_NOT_MEDICINE = {"건강기능식품", "음식·영양성분"}
 MAX_NEW = 2
 _REPORT_STAT = re.compile(r"약 자체에 따르는 위험|\(AI 참고\)")  # FAERS associations shown as information only
 log = logging.getLogger(__name__)
@@ -50,7 +61,10 @@ def _lookup(eng, w: str) -> str | None:
     exact = next((h["name"] for h in hits if h["name"].replace(" ", "").lower() == w.lower()), None)
     if exact:
         return exact
-    if len(w) >= 3 and any(h["name"].startswith(w) and len(h["name"]) <= len(w) + 12 for h in hits):
+    # health foods / foods have marketing names that begin with everyday words ('먹으면티나', '하루에…'): their names
+    # count only from 4 letters ('고려홍삼정'); medicines from 3
+    if any(h["name"].startswith(w) and len(h["name"]) <= len(w) + 12
+           and len(w) >= (4 if h.get("type") in _NOT_MEDICINE else 3) for h in hits):
         return w  # resolved later like the drug bar does ('게보린' -> 게보린정, not the first search hit)
     return None
 
@@ -58,18 +72,34 @@ def _lookup(eng, w: str) -> str | None:
 def find_items(eng, question: str) -> list[str]:
     """Names of medicines / foods mentioned in the question (at most MAX_NEW)."""
     out: list[str] = []
-    for raw in re.findall(r"[가-힣A-Za-z][가-힣A-Za-z0-9\-]*", question):
-        for w in _variants(raw):
-            if w in _GENERIC:
-                break
+    words = re.findall(r"[가-힣A-Za-z][가-힣A-Za-z0-9\-]*", question)
+    used: set[int] = set()
+    # a food / drink of several words ('스타벅스 카페 아메리카노'): the nutrient DB knows it as one name
+    for n in (3, 2):
+        for i in range(len(words) - n + 1):
+            if used & set(range(i, i + n)):
+                continue
+            for last in _variants(words[i + n - 1]):
+                name = " ".join([*words[i:i + n - 1], last])
+                if food_norm(name) in getattr(eng, "food_nutr", {}):
+                    out.append(name)
+                    used |= set(range(i, i + n))
+                    break
+    for j, raw in enumerate(words):
+        if len(out) >= MAX_NEW:
+            break
+        if j in used:
+            continue
+        variants = _variants(raw)
+        if any(w in _GENERIC for w in variants) or _VERB.search(raw):  # '하루에' is '하루', not '하루에…' (a product)
+            continue
+        for w in variants:
             name = _lookup(eng, w)
             if name:
                 if name not in out:
                     out.append(name)
                 break
-        if len(out) >= MAX_NEW:
-            break
-    return out
+    return out[:MAX_NEW]
 
 
 def lookups(eng, question: str, base: list[dict], patient: Patient, base_verdict: str | None = None) -> list[dict]:
@@ -150,11 +180,15 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     for g in [] if ctl or own_alert else ings:
         lim = effective_limit(g.key, lctx, er=info.get("release") == "ER")
         if lim:
-            limits.append(limit_text(eng.ko(g), lim) + " (다른 약·음료의 같은 성분과 합쳐서)")
+            # no content per unit (의약외품 박카스): the mg limit cannot be turned into bottles - the label usage answers
+            limits.append(limit_text(eng.ko(g), lim) + " (다른 약·음료의 같은 성분과 합쳐서"
+                          + (")" if content else " — 1개당 함량 자료가 없어 개수로 바꿀 수 없음: 개수는 제품 설명서 용법)"))
     lab = info.get("label_ko") or {}
     src = _sources(r, keys, [*names, name]) | ({"허가 용량 기준"} if limits else set())
     if lab:
-        src.add("식약처 허가사항(제품 설명서)")
+        src.add(mech_source("식약처표시") if lab.get("kind") == "건강기능식품" else mech_source("식약처허가"))
+    if info.get("nutrients"):
+        src.add("식약처 식품영양성분DB")
     if not src:  # checked, and no documented problem: that is the source of a '괜찮다' answer
         src.add("상호작용 검사(문서·규칙 근거 없음)")
     usage = (lab.get("usage") or "")[:300] or None
@@ -163,9 +197,10 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     return {"확인한 제품": f"{name} = {shown}", "함께 먹을 때 판정": verdict,
             "1개당 함량": f"{st.get('unit') or '1회 단위'}당 " + ", ".join(content) if content else None,
             LIMIT_KEY: limits,
-            # Korean label (박카스 '1일 1회 1병', 일반의약품 용법): answers '하루 몇 병?' when no mg limit exists
-            (USAGE_KEY_LIMITED if limits else USAGE_KEY): usage,
+            # Korean label (박카스 '1일 1회 1병', 일반의약품 용법): answers '하루 몇 병?' when the mg limit cannot
+            (USAGE_KEY_LIMITED if limits and content else USAGE_KEY): usage,
             "제품 설명서 주의사항(요약)": label_cautions(lab.get("cautions") or "") or None,
+            NUTRIENT_KEY: nutrient_text(info["nutrients"]) if info.get("nutrients") else None,
             "이 제품 관련 이유": [x["text"] for x in s["reasons"] if x["sev"] != "low" and mine(x["text"])][:5],
             # not the FAERS 'drug's own risk' associations: they are report statistics, not known side effects
             "이 제품 관련 참고": [x["text"] for x in s["reasons"] if x["sev"] == "low" and mine(x["text"])

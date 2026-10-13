@@ -785,6 +785,21 @@ DRUG_GROUPS.update({
     "harmala": frozenset({"harmine"}),
     "synthetic_cannabinoid": frozenset({"jwh-018"}),
 })
+# medicine classes named by Korean health functional food labels (stage "supplements")
+DRUG_GROUPS.update({
+    "antidiabetic": DRUG_GROUPS["insulin"] | DRUG_GROUPS["sulfonylurea"] | DRUG_GROUPS["metformin"]
+    | DRUG_GROUPS["thiazolidinedione"] | frozenset({"sitagliptin", "linagliptin", "vildagliptin", "saxagliptin",
+                                                    "gemigliptin", "teneligliptin", "evogliptin", "dapagliflozin",
+                                                    "empagliflozin", "ertugliflozin", "semaglutide", "liraglutide",
+                                                    "dulaglutide", "tirzepatide", "repaglinide", "nateglinide",
+                                                    "acarbose", "voglibose"}),
+    "antihypertensive": DRUG_GROUPS["ace_arb"] | DRUG_GROUPS["thiazide"] | DRUG_GROUPS["loop_diuretic"]
+    | DRUG_GROUPS["nondhp_ccb"] | DRUG_GROUPS["k_sparing"] | DRUG_GROUPS["nonselective_beta_blocker"]
+    | frozenset({"amlodipine", "nifedipine", "felodipine", "lercanidipine", "cilnidipine", "atenolol", "metoprolol",
+                 "bisoprolol", "nebivolol", "doxazosin", "terazosin", "prazosin", "clonidine", "hydralazine"}),
+    "antiarrhythmic": frozenset({"amiodarone", "dronedarone", "flecainide", "propafenone", "sotalol", "dofetilide",
+                                 "digoxin", "pilsicainide"}),
+})
 DRUG_GROUPS["qt_prolonging"] = DRUG_GROUPS["qt_prolonging"] | {"ibogaine"}
 DISEASES.update({
     "thyroid_cancer": {"ko": "갑상선수질암·MEN2", "kw": ("갑상선수질암", "수질암", "men2", "medullary thyroid"),
@@ -852,6 +867,12 @@ PAIR_RULES: list[tuple[str, str, str, str]] = [
     ("dairy", "tetracycline", "주의", "우유·유제품이 항생제 흡수를 막습니다 — 2~3시간 간격을 두세요"),
     ("dairy", "fluoroquinolone", "주의", "우유·유제품이 항생제 흡수를 막습니다 — 2시간 이상 간격을 두세요"),
     ("vitamin_k_food", "warfarin", "주의", "비타민K가 많은 음식은 와파린 효과를 줄입니다 — 끊지 말고 매일 비슷한 양을 드세요"),
+    ("vitamin_k_supplement", "warfarin", "주의", "비타민K 영양제는 와파린 효과(INR)를 떨어뜨립니다 — 시작하거나 끊기 전에 의사와 "
+                                               "상의하고 INR을 확인하세요"),
+    ("high_potassium_food", "k_sparing", "주의", "칼륨이 많은 음식을 많이 먹으면 칼륨이 지나치게 올라갈 수 있습니다(고칼륨혈증) — "
+                                              "특히 콩팥 기능이 떨어졌을 때"),
+    ("high_potassium_food", "ace_arb", "주의", "칼륨이 많은 음식을 많이 먹으면 칼륨이 지나치게 올라갈 수 있습니다(고칼륨혈증) — "
+                                            "특히 콩팥 기능이 떨어졌을 때"),
     ("smoking", "oral_contraceptive", "주의", "흡연자(특히 35세 이상)는 피임약으로 혈전·심혈관 사고 위험이 큽니다 (박스경고)"),
     ("smoking", "smoking_cyp1a2", "주의", "흡연이 약의 분해를 빠르게 해 효과가 떨어질 수 있습니다 — 금연·흡연 시작 시 용량 조절 필요"),
     ("anticoagulant", "nsaid", "주의", "출혈(특히 위장관 출혈) 위험이 커집니다 — 검은 변·멍·잇몸 출혈을 살피세요"),
@@ -860,8 +881,10 @@ PAIR_RULES: list[tuple[str, str, str, str]] = [
     ("bleeding_herb", "anticoagulant", "주의", "은행잎·마늘·강황 같은 성분은 혈액 응고를 늦춰 출혈 위험을 더할 수 있습니다"),
     ("bleeding_herb", "nsaid", "주의", "은행잎·마늘·강황 같은 성분은 혈액 응고를 늦춰 출혈 위험을 더할 수 있습니다"),
     ("ginseng", "warfarin", "주의", "인삼이 와파린 효과(INR)를 떨어뜨릴 수 있습니다"),
-    ("ginseng", "insulin", "주의", "인삼이 혈당을 더 낮출 수 있습니다 — 저혈당 증상을 살피세요"),
-    ("ginseng", "sulfonylurea", "주의", "인삼이 혈당을 더 낮출 수 있습니다 — 저혈당 증상을 살피세요"),
+    # every diabetes medicine: the MFDS standard caution of 홍삼 products ('의약품(당뇨치료제, 혈액항응고제) 복용 시
+    # 섭취에 주의' - 4,012 of 4,313 ginseng products in 건강기능식품정보)
+    ("ginseng", "antidiabetic", "주의", "인삼·홍삼이 혈당을 더 낮출 수 있습니다 — 저혈당 증상을 살피세요(식약처 홍삼 제품 "
+                                     "표시: '당뇨치료제 복용 시 섭취에 주의')"),
     # common supplements (product labelling and standard interaction references); never above '주의'
     ("omega3", "anticoagulant", "주의", "오메가3를 많이(하루 3g 이상) 먹으면 출혈 경향이 커질 수 있습니다 — 멍·잇몸 출혈을 살피세요"),
     ("coq10", "warfarin", "주의", "코엔자임Q10이 와파린 효과(INR)를 떨어뜨릴 수 있습니다 — 시작하거나 끊을 때 INR을 확인하세요"),
@@ -948,6 +971,16 @@ KR_AVOID_TERMS: list[tuple[re.Pattern, frozenset[str], str]] = [
     (re.compile(r"타크로리무스"), frozenset({"tacrolimus"}), "주의"),
     (re.compile(r"메칠도파|메틸도파"), frozenset({"methyldopa"}), "주의"),
     (re.compile(r"(?<!외용 )코르티코(스테로이드|이드)"), frozenset({"corticosteroid"}), "주의"),
+    # classes the health functional food labels name ('의약품(당뇨치료제, 혈액항응고제) 복용 시 섭취에 주의')
+    (re.compile(r"항응고|혈액\s*응고|응고\s*방지|항혈소판|항혈전"), frozenset({"anticoagulant"}), "주의"),
+    (re.compile(r"당[뇨료]|혈당\s*강하|항당뇨"), frozenset({"antidiabetic"}), "주의"),  # '당료치료제': a common misspelling
+    (re.compile(r"혈압\s*강[하화]|고혈압|혈압약"), frozenset({"antihypertensive"}), "주의"),
+    (re.compile(r"면역\s*억제"), frozenset({"immunosuppressant"}), "주의"),
+    (re.compile(r"부정맥"), frozenset({"antiarrhythmic"}), "주의"),
+    (re.compile(r"고지혈증|콜레스테롤"), frozenset({"statin"}), "주의"),
+    (re.compile(r"갑상선\s*호르몬"), frozenset({"levothyroxine"}), "주의"),
+    (re.compile(r"항우울"), frozenset({"ssri", "serotonergic"}), "주의"),
+    (re.compile(r"수면\s*유도"), frozenset({"sedative"}), "주의"),
 ]
 _KR_AVOID_SKIP = re.compile(r"외용|바셀린|레티노이드|디트라놀|^이 약은|필요하지 않다")
 
@@ -982,7 +1015,9 @@ EVENT_INDICATION: dict[str, re.Pattern] = {k: re.compile(v) for k, v in {
 }.items()}
 
 # where a mechanism / rule entry comes from (engine pair rows' "mechanism"[].kind -> source shown and cited)
-MECH_SOURCE = {"규칙": "임상 규칙", "CYP-FDA": "FDA CYP 지표표", "식약처허가": "식약처 허가사항(제품 설명서)"}
+MECH_SOURCE = {"규칙": "임상 규칙", "CYP-FDA": "FDA CYP 지표표", "식약처허가": "식약처 허가사항(제품 설명서)",
+               "식약처표시": "식약처 건강기능식품정보(제품 표시)"}
+KR_LABEL_KINDS = ("식약처허가", "식약처표시")  # a Korean product's own text (medicine label / health food label)
 
 
 def mech_source(kind: str) -> str:
@@ -1069,6 +1104,7 @@ NAME_GROUPS: list[tuple[re.Pattern, set[str]]] = [
                 r"\bbismuth\b|sevelamer|lanthanum", re.I), {"polyvalent_cation"}),
     (re.compile(r"^potassium (chloride|citrate|gluconate|bicarbonate)", re.I), {"potassium_supplement"}),
     (re.compile(r"\bnitrite\b", re.I), {"nitrite"}),  # amyl / isobutyl nitrite (poppers)
+    (re.compile(r"phytonadione|vitamin k\b|vitamin k ?[12]|menaquinone|phylloquinone", re.I), {"vitamin_k_supplement"}),
 ]
 
 
@@ -1096,6 +1132,13 @@ FOODS: dict[str, dict] = {
     "smoking": {"ko": "흡연(담배)", "aliases": ["흡연", "담배", "smoking", "tobacco", "cigarette"],
                 "groups": {"smoking"},
                 "terms": ["cigarette smoking", "smokers", "tobacco smoking", "smoking", "who smoke", "smoke"]},
+    # foods found by name in the MFDS food nutrient DB (stage "food-nutrients") by what they contain
+    "potassium-rich foods": {"ko": "칼륨이 많은 음식", "aliases": ["칼륨이많은음식", "고칼륨식품", "칼륨많은음식"],
+                             "groups": {"high_potassium_food"},
+                             "terms": ["potassium-rich", "high-potassium", "high potassium diet", "salt substitutes",
+                                       "potassium-containing salt"]},
+    "calcium-rich foods": {"ko": "칼슘이 많은 음식", "aliases": ["칼슘이많은음식", "고칼슘식품"],
+                           "groups": {"polyvalent_cation"}, "terms": ["calcium-rich", "calcium-fortified"]},
 }
 FOOD_ALIAS = {a.replace(" ", "").lower(): k for k, v in FOODS.items() for a in v["aliases"]}
 

@@ -15,6 +15,7 @@ from collections.abc import AsyncIterator
 import httpx
 
 from omnipharm.config import settings
+from omnipharm.knowledge import mech_source
 
 log = logging.getLogger(__name__)
 
@@ -53,6 +54,16 @@ HARM_REDUCTION_LINE = "응급 시 119 · 마약류 24시간 익명 상담 1342 (
 LIMIT_KEY = "1일최대량(허가기준·이 환자 — 하루 몇 개 질문에 답할 값)"
 USAGE_KEY = "제품 설명서 용법(식약처)"
 USAGE_KEY_LIMITED = "제품 설명서 용법(식약처 — 일반 성인 기준, 하루 상한은 위의 이 환자 기준을 따를 것)"
+NUTRIENT_KEY = "음식 영양성분(식약처 식품영양성분DB)"
+
+
+def nutrient_text(n: dict) -> str:
+    """{'per': '100mL', 'caffeine_mg': 42.5, ...} -> '100mL당 카페인 42.5mg, 칼륨 120mg (여러 제품의 중앙값 7개)'."""
+    from omnipharm.pipeline.food_nutrients import KO
+
+    parts = [f"{ko} {n[k]:g}{u}" for k, (ko, u) in KO.items() if n.get(k) is not None]
+    many = f" (같은 이름의 제품·크기 {n['n']}개의 중앙값)" if (n.get("n") or 1) > 1 else ""
+    return f"{n.get('per', '100g')}당 " + ", ".join(parts) + many
 
 
 def ratio(x: float) -> str:
@@ -322,6 +333,9 @@ def chat_context(res: dict, patient: dict) -> dict:
     # ('1일 최대 4그램(8정)') must not be the answer for an elderly patient on warfarin: the key says so
     usage = [f"{p['input']}: {p['usage'][:200]}" for p in res.get("products", []) if p.get("usage")]
     facts[USAGE_KEY_LIMITED if limits else USAGE_KEY] = usage
+    # foods by what they contain (식약처 식품영양성분DB): caffeine per mL, vitamin K for warfarin, potassium ...
+    facts[NUTRIENT_KEY] = [f"{p['input']}: {nutrient_text(p['nutrients'])}" for p in res.get("products", [])
+                           if p.get("nutrients")]
     # which kinds of evidence this analysis actually has: the answer may cite only these
     src = set()
     for p in res.get("pairs", []):
@@ -332,13 +346,14 @@ def chat_context(res: dict, patient: dict) -> dict:
         if any(e.get("context") != "co_therapy" for e in p.get("label_evidence", [])):
             src.add("FDA 허가 라벨")
         for m in p.get("mechanism", []):
-            from omnipharm.knowledge import mech_source
-
             src.add(mech_source(m["kind"]))
     for d in res.get("disease_alerts", []):
         src.add("식약처 허가사항(제품 설명서)" if d.get("key") == "age_label" else "질환별 금기 기준(Beers·허가사항·DUR)")
-    if usage:
-        src.add("식약처 허가사항(제품 설명서)")
+    for p in res.get("products", []):
+        if p.get("usage"):
+            src.add(mech_source("식약처표시" if p.get("kind") == "건강기능식품" else "식약처허가"))
+    if facts[NUTRIENT_KEY]:
+        src.add("식약처 식품영양성분DB")
     if (res.get("dosing") or {}).get("alerts") or limits:
         src.add("허가 용량 기준")
     if any(e.get("drives_verdict") for e in res.get("events", [])):

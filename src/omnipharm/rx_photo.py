@@ -94,6 +94,9 @@ def _norm(s: str) -> str:
     return re.sub(r"[\s\-·,./]", "", s)
 
 
+_NOT_MEDICINE = {"건강기능식품", "음식·영양성분"}
+
+
 def _base(s: str) -> str:
     return _norm(re.sub(r"\(.*?\)|\[.*?\]", "", s))
 
@@ -125,7 +128,8 @@ def match_name(eng, raw: str) -> dict:
     for q in dict.fromkeys([raw, base, b[:5], b[:4], b[:3], b[:2], *windows, *inner]):
         if len(q) >= 2:
             for h in eng.search(q, 25):
-                pool.setdefault(h["name"], h)
+                if h.get("type") not in _NOT_MEDICINE:  # a prescription / medicine bag lists medicines only
+                    pool.setdefault(h["name"], h)
     ranked = sorted(pool, key=lambda n: -_score(raw, n))
     best = ranked[0] if ranked else None
     score = _score(raw, best) if best else 0.0

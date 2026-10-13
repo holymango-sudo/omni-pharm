@@ -97,6 +97,15 @@ SCENARIOS = [
     {"id": "S13", "title": "영양제 일반 상담, 40세", "drugs": [], "analysed": False, "patient": {"age": 40, "sex": "F"},
      "questions": [{"q": "철분제를 녹차랑 같이 먹어도 되나요?", "must": ["흡수"]},
                    {"q": "오메가3는 언제 먹는 게 좋아요?", "must": ["식후", "식사"]}]},
+    # v2.17: health functional foods (식약처 건강기능식품정보) and foods by name (식약처 식품영양성분DB)
+    {"id": "S14", "title": "리시노프릴 + 메트포르민, 66세 남성", "drugs": ["리시노프릴", "메트포르민"], "analysed": True,
+     "patient": {"age": 66, "sex": "M", "weight_kg": 70, "height_cm": 170, "scr": 1.0},
+     "questions": [{"q": "바나나를 매일 먹는데 괜찮아요?", "must": ["칼륨"]},
+                   {"q": "고려홍삼정 먹어도 되나요?", "must": ["혈당", "당뇨"]}]},
+    {"id": "S15", "title": "와파린 복용 중, 분석 전, 72세 여성", "drugs": ["와파린"], "analysed": False,
+     "patient": {"age": 72, "sex": "F", "weight_kg": 54},
+     "questions": [{"q": "시금치 자주 먹어도 되나요?", "must": ["비타민K", "비타민 K"]},
+                   {"q": "스타벅스 카페 아메리카노 하루 두 잔 마셔도 돼요?", "must": ["카페인"]}]},
 ]
 
 
