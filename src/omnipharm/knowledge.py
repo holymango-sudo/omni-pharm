@@ -740,6 +740,8 @@ DRUG_GROUPS.update({
     "loop_diuretic": frozenset({"furosemide", "torsemide", "bumetanide", "ethacrynic acid"}),
     "digoxin": frozenset({"digoxin"}),
     "warfarin": frozenset({"warfarin"}),
+    # direct oral anticoagulants: not vitamin K antagonists
+    "doac": frozenset({"apixaban", "rivaroxaban", "dabigatran", "dabigatran etexilate", "edoxaban"}),
     "levothyroxine": frozenset({"levothyroxine", "liothyronine"}),
     "tetracycline": frozenset({"tetracycline", "doxycycline", "minocycline", "sarecycline", "omadacycline"}),
     "bisphosphonate": frozenset({"alendronate", "risedronate", "ibandronate", "etidronate"}),
@@ -862,6 +864,9 @@ PAIR_RULES: list[tuple[str, str, str, str]] = [
     ("alcohol", "sulfonylurea", "주의", "술이 저혈당을 일으키거나 숨길 수 있습니다"),
     ("alcohol", "insulin", "주의", "술이 저혈당을 일으키거나 숨길 수 있습니다"),
     ("alcohol", "warfarin", "주의", "술이 와파린 효과(INR)를 흔들어 출혈·혈전 위험이 생깁니다 — 과음 금지"),
+    # warfarin label (drug interactions: acetaminophen); INR rises with regular use of more than ~2 g a day (Hylek 1998)
+    ("acetaminophen", "warfarin", "주의", "아세트아미노펜을 며칠 이상 매일 많이(하루 2g 이상) 먹으면 INR이 올라 출혈 위험이 생길 수 "
+                                       "있습니다 — 가끔 먹는 것은 괜찮습니다"),
     ("grapefruit", "grapefruit_major", "높음", "자몽(주스)이 약의 혈중 농도를 크게 올립니다 — 복용 중 자몽을 피하세요"),
     ("grapefruit", "grapefruit_moderate", "주의", "자몽(주스)이 약의 혈중 농도를 올릴 수 있습니다 — 많이 마시지 마세요"),
     ("dairy", "tetracycline", "주의", "우유·유제품이 항생제 흡수를 막습니다 — 2~3시간 간격을 두세요"),
@@ -941,6 +946,63 @@ PAIR_RULES: list[tuple[str, str, str, str]] = [
     ("gaba_depressant", "alcohol", "주의", "진정·호흡 억제가 커집니다"),
     ("gaba_depressant", "sedative", "주의", "진정·호흡 억제가 커집니다"),
     ("gaba_depressant", "opioid", "주의", "진정·호흡 억제가 커집니다"),
+]
+
+# Plain-language explanation of a rule for people who are not clinicians (key = the rule's two groups as in PAIR_RULES):
+#   short  one-line takeaway (the result headline when this is the only documented interaction)
+#   why    how the interaction works and what goes wrong in BOTH directions
+#   do     what to do (replaces the generic advice) - never 'stop the medicine' for a drug that must not be stopped
+#   signs  when to see a doctor at once (shown once, after the actions of every explained pair)
+_WARFARIN_SIGNS = ("이럴 때는 바로 진료를 받으세요: 출혈 신호(쉽게 드는 멍, 잇몸·코 출혈, 검은 변·붉은 소변) 또는 혈전 신호(한쪽 "
+                   "다리가 붓고 아픔, 갑작스러운 숨참·가슴 통증, 한쪽 팔다리 마비·말이 어눌해짐) — 와파린은 임의로 끊지 마세요.")
+RULE_DETAIL: dict[tuple[str, str], dict] = {
+    ("vitamin_k_food", "warfarin"): {
+        "short": "함께 먹어도 되지만, 비타민K가 많은 음식은 매일 비슷한 양을 꾸준히 드세요 — 갑자기 늘리거나 줄이는 것이 위험합니다.",
+        "why": "와파린은 피를 굳게 하는 응고 인자를 만들 때 필요한 비타민K의 작용을 막아 피가 잘 굳지 않게 하는 약입니다. "
+               "비타민K를 평소보다 갑자기 많이 먹으면 와파린 효과가 약해져 혈전(뇌졸중·폐색전증 등) 위험이 커지고, 반대로 갑자기 "
+               "크게 줄이면 효과가 너무 강해져 출혈 위험이 커집니다. 피할 필요는 없고, 평소 먹는 양을 일정하게 유지하는 것이 핵심입니다",
+        "do": ["비타민K가 많은 음식(시금치·케일·상추·브로콜리·청국장·녹즙 등)을 끊지 말고 매일 비슷한 양을 드세요.",
+               "식단을 크게 바꾸거나(다이어트·채식 시작, 입원·여행) 녹즙·비타민K 영양제를 시작하거나 끊을 때는 의사에게 알리고 "
+               "INR 검사를 받으세요."],
+        "signs": _WARFARIN_SIGNS},
+    ("vitamin_k_supplement", "warfarin"): {
+        "short": "비타민K 영양제는 와파린 효과를 바꿉니다 — 시작하거나 끊기 전에 의사와 상의하고, 먹는다면 매일 같은 양을 드세요.",
+        "why": "와파린은 비타민K의 작용을 막아 피가 잘 굳지 않게 하는 약입니다. 비타민K(K1·K2) 영양제를 새로 먹기 시작하면 와파린 "
+               "효과가 약해져 혈전(뇌졸중·폐색전증 등) 위험이 커지고, 먹던 영양제를 갑자기 끊으면 효과가 너무 강해져 출혈 위험이 "
+               "커집니다(의사가 INR이 너무 높을 때 비타민K를 처방하는 것은 이 작용을 이용한 치료입니다)",
+        "do": ["비타민K가 든 영양제(비타민K2·종합비타민 포함)를 시작하거나 끊기 전에 의사와 상의하세요 — 먹는다면 매일 같은 양을 드세요.",
+               "영양제를 시작하거나 끊은 뒤에는 INR 검사를 평소보다 자주 받으세요."],
+        "signs": _WARFARIN_SIGNS},
+    ("acetaminophen", "warfarin"): {
+        "short": "가끔 먹는 것은 괜찮습니다 — 며칠 이상 매일 먹어야 한다면 의사에게 알리고 INR을 확인하세요.",
+        "why": "아세트아미노펜(타이레놀)은 와파린을 먹는 사람에게 소염진통제보다 안전한 진통제로 권장됩니다. 다만 며칠 이상 매일 "
+               "많이(하루 2g 이상) 먹으면 와파린 효과가 세져 INR이 오르고 출혈 위험이 커질 수 있습니다",
+        "do": ["필요할 때 가끔 먹는 것은 괜찮습니다 — 하루 최대량을 넘기지 말고, 감기약 등 다른 제품의 아세트아미노펜도 합쳐서 세세요.",
+               "며칠 이상 매일 먹어야 한다면 의사에게 알리고 INR 검사를 받으세요."],
+        "signs": _WARFARIN_SIGNS},
+    ("alcohol", "warfarin"): {
+        "short": "마신다면 적게, 매일 비슷하게 — 폭음은 와파린 효과를 크게 흔듭니다.",
+        "why": "한 번에 많이 마시면 와파린 분해가 늦어져 효과가 세지고 출혈 위험이 커지며, 오랫동안 많이 마시면 반대로 효과가 약해질 "
+               "수 있습니다. 술 자체도 위 출혈과 넘어짐(머리 출혈) 위험을 키웁니다",
+        "do": ["마신다면 적게(하루 1~2잔 이내) 마시고 폭음은 피하세요.",
+               "음주 습관이 크게 바뀌면 의사에게 알리고 INR 검사를 받으세요."],
+        "signs": _WARFARIN_SIGNS},
+    ("anticoagulant", "nsaid"): {
+        "short": "출혈 위험이 커지는 조합입니다 — 스스로 사 먹는 소염진통제는 피하고, 처방받은 약은 임의로 끊지 마세요.",
+        "why": "항응고·항혈소판제는 피가 굳는 것을 막고, 소염진통제(이부프로펜·아스피린 등)는 혈소판 기능을 떨어뜨리며 위 점막을 "
+               "상하게 합니다. 함께 쓰면 두 작용이 겹쳐 출혈, 특히 위장관 출혈 위험이 커집니다",
+        "do": ["스스로 사 먹는 소염진통제(이부프로펜·나프록센 등)는 피하고, 진통제가 필요하면 의사·약사와 상의해 아세트아미노펜 같은 "
+               "약을 쓰세요.",
+               "처방받은 아스피린·소염진통제라면 임의로 끊지 말고, 함께 쓰는 것이 의도된 처방인지 의사에게 확인하세요."],
+        "signs": "출혈 신호(검은 변, 피 섞인 구토, 쉽게 드는 멍, 잇몸·코 출혈)가 있으면 바로 진료를 받으세요."},
+}
+
+# Pairs that people often ASK about but that do not interact (documented): shown as information when nothing else is
+# found - 'vitamin K + apixaban' gets an answer instead of silence
+PAIR_NOTES: list[tuple[str, str, str]] = [
+    (vk, "doac", "비타민K는 와파린과 달리 아픽사반·리바록사반·다비가트란·에독사반(새 항응고제)의 효과에는 영향을 주지 않습니다 — "
+                 "이 약을 먹을 때는 비타민K 음식을 따로 조절하지 않아도 됩니다")
+    for vk in ("vitamin_k_food", "vitamin_k_supplement")
 ]
 
 
@@ -1104,7 +1166,9 @@ NAME_GROUPS: list[tuple[re.Pattern, set[str]]] = [
                 r"\bbismuth\b|sevelamer|lanthanum", re.I), {"polyvalent_cation"}),
     (re.compile(r"^potassium (chloride|citrate|gluconate|bicarbonate)", re.I), {"potassium_supplement"}),
     (re.compile(r"\bnitrite\b", re.I), {"nitrite"}),  # amyl / isobutyl nitrite (poppers)
-    (re.compile(r"phytonadione|vitamin k\b|vitamin k ?[12]|menaquinone|phylloquinone", re.I), {"vitamin_k_supplement"}),
+    # (not 'vitamin k foods': a food is not a supplement - it has its own rule and advice)
+    (re.compile(r"phytonadione|vitamin k\b(?! foods)|vitamin k ?[12]|menaquinone|phylloquinone", re.I),
+     {"vitamin_k_supplement"}),
 ]
 
 

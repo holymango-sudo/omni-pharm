@@ -157,6 +157,28 @@ def test_tonic_drink_and_painkiller(eng):
     assert v == "위험"
 
 
+def test_warfarin_vitamin_k_explained_in_plain_words(eng):
+    """'주의, check the reasons' is not an answer: the result says how it works (both directions) and what to do."""
+    for food in ("녹색채소", "시금치"):
+        v, r = verdict(eng, [food, "warfarin"], age=65)
+        s = r["summary"]
+        assert v == "주의" and "매일 비슷한 양" in s["headline"]
+        why = next(x["text"] for x in s["reasons"] if "비타민K" in x["text"])
+        assert "혈전" in why and "출혈" in why  # too much -> clots, cut down suddenly -> bleeding
+        assert "와파린은 임의로 끊지" in s["advice"][-1] and not any("복용을 멈추고" in a for a in s["advice"])
+        assert not any("뇌졸중" in x["text"] and "AI" in x["text"] for x in s["reasons"])  # warfarin is GIVEN for it
+    _, r = verdict(eng, ["비타민K", "warfarin"], age=65)
+    assert "영양제" in r["summary"]["headline"] and "INR" in " ".join(r["summary"]["advice"])
+    # no interaction with the newer anticoagulants - said, not left unanswered
+    v, r = verdict(eng, ["비타민K", "apixaban"])
+    assert v == "비교적 안전" and any("새 항응고제" in x["text"] for x in r["summary"]["reasons"])
+    # two explained pairs: both pairs' first steps survive the line limit, warning signs last and once
+    _, r = verdict(eng, ["warfarin", "acetaminophen", "시금치"], age=65)
+    adv = r["summary"]["advice"]
+    assert any("가끔" in a for a in adv) and any("매일 비슷한 양" in a for a in adv)
+    assert sum("바로 진료" in a for a in adv) == 1 and "바로 진료" in adv[-1]
+
+
 def test_class_phrases_cover_label_wording():
     from omnipharm.knowledge import class_phrases
 

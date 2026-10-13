@@ -143,7 +143,7 @@ def test_health_functional_foods_in_the_result(eng):
     assert pair["level"] == "주의" and any(m["kind"] == "식약처표시" and "건강기능식품정보" in m["text"]
                                          for m in pair["mechanism"])  # the product's own label, cited as such
     k2 = _predict(eng, ["MK-7 비타민K2&비타민D3", "와파린"])
-    assert any("비타민K 영양제" in x["text"] for x in k2["summary"]["reasons"])
+    assert any("비타민K" in x["text"] and "혈전" in x["text"] for x in k2["summary"]["reasons"])
     hits = eng.search("고려홍삼정", 5)
     assert hits and hits[0]["type"] == "건강기능식품" and "lab:" not in hits[0]["sub"]
 

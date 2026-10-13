@@ -48,8 +48,10 @@ from omnipharm.knowledge import (
     KR_INGREDIENTS,
     KR_LABEL_KINDS,
     ORGANS,
+    PAIR_NOTES,
     PAIR_RULES,
     PRODRUGS_ACTIVATED_BY,
+    RULE_DETAIL,
     SERIOUS_CONDITIONS,
     bio_key,
     class_phrases,
@@ -1060,8 +1062,14 @@ class Engine:
     def _pair_rules(a: Ingredient, b: Ingredient) -> list[dict]:
         """Class-level interactions stated in labelling (knowledge.PAIR_RULES), e.g. GLP-1 + insulin."""
         ga, gb = drug_groups(a.key), drug_groups(b.key)
-        return [{"kind": "규칙", "severe": sev == "높음", "text": text} for x, y, sev, text in PAIR_RULES
-                if (x in ga and y in gb) or (x in gb and y in ga)]
+        return [{"kind": "규칙", "severe": sev == "높음", "text": text,
+                 **({"detail": RULE_DETAIL[(x, y)]} if (x, y) in RULE_DETAIL else {})}
+                for x, y, sev, text in PAIR_RULES if (x in ga and y in gb) or (x in gb and y in ga)]
+
+    def _pair_note(self, r: dict) -> str | None:
+        """A documented 'no interaction' note for a pair people often ask about (knowledge.PAIR_NOTES)."""
+        ga, gb = drug_groups(r["a_key"]), drug_groups(r["b_key"])
+        return next((t for x, y, t in PAIR_NOTES if (x in ga and y in gb) or (x in gb and y in ga)), None)
 
     def _mechanism(self, a: Ingredient, b: Ingredient) -> list[dict]:
         """Pharmacological reasons two drugs may interact: class rules, FDA CYP index tables, ChEMBL in-vitro data."""
@@ -1273,6 +1281,10 @@ class Engine:
                 given_for = self.indications.get(drv.key) or self.indications.get(drv.bare) or ""
                 ev["indication"] = bool(rx and given_for and rx.search(given_for))
                 ev["own_signal"] = (drv.bare, cm.condition[c]) in self.offsides and not ev["indication"]
+                # what ANY medicine of the regimen is given for (warfarin -> stroke): reports of it come from the
+                # illness being treated, so it informs but does not drive the verdict
+                ev["indication_any"] = bool(rx) and any(
+                    rx.search(self.indications.get(g.key) or self.indications.get(g.bare) or "") for g in V)
                 events.append(ev)
             if p_loo is not None:
                 for d in range(n):
@@ -1389,7 +1401,8 @@ class Engine:
         # patients), while true interactions are far above (sertraline + tramadol serotonin syndrome 12.6x)
         for e in events:
             e["drives_verdict"] = bool(e["serious"] and e["lift"] >= 1.5 and e["prob"] >= SIGNAL_P
-                                       and (_combo(e) >= COMBO_X or e["patient_factor"] >= 1.5))
+                                       and (_combo(e) >= COMBO_X or e["patient_factor"] >= 1.5)
+                                       and not e.get("indication_any"))
         added_signal = any(e["drives_verdict"] for e in events)
         if any(not d["minor"] for d in duplicates):
             overall = "높음"
@@ -1637,14 +1650,18 @@ class Engine:
                                     + (" (피해야 함)" if d["severity"] == "금기" else "")})
             if d["severity"] == "금기":
                 advice.append(f"{d['drug']}은(는) 피하고, 대신 쓸 약을 의사·약사와 상의하세요.")
+        details: list[dict] = []  # plain-language explanations (knowledge.RULE_DETAIL) of the interactions found
         for r in pair_rows:
             own = _own(r["label_evidence"])
             secs = {e["section"] for e in own}
             if r["level"] == "낮음":
+                note = self._pair_note(r)
                 if any(e.get("context") == "no_interaction" for e in r["label_evidence"]):
                     reasons.append({"sev": "low", "icon": "✅",
                                     "text": f"{r['a']}과(와) {r['b']}은(는) 허가 문서에 '임상적으로 의미 있는 상호작용 없음'으로 "
                                             "적혀 있습니다."})
+                elif note:  # 'vitamin K + apixaban': people ask - say it does not interact
+                    reasons.append({"sev": "low", "icon": "✅", "text": f"{r['a']} + {r['b']}: {note}."})
                 continue
             if r.get("dur"):
                 why = f" (사유: {r['dur']['content']})" if r["dur"].get("content") else ""
@@ -1667,18 +1684,23 @@ class Engine:
                 advice.append(avoid(r) or f"{r['a']}과(와) {r['b']}을(를) 함께 써야 한다면 용량 조절·검사 계획을 "
                                            "의사·약사와 정하세요.")
             elif not own and r.get("mechanism"):
-                m = r["mechanism"][0]
+                m = next((m for m in r["mechanism"] if m.get("detail")), r["mechanism"][0])
                 src = {"규칙": "임상 규칙", "식약처허가": "식약처 허가사항"}.get(m["kind"], "약리 기전")
                 if m["kind"] in KR_LABEL_KINDS:  # a product's own label: the text already names both sides
                     reasons.append({"sev": "mid", "icon": "📋", "text": f"{m['text']}."})
                     continue
+                if m.get("detail"):  # how it works and what goes wrong, in plain words; its own advice
+                    details.append(m["detail"])
                 reasons.append({"sev": "mid", "icon": "📋" if m["kind"] == "규칙" else "🧬",
                                 "text": f"{r['a']} + {r['b']} ({src}): "
-                                        f"{m['text']}."})
+                                        f"{m['detail']['why'] if m.get('detail') else m['text']}."})
             elif own:
                 occasional = r["a_key"] in prn_keys or r["b_key"] in prn_keys
-                rule = next((m["text"] for m in r.get("mechanism", []) if m["kind"] in ("규칙", *KR_LABEL_KINDS, "CYP-FDA")),
-                            None)
+                rule_m = next((m for m in r.get("mechanism", []) if m["kind"] in ("규칙", *KR_LABEL_KINDS, "CYP-FDA")),
+                              None)
+                rule = rule_m and (rule_m["detail"]["why"] if rule_m.get("detail") else rule_m["text"])
+                if rule_m and rule_m.get("detail"):
+                    details.append(rule_m["detail"])
                 if rule:  # the concrete consequence is more useful than "documented interaction"
                     text = f"{r['a']} + {r['b']}: {rule} (허가 문서에도 상호작용으로 기재)"
                 else:
@@ -1697,7 +1719,7 @@ class Engine:
                 text = f"{organ} (AI 예측): 이 환자의 몸 상태 때문에 '{ev}' 위험이 평균보다 커질 수 있습니다."
             reasons.append({"sev": "mid", "icon": "📈", "text": text})
         top = [e for e in events if e["serious"] and e["lift"] >= 2 and e["prob"] >= MIN_P
-               and not e.get("drives_verdict")][:max(0, 2 - len(drivers))]
+               and not e.get("drives_verdict") and not e.get("indication_any")][:max(0, 2 - len(drivers))]
         for e in top:
             organ, ev = ORGANS[e["organ"]], e["ko"]
             rare = e["prob"] < SIGNAL_P
@@ -1742,13 +1764,28 @@ class Engine:
         headline = {"위험": "이 약 조합은 이 환자에게 위험할 수 있습니다.",
                     "주의": "주의가 필요한 조합입니다. 아래 이유를 확인하세요.",
                     "비교적 안전": "뚜렷한 위험 신호는 없습니다. 복약 안내는 그대로 지켜 주세요."}[verdict]
+        # one documented interaction with a plain explanation and nothing more serious: its takeaway IS the headline
+        # ('함께 먹어도 되지만 비타민K 음식은 매일 비슷한 양을…' instead of 'check the reasons below'). An AI signal of
+        # the combination itself competes with it; one from this patient's age / body alone (falls at 65) does not
+        combo_ai = any(_combo(e) >= COMBO_X for e in drivers)
+        if (verdict == "주의" and len(details) == 1 and sum(r["level"] != "낮음" for r in pair_rows) == 1
+                and not (duplicates or class_dups or disease_alerts or combo_ai or (dosing or {}).get("alerts"))):
+            headline = details[0]["short"]
         if ctl_keys:  # harm reduction instead of 'keep to the labelled dose' (kept within the 4 lines shown)
             advice.insert(min(len(advice), 3), "혼자 쓰지 말고 다른 약·술과 섞지 마세요 — 위험 신호가 보이면 바로 119 "
                                                "(마약류 24시간 익명 상담 1342).")
-        if not advice:
-            advice.append("새로운 증상이 생기면 복용을 멈추고 의사·약사와 상의하세요." if verdict != "비교적 안전"
+        # the explained pairs' own steps, alternating between pairs (every pair's first step first), and their warning
+        # signs once at the end - never cut off by the line limit
+        steps = [d["do"][i] for i in range(max((len(d["do"]) for d in details), default=0))
+                 for d in details if i < len(d["do"])]
+        signs = list(dict.fromkeys(d["signs"] for d in details if d.get("signs")))
+        if not advice and not steps:
+            # never 'stop the medicine': stopping warfarin, an antiepileptic or a heart medicine on one's own is dangerous
+            advice.append("새로운 증상이 생기면 의사·약사와 상의하세요 — 처방받은 약은 임의로 끊지 마세요." if verdict != "비교적 안전"
                           else "정해진 용법·용량을 지키세요.")
-        return {"verdict": verdict, "headline": headline, "reasons": reasons, "advice": list(dict.fromkeys(advice))[:4]}
+        cap = 5 if details else 4
+        advice = list(dict.fromkeys(advice + steps))[:cap - len(signs)] + signs
+        return {"verdict": verdict, "headline": headline, "reasons": reasons, "advice": advice}
 
     # ------------------------------------------------------------------ catalog
     def catalog(self) -> dict:

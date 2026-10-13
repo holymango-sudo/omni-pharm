@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-VERSION = "2.17.0"
+VERSION = "2.17.1"
 
 
 class Settings(BaseSettings):
