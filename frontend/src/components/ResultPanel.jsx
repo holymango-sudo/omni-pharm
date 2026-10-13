@@ -4,7 +4,7 @@ import Markdown from "./Markdown.jsx";
 import { fx, pct } from "../api.js";
 
 const LV = { 위험: "high", 주의: "caution", "비교적 안전": "normal" };
-const WORD_CLASS = { "매우 높음": "hi", 높음: "hi", "약간 높음": "mid", "약 자체 위험": "mid", 보통: "" };
+const WORD_CLASS = { "매우 높음": "hi", 높음: "hi", "약간 높음": "mid", "약 자체 위험": "mid", 보통: "", "치료 중인 질환": "" };
 
 function Verdict({ res, expert }) {
   const s = res.summary;
@@ -39,7 +39,9 @@ function Reasons({ s }) {
 }
 
 function Symptoms({ events, expert }) {
-  const top = events.filter((e) => e.prob >= 0.003 && e.lift >= 1.3).slice(0, expert ? 8 : 5);
+  // the illness a medicine is given for (warfarin -> stroke) is not a side effect to watch: expert view only
+  const top = events.filter((e) => e.prob >= 0.003 && e.lift >= 1.3 && (expert || !e.indication_any))
+    .slice(0, expert ? 8 : 5);
   if (!top.length) return <div className="muted small">특별히 늘어나는 부작용이 예측되지 않았습니다.</div>;
   const max = Math.max(...top.map((e) => Math.min(e.lift, 6)));
   return (

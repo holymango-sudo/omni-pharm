@@ -1473,8 +1473,11 @@ class Engine:
                              f"({' / '.join(d['products'])}) — 효과·부작용이 겹칩니다")
         for e in events:
             e["added"] = added_risk(e)
-            # plain word = how much the combination / this patient ADDS; a drug's inherent risk alone is "약 자체 위험"
-            if e["lift"] >= 3 and e["added"] >= 1.5:
+            # plain word = how much the combination / this patient ADDS; a drug's inherent risk alone is "약 자체 위험";
+            # the illness a medicine of the regimen is given for (warfarin -> stroke) is neither
+            if e.get("indication_any"):
+                e["level_word"] = "치료 중인 질환"
+            elif e["lift"] >= 3 and e["added"] >= 1.5:
                 e["level_word"] = "매우 높음"
             elif e["lift"] >= 2 and e["added"] >= 1.25:
                 e["level_word"] = "높음"
