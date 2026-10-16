@@ -18,6 +18,7 @@ import time
 import uuid
 from collections import OrderedDict
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -26,7 +27,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from omnipharm import assistant, chat_checks, fhir, recommend, recreational, rx_photo, security
+from omnipharm import assistant, chat_checks, fhir, recommend, recreational, review, rx_photo, security
 from omnipharm.clinical import Patient, assess
 from omnipharm.config import VERSION, settings
 from omnipharm.dosing import Dose
@@ -446,6 +447,47 @@ async def recommend_drugs(req: RecommendRequest):
         if not err:
             current.append({"input": name, "ingredients": ings})
     return await asyncio.to_thread(recommend.recommend, eng, req.symptoms, current, req.patient)
+
+
+# --------------------------------------------------------------------------- blinded pharmacist review (v2.18)
+class ReviewAnswer(BaseModel):
+    reviewer: str = Field(..., min_length=1, max_length=40)
+    case: int = Field(..., ge=1, le=100000)
+    verdict: str = Field(..., max_length=4)
+    memo: str = Field("", max_length=500)
+
+
+@app.get("/api/v1/review/cases")
+async def review_cases():
+    """The review cases (patient + medicines) - never the program's verdict (the review is blinded)."""
+    if not review.SHEET.exists():
+        raise HTTPException(404, {"message": "검수표가 없습니다 (python scripts/review_sheet.py)."})
+    if "review_cases" not in E:
+        E["review_cases"] = await asyncio.to_thread(review.cases, E["engine"])
+    return {"cases": E["review_cases"], "verdicts": list(review.VERDICTS)}
+
+
+@app.get("/api/v1/review/answers")
+async def review_answers(reviewer: str):
+    try:
+        return {"answers": review.answers(reviewer)}
+    except ValueError as e:
+        raise HTTPException(422, {"message": str(e)}) from None
+
+
+@app.post("/api/v1/review/answer")
+async def review_answer(a: ReviewAnswer, request: Request):
+    try:
+        res = review.save_answer(a.reviewer, a.case, a.verdict, a.memo)
+    except ValueError as e:
+        raise HTTPException(422, {"message": str(e)}) from None
+    security.audit("review", _who(request), _client(request), reviewer=res["reviewer"], case=a.case)
+    return res
+
+
+@app.get("/review", include_in_schema=False)
+def review_page():
+    return FileResponse(Path(__file__).parent / "static" / "review.html", headers={"Cache-Control": "no-cache"})
 
 
 # --------------------------------------------------------------------------- built React UI

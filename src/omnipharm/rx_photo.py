@@ -65,10 +65,14 @@ _UNIT = {"정": "unit", "알": "unit", "캡슐": "unit", "포": "unit", "봉": "
 
 def parse_dose(item: dict) -> dict | None:
     """{'per_dose': '1정', 'times_per_day': 3, 'days': 3, 'timing': '식후'} -> a Dose dict (None if no amount)."""
-    m = re.search(r"(\d+(?:\.\d+)?|½|1/2)\s*([가-힣a-zA-Z]*)", str(item.get("per_dose") or ""))
+    # '1회 2정' -> 2정 (the '1회' is 'per dose', not an amount); fractions before plain numbers ('1/2정' is half)
+    text = re.sub(r"^\s*1\s*회\s*", "", str(item.get("per_dose") or ""))
+    m = re.search(r"(\d+\s*/\s*\d+|½|¼|\d+(?:\.\d+)?)\s*([가-힣a-zA-Z]*)", text)
     if not m:
         return None
-    amount = 0.5 if m[1] in ("½", "1/2") else float(m[1])
+    frac = re.fullmatch(r"(\d+)\s*/\s*(\d+)", m[1])
+    amount = (0.5 if m[1] == "½" else 0.25 if m[1] == "¼" else
+              int(frac[1]) / int(frac[2]) if frac and int(frac[2]) else float(m[1]) if not frac else 0.0)
     if not 0 < amount <= 1000:
         return None
     unit = _UNIT.get(m[2].lower(), "unit")

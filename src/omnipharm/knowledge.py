@@ -202,6 +202,7 @@ KR_INGREDIENTS: dict[str, str] = {
     "비오틴": "biotin", "프로폴리스": "propolis", "아르기닌": "arginine",
     "가르시니아": "garcinia cambogia", "칼슘": "calcium carbonate",
     "마그네슘": "magnesium oxide", "철분": "ferrous sulfate", "아연": "zinc", "염화칼륨": "potassium chloride",
+    "철분제": "ferrous sulfate", "칼슘제": "calcium carbonate", "마그네슘제": "magnesium oxide",
     "비타민C": "ascorbic acid", "비타민D": "cholecalciferol", "비타민E": "tocopherol", "비타민K": "phytonadione",
     "비타민B12": "cyanocobalamin", "엽산": "folic acid", "글루타치온": "glutathione", "히알루론산": "hyaluronic acid",
     "콜라겐": "collagen", "태반": "human placenta hydrolysate", "멜스몬": "human placenta hydrolysate",

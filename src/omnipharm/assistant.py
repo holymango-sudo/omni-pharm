@@ -30,7 +30,11 @@ _ENDING = re.compile(r"(이랑|랑|하고|이나|이요|에서|으로|까지|부
 _GENERIC = {"약", "약물", "알약", "영양제", "비타민", "감기약", "진통제", "해열제", "소화제", "수면제", "항생제", "한약", "보약", "음식",
             "같이", "함께", "먹어도", "마셔도", "되나요", "돼요", "괜찮", "괜찮아요", "언제", "몇", "시간", "하루", "지금", "오늘", "어제",
             "정도", "얼마나", "조금", "많이", "한잔", "한", "잔", "병", "알", "개", "번", "후", "전", "같은", "다른", "그럼", "그리고",
-            "이거", "저거", "그거", "제가", "저는", "우리", "아이", "엄마", "아빠", "임신", "운전", "운동", "공복", "식후", "식전"}
+            "이거", "저거", "그거", "제가", "저는", "우리", "아이", "엄마", "아빠", "임신", "운전", "운동", "공복", "식후", "식전",
+            # everyday 2-letter words that begin product names (2-letter brands such as 펜잘 are looked up)
+            "감기", "두통", "기침", "콧물", "가래", "몸살", "생리", "소화", "변비", "설사", "치통", "근육", "허리", "무릎", "피부",
+            "머리", "혈압", "혈당", "당뇨", "심장", "신장", "콩팥", "위장", "장염", "비염", "수유", "아기", "노인", "남편", "아내",
+            "친구", "어린", "열이", "잠이", "속이", "배가", "눈이", "목이", "기운", "증상", "효과", "부작", "얼마", "무슨", "어떤"}
 # a verb / adjective in the question ('먹으면', '마셔도', '괜찮을까요'): never a product, whatever names start with it
 _VERB = re.compile(r"(으면|하면|는데|어요|아요|해요|나요|까요|어도|아도|니까|지만|으니|면서|습니다|세요|던데|는지|을까)$")
 _NOT_MEDICINE = {"건강기능식품", "음식·영양성분"}
@@ -50,7 +54,7 @@ def _variants(word: str) -> list[str]:
     return out
 
 
-def _lookup(eng, w: str) -> str | None:
+def _lookup(eng, w: str, prefix: bool = True) -> str | None:
     """One word -> a medicine / food name the engine knows, or None. Only confident matches: the exact name,
     or a product whose name starts with a word of 3+ letters ('박카스' -> 박카스디액)."""
     if w.replace(" ", "").lower() in FOOD_ALIAS:  # 술, 소주, 자몽, 우유, 담배 ...
@@ -59,12 +63,13 @@ def _lookup(eng, w: str) -> str | None:
         return None
     hits = eng.search(w, 6)
     exact = next((h["name"] for h in hits if h["name"].replace(" ", "").lower() == w.lower()), None)
-    if exact:
+    if exact or not prefix:
         return exact
     # health foods / foods have marketing names that begin with everyday words ('먹으면티나', '하루에…'): their names
-    # count only from 4 letters ('고려홍삼정'); medicines from 3
-    if any(h["name"].startswith(w) and len(h["name"]) <= len(w) + 12
-           and len(w) >= (4 if h.get("type") in _NOT_MEDICINE else 3) for h in hits):
+    # count only from 4 letters ('고려홍삼정'); medicines from 3, and a 2-letter brand ('펜잘' -> 펜잘큐정) only when the
+    # product name is little more than the brand
+    if any(h["name"].startswith(w) and len(h["name"]) <= len(w) + (12 if len(w) >= 3 else 6)
+           and len(w) >= (4 if h.get("type") in _NOT_MEDICINE else 2) for h in hits):
         return w  # resolved later like the drug bar does ('게보린' -> 게보린정, not the first search hit)
     return None
 
@@ -93,12 +98,12 @@ def find_items(eng, question: str) -> list[str]:
         variants = _variants(raw)
         if any(w in _GENERIC for w in variants) or _VERB.search(raw):  # '하루에' is '하루', not '하루에…' (a product)
             continue
-        for w in variants:
-            name = _lookup(eng, w)
-            if name:
-                if name not in out:
-                    out.append(name)
-                break
+        # an exact name in any form first ('오메가3는' -> 오메가3, not a product that begins with '오메가3는'), then a
+        # product that begins with it
+        name = next((n for w in variants if (n := _lookup(eng, w, prefix=False))), None) or \
+            next((n for w in variants if (n := _lookup(eng, w))), None)
+        if name and name not in out:
+            out.append(name)
     return out[:MAX_NEW]
 
 

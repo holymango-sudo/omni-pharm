@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OMNI-PHARM 약사 검수</title>
+<style>
+  :root { --bg: #f6f7f9; --card: #fff; --ink: #1b2430; --muted: #5f6b7a; --line: #d9dee5; --acc: #0b6bcb;
+          --hi: #c62828; --mid: #b26a00; --ok: #2e7d32; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #11161c; --card: #1a2129; --ink: #e8edf2; --muted: #9aa7b4; --line: #2c3540; --acc: #5aa9ff;
+            --hi: #ff6b6b; --mid: #ffb74d; --ok: #81c784; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, "Malgun Gothic", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 4px 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
+  input, textarea { width: 100%; font: inherit; padding: 10px; border: 1px solid var(--line); border-radius: 8px;
+                    background: var(--bg); color: var(--ink); }
+  textarea { min-height: 70px; }
+  button { font: inherit; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
+           color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--acc); color: #fff; border-color: var(--acc); }
+  .verdicts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; }
+  .v { font-weight: 700; }
+  .v.sel { outline: 3px solid var(--acc); }
+  .v[data-v="위험"] { color: var(--hi); } .v[data-v="주의"] { color: var(--mid); } .v[data-v="안전"] { color: var(--ok); }
+  .drugs { font-size: 18px; font-weight: 700; margin: 6px 0; }
+  .row { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .bar i { display: block; height: 100%; background: var(--acc); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>약 조합 판정 검수 (블라인드)</h1>
+  <section class="card" id="intro">
+    <p>환자 정보와 함께 먹는 약을 보고 <b>위험 / 주의 / 안전</b> 중 하나를 골라 주세요. 프로그램의 판정은 보여 드리지 않습니다.</p>
+    <p class="muted">위험 = 함께 쓰지 않거나 처방 변경·용량 조절이 꼭 필요 · 주의 = 함께 쓸 수 있으나 관찰·간격·설명이 필요 ·
+      안전 = 특별한 조치 없음 · 모름 = 판단 자료 부족</p>
+    <label for="who">검수자 이름 또는 코드 (예: 약사A)</label>
+    <input id="who" maxlength="30" autocomplete="off">
+    <p style="margin-top:12px"><button class="primary" id="start">시작 / 이어서 하기</button></p>
+    <p class="muted" id="msg"></p>
+  </section>
+  <section class="card hidden" id="case">
+    <div class="row"><b id="num"></b><span class="muted" id="prog"></span></div>
+    <div class="bar"><i id="barv" style="width:0"></i></div>
+    <p class="muted" style="margin-top:12px">환자</p>
+    <div id="patient"></div>
+    <p class="muted" style="margin-top:8px">함께 먹는 약</p>
+    <div class="drugs" id="drugs"></div>
+    <div class="verdicts" id="vbtns"></div>
+    <label for="memo">메모 (선택 — 판단 이유, 프로그램이 알려야 할 점)</label>
+    <textarea id="memo" maxlength="500"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button id="prev">← 이전</button>
+      <button class="primary" id="save">저장하고 다음 →</button>
+    </div>
+    <p class="muted" id="saved"></p>
+  </section>
+</main>
+<script>
+const PIN_KEY = "omnipharm.pin";
+const $ = (id) => document.getElementById(id);
+let cases = [], answers = {}, i = 0, choice = null, who = "";
+const pin = () => { try { return localStorage.getItem(PIN_KEY) || ""; } catch { return ""; } };
+
+async function call(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", "X-Access-PIN": pin(), ...(opts.headers || {}) } });
+  const b = await r.json().catch(() => ({}));
+  if (r.status === 401 && b.detail?.pin_required) {
+    const p = prompt("접근 PIN을 입력하세요");
+    if (p) { try { localStorage.setItem(PIN_KEY, p); } catch {} return call(path, opts); }
+  }
+  if (!r.ok) throw new Error(b.detail?.message || `요청 실패 (${r.status})`);
+  return b;
+}
+
+function show() {
+  const c = cases[i];
+  const a = answers[String(c.id)] || {};
+  choice = a.verdict || null;
+  $("num").textContent = `사례 ${c.id}`;
+  const done = Object.keys(answers).length;
+  $("prog").textContent = `${done} / ${cases.length} 완료`;
+  $("barv").style.width = `${(done / cases.length) * 100}%`;
+  $("patient").textContent = c.patient;
+  $("drugs").textContent = c.drugs.join("  +  ");
+  $("memo").value = a.memo || "";
+  $("saved").textContent = a.at ? `저장됨 (${a.at})` : "";
+  document.querySelectorAll(".v").forEach((b) => b.classList.toggle("sel", b.dataset.v === choice));
+}
+
+$("start").onclick = async () => {
+  who = $("who").value.trim();
+  if (!who) { $("msg").textContent = "검수자 이름을 입력하세요."; return; }
+  try {
+    const c = await call("/api/v1/review/cases");
+    cases = c.cases;
+    $("vbtns").innerHTML = c.verdicts.map((v) => `<button class="v" data-v="${v}">${v}</button>`).join("");
+    document.querySelectorAll(".v").forEach((b) => b.onclick = () => {
+      choice = b.dataset.v;
+      document.querySelectorAll(".v").forEach((x) => x.classList.toggle("sel", x === b));
+    });
+    answers = (await call(`/api/v1/review/answers?reviewer=${encodeURIComponent(who)}`)).answers;
+    const first = cases.findIndex((x) => !answers[String(x.id)]);
+    i = first >= 0 ? first : 0;
+    $("intro").classList.add("hidden");
+    $("case").classList.remove("hidden");
+    show();
+  } catch (e) { $("msg").textContent = e.message; }
+};
+$("prev").onclick = () => { if (i > 0) { i -= 1; show(); } };
+$("save").onclick = async () => {
+  if (!choice) { $("saved").textContent = "판정을 골라 주세요."; return; }
+  const c = cases[i];
+  try {
+    await call("/api/v1/review/answer", { method: "POST", body: JSON.stringify({ reviewer: who, case: c.id, verdict: choice, memo: $("memo").value }) });
+    answers[String(c.id)] = { verdict: choice, memo: $("memo").value, at: "방금" };
+    if (i < cases.length - 1) i += 1;
+    show();
+    if (Object.keys(answers).length === cases.length) $("saved").textContent = "모든 사례를 마쳤습니다. 감사합니다!";
+  } catch (e) { $("saved").textContent = e.message; }
+};
+</script>
+</body>
+</html>

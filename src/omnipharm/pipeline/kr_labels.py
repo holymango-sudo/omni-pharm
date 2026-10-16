@@ -94,13 +94,33 @@ def avoid_with(cautions: str) -> list[str]:
     return list(dict.fromkeys(out))[:20]
 
 
+def _unbracket(x: str) -> str:
+    """Text outside (nested) brackets."""
+    out, depth = [], 0
+    for ch in x:
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth = max(0, depth - 1)
+        elif depth == 0:
+            out.append(ch)
+    return "".join(out)
+
+
 def _split_items(text: str) -> list[str]:
     """'다른 감기약, 해열진통제, 항히스타민제를 함유하는 내복약(비염용 경구제, 멀미약)' -> items; commas inside brackets
     belong to the bracket ('(비염용 경구제, 멀미약)' lists examples of the item before it)."""
+    # the list number first: '1) 인산염, 경구(먹는, 복용하는)용 …' - its ')' must not close a bracket that was never
+    # opened (the comma inside '(먹는, 복용하는)' then looked like a separator); '·' joins one class name
+    # ('위장진통·진경제', '진해·거담약'), it does not separate items
+    text = re.sub(r"^\s*(\(?\d+\)|\d+\.)\s*", "", text)
     items, depth, cur = [], 0, ""
     for ch in text:
-        depth += (ch in "([") - (ch in ")]")
-        if ch in ",，·" and depth <= 0:
+        if ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth = max(0, depth - 1)
+        if ch in ",，" and depth == 0:
             items.append(cur)
             cur = ""
         else:
@@ -110,8 +130,10 @@ def _split_items(text: str) -> list[str]:
     for x in items:
         x = re.sub(r"^\s*(\(?\d+\)|\d+\.)\s*", "", x)
         x = " ".join(x.split()).strip(" .")
-        if 1 < len(x) <= 60:
-            out.append(x)
+        # the length limit is for the item itself, not its bracketed examples ('항응고제(아세노쿠마롤, …, 아픽사반 등)의
+        # 항응고작용을 저해한다' is one item)
+        if 1 < len(_unbracket(x)) <= 60:
+            out.append(x[:200])
     return out
 
 

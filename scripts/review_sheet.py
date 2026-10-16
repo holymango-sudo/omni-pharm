@@ -22,18 +22,10 @@ import pandas as pd  # noqa: E402
 
 from omnipharm.clinical import Patient  # noqa: E402
 from omnipharm.engine import Engine  # noqa: E402
+from omnipharm.review import REVIEW_PATIENTS  # noqa: E402
 
 OUT = ROOT / "docs" / "validation"
-PATIENTS = {
-    "건강한 성인 (45세 남, 72kg)": dict(age=45, sex="M", weight_kg=72, height_cm=174, scr=0.9),
-    "고령·신장저하 (82세 여, 48kg, Cr 1.6)": dict(age=82, sex="F", weight_kg=48, height_cm=150, scr=1.6),
-    "임신 중 (31세 여)": dict(age=31, sex="F", weight_kg=60, height_cm=162, scr=0.7, conditions=["pregnancy"]),
-    "간경변 (63세 남)": dict(age=63, sex="M", weight_kg=68, height_cm=170, scr=1.0, ast=110, alt=80,
-                         total_bilirubin=2.8, conditions=["hepatic"]),
-    "심부전·당뇨 (70세 남)": dict(age=70, sex="M", weight_kg=80, height_cm=168, scr=1.3,
-                            conditions=["heart_failure", "diabetes"]),
-    "소아 (9세, 30kg)": dict(age=9, sex="M", weight_kg=30, height_cm=133, scr=0.5),
-}
+PATIENTS = REVIEW_PATIENTS  # (shared with the review page and the scoring)
 # commonly used medicines in Korean practice (chronic, acute, OTC, lifestyle)
 POOL = ["amlodipine", "losartan", "telmisartan", "atorvastatin", "rosuvastatin", "metformin", "glimepiride",
         "sitagliptin", "dapagliflozin", "aspirin", "clopidogrel", "warfarin", "apixaban", "rivaroxaban", "digoxin",

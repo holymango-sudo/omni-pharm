@@ -1,19 +1,31 @@
-"""Score a filled pharmacist review sheet (scripts/review_sheet.py) against the program's verdicts.
+"""Score the pharmacist review against the program's CURRENT verdicts (v2.18).
 
-  python scripts/score_review.py docs/validation/약사_검수표.xlsx
--> exact agreement, Cohen's kappa (unweighted / linear-weighted), sensitivity & PPV for '위험',
-   confusion matrix; written to logs/validation/review_score.json
+  python scripts/score_review.py                 answers saved by the /review page (data/review/answers_*.json)
+  python scripts/score_review.py filled.xlsx     a filled copy of docs/validation/약사_검수표.xlsx (column '약사 판정')
+
+Per reviewer: exact agreement, Cohen's kappa (unweighted / linear-weighted), sensitivity and positive predictive
+value of '위험', confusion matrix. Between reviewers: Cohen's kappa for each pair and Fleiss' kappa for all of them
+(how much pharmacists agree with each other is the ceiling for the program). '모름' answers are left out.
+The program's verdicts are recomputed with the engine of this version, so the score belongs to this version.
+-> logs/validation/review_score.json, review_disagreements.csv
 """
 
 from __future__ import annotations
 
+import itertools
 import json
+import os
 import sys
 from pathlib import Path
 
-import pandas as pd
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+os.environ.setdefault("OMNIPHARM_ONLINE_LOOKUP", "0")
+
+import pandas as pd  # noqa: E402
+
+from omnipharm import review  # noqa: E402
+
 LEVELS = ["안전", "주의", "위험"]
 
 
@@ -32,29 +44,81 @@ def kappa(a: list[str], b: list[str], weighted: bool) -> float:
     return 1 - po / pe if pe else 1.0
 
 
-def main(path: str) -> None:
-    cases = pd.read_excel(path, sheet_name="사례")
-    prog = pd.read_excel(path, sheet_name="프로그램 결과")
-    df = cases.merge(prog, on="번호")
-    col = next(c for c in df.columns if c.startswith("약사 판정"))
-    df = df[df[col].isin(LEVELS)]
-    if df.empty:
-        sys.exit("약사 판정이 입력된 사례가 없습니다.")
-    a, b = df[col].tolist(), df["프로그램 판정"].tolist()
+def fleiss(table: list[list[str]]) -> float:
+    """Fleiss' kappa: rows = cases, each with the verdicts of the raters who judged it (>= 2 per case)."""
+    rows = [r for r in table if len(r) >= 2]
+    if not rows:
+        return float("nan")
+    p_j = {v: 0.0 for v in LEVELS}
+    pis = []
+    for r in rows:
+        n = len(r)
+        counts = {v: r.count(v) for v in LEVELS}
+        for v in LEVELS:
+            p_j[v] += counts[v] / n
+        pis.append((sum(c * c for c in counts.values()) - n) / (n * (n - 1)))
+    p_bar = sum(pis) / len(rows)
+    pe = sum((x / len(rows)) ** 2 for x in p_j.values())
+    return (p_bar - pe) / (1 - pe) if pe < 1 else 1.0
+
+
+def program_verdicts() -> dict[int, str]:
+    from omnipharm.clinical import Patient
+    from omnipharm.engine import Engine
+
+    eng = Engine()
+    out = {}
+    for r in review.raw_cases().itertuples():
+        prods = [{"input": d, "ingredients": eng.resolve(d)} for d in str(r.약물).split(" + ")]
+        v = eng.predict(prods, Patient(**review.REVIEW_PATIENTS[r.환자]))["summary"]["verdict"]
+        out[int(r.번호)] = {"비교적 안전": "안전"}.get(v, v)
+    return out
+
+
+def score(a: list[str], b: list[str]) -> dict:
     tp = sum(x == "위험" and y == "위험" for x, y in zip(a, b, strict=True))
-    res = {"n": len(df), "agreement": round(sum(x == y for x, y in zip(a, b, strict=True)) / len(df), 3),
-           "kappa": round(kappa(a, b, False), 3), "kappa_linear_weighted": round(kappa(a, b, True), 3),
-           "danger_sensitivity": round(tp / max(a.count("위험"), 1), 3),
-           "danger_ppv": round(tp / max(b.count("위험"), 1), 3),
-           "confusion(pharmacist->program)": pd.crosstab(pd.Series(a, name="약사"), pd.Series(b, name="프로그램"))
-           .reindex(index=LEVELS, columns=LEVELS, fill_value=0).to_dict()}
+    return {"n": len(a), "agreement": round(sum(x == y for x, y in zip(a, b, strict=True)) / len(a), 3),
+            "kappa": round(kappa(a, b, False), 3), "kappa_linear_weighted": round(kappa(a, b, True), 3),
+            "danger_sensitivity": round(tp / max(a.count("위험"), 1), 3),
+            "danger_ppv": round(tp / max(b.count("위험"), 1), 3),
+            "confusion(pharmacist->program)": pd.crosstab(pd.Series(a, name="약사"), pd.Series(b, name="프로그램"))
+            .reindex(index=LEVELS, columns=LEVELS, fill_value=0).to_dict()}
+
+
+def main(path: str | None) -> None:
+    if path:  # a filled spreadsheet: one reviewer
+        df = pd.read_excel(path, sheet_name="사례")
+        col = next(c for c in df.columns if c.startswith("약사 판정"))
+        given = {"spreadsheet": {str(int(n)): {"verdict": v, "memo": m}
+                                 for n, v, m in zip(df["번호"], df[col], df.get("약사 메모", [""] * len(df)), strict=False)}}
+    else:
+        given = review.all_answers()
+    given = {k: {c: x for c, x in v.items() if x.get("verdict") in LEVELS} for k, v in given.items()}
+    given = {k: v for k, v in given.items() if v}
+    if not given:
+        sys.exit("약사 판정이 입력된 사례가 없습니다 (/review 페이지 또는 검수표 엑셀).")
+    prog = program_verdicts()
+    res, rows = {"reviewers": {}, "between_reviewers": {}}, []
+    for who, ans in given.items():
+        ids = sorted(int(c) for c in ans)
+        a, b = [ans[str(i)]["verdict"] for i in ids], [prog[i] for i in ids]
+        res["reviewers"][who] = score(a, b)
+        rows += [{"검수자": who, "번호": i, "약사": x, "프로그램": y, "메모": ans[str(i)].get("memo", "")}
+                 for i, x, y in zip(ids, a, b, strict=True) if x != y]
+    for x, y in itertools.combinations(given, 2):
+        common = sorted(set(given[x]) & set(given[y]), key=int)
+        if len(common) >= 5:
+            a, b = [given[x][c]["verdict"] for c in common], [given[y][c]["verdict"] for c in common]
+            res["between_reviewers"][f"{x} vs {y}"] = {"n": len(common), "kappa": round(kappa(a, b, False), 3)}
+    if len(given) >= 2:
+        table = [[g[c]["verdict"] for g in given.values() if c in g] for c in {c for g in given.values() for c in g}]
+        res["between_reviewers"]["fleiss_kappa(all)"] = round(fleiss(table), 3)
     out = ROOT / "logs" / "validation"
     out.mkdir(parents=True, exist_ok=True)
     (out / "review_score.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
-    disagree = df[[x != y for x, y in zip(a, b, strict=True)]]
-    disagree.to_csv(out / "review_disagreements.csv", index=False, encoding="utf-8-sig")
+    pd.DataFrame(rows).to_csv(out / "review_disagreements.csv", index=False, encoding="utf-8-sig")
     print(json.dumps(res, ensure_ascii=False, indent=1))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else str(ROOT / "docs" / "validation" / "약사_검수표.xlsx"))
+    main(sys.argv[1] if len(sys.argv) > 1 else None)
