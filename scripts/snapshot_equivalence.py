@@ -109,7 +109,7 @@ def main() -> int:
         print(f"case count differs: {len(old['rows'])} -> {len(new)}")
         return 1
     diffs = []
-    for a, b in zip(old["rows"], new):
+    for a, b in zip(old["rows"], new, strict=True):
         if a["case"] != b["case"]:
             diffs.append((a["case"], "different case"))
             continue
