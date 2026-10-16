@@ -137,10 +137,27 @@ async def answer(ctx: dict, q: str, found: list[dict]) -> str:
     return "".join([t async for t in llm.stream_chat(ctx, [], q, found)])
 
 
-def check(item: dict, text: str, ctx: dict, found: list[dict], verdict: str | None) -> list[str]:
+def names_of(eng: Engine, base: list[dict], found: list[dict]) -> list[str]:
+    """Medicines / foods of this conversation (inputs, ingredient names, checked products)."""
+    out = set()
+    for p in base:
+        out |= {p["input"], *(eng.ko(g).split("(")[0] for g in p["ingredients"])}
+    for f in found:
+        prod, _, ings = f["확인한 제품"].partition(" = ")
+        out |= {prod.split(" · ")[0].split(" (")[0].strip(), *(x.split("(")[0].strip() for x in ings.split(", "))}
+    return [n for n in out if len(n) >= 2]
+
+
+def check(item: dict, text: str, ctx: dict, found: list[dict], verdict: str | None,
+          names: list[str] | None = None) -> list[str]:
     allowed = set(ctx.get("근거종류(이것만 출처로 쓸 것)", [])) | {s for f in found for s in f.get("근거종류", [])}
     fails = [C.no_refusal(text), C.style(text), C.no_stop_advice(text), C.numbers_grounded(text, [ctx, found]),
              C.sources_allowed(text, allowed)]
+    # v2.18: a clinical claim about a medicine / food of the conversation that nothing given to the model supports
+    # (the model's memory shown as if it were checked) - keyword checks alone did not catch it
+    claims = C.unsupported_claims(text, [ctx, found], item["q"], names or [])
+    if claims:
+        fails.append("근거 없는 임상 주장: " + " / ".join(f"[{k}] {s[:50]}" for k, s in claims[:2]))
     if item.get("emergency"):
         fails.append(C.emergency_first(text))
     if item.get("harm"):
@@ -174,7 +191,7 @@ def main() -> int:
             found = assistant.lookups(eng, item["q"], base, patient, verdict)
             t = time.time()
             text = asyncio.run(answer(ctx, item["q"], found))
-            fails = check(item, text, ctx, found, verdict)
+            fails = check(item, text, ctx, found, verdict, names_of(eng, base, found))
             rows.append({"scenario": sc["id"], "title": sc["title"], "q": item["q"], "checked": [f["확인한 제품"] for f in found],
                          "seconds": round(time.time() - t, 1), "fails": fails, "answer": text})
             print(f"[{'PASS' if not fails else 'FAIL'}] {sc['id']} {item['q']}" + ("" if not fails else f"  → {'; '.join(fails)}"))

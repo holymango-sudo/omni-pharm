@@ -132,3 +132,38 @@ def style(answer: str) -> str | None:
 
 def mentions(answer: str, words: list[str]) -> str | None:
     return None if any(w in answer for w in words) else f"필요한 내용 없음: {' / '.join(words)}"
+
+
+# clinical effects an answer may claim about a medicine / food; each must be in the facts the model was given
+EFFECT_TERMS: list[tuple[str, re.Pattern]] = [(k, re.compile(p)) for k, p in [
+    ("혈압", r"혈압"), ("혈당", r"혈당"), ("간", r"(?<![가-힣])간(?=[ 에이을의]|독성|기능|손상|수치|부담|부전|질환)"),
+    ("신장", r"신장|콩팥|신기능"), ("출혈", r"출혈|피가\s*(잘\s*)?멈추지"), ("혈전", r"혈전|뇌졸중|색전"),
+    ("세로토닌", r"세로토닌"), ("심장 리듬", r"QT|부정맥|심장\s*박동|맥박"), ("진정", r"졸음|진정|호흡\s*억제"),
+    ("칼륨", r"칼륨"), ("근육", r"근육|횡문근"), ("경련", r"경련|발작"), ("위장", r"위궤양|속쓰림|위\s*점막|위장\s*출혈"),
+    ("흡수", r"흡수"), ("혈중 농도", r"혈중\s*농도|농도가\s*(올라|높아|떨어|낮아)")]]
+_BOILERPLATE = re.compile(r"응급 신호일 수 있습니다|새로운 증상|근거\s*[:：]|119|의사|약사")
+_PARTICLE = re.compile(r"(은|는|이|가|을|를|과|와|도|의|에|로|으로|만|이나|랑|이랑)$")
+
+
+def _names_in(s: str, names: list[str]) -> bool:
+    """The sentence names a medicine / food of this conversation ('홍삼은' for 고려홍삼정, '타이레놀' for 타이레놀정)."""
+    if any(n and n in s for n in names):
+        return True
+    words = {_PARTICLE.sub("", w) for w in re.findall(r"[가-힣A-Za-z0-9]{2,}", s)}
+    return any(len(w) >= 2 and any(w in n for n in names) for w in words)
+
+
+def unsupported_claims(answer: str, facts: object, question: str, names: list[str]) -> list[tuple[str, str]]:
+    """Sentences that say something clinical (blood pressure, bleeding, liver ...) about a medicine / food of this
+    conversation although nothing given to the model says it: the model's own memory, shown as if checked.
+    -> [(effect, sentence)]."""
+    known = json.dumps(facts, ensure_ascii=False) + " " + question
+    out = []
+    for s in _sentences(answer):
+        if _BOILERPLATE.search(s) or not _names_in(s, names):
+            continue
+        for label, pat in EFFECT_TERMS:
+            if pat.search(s) and not pat.search(known):
+                out.append((label, s.strip()[:120]))
+                break
+    return out

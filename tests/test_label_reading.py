@@ -73,6 +73,21 @@ def test_real_contraindications_survive_without_dur(eng, a, b):
     assert level(eng, a, b) == "높음"
 
 
+@pytest.mark.parametrize(("a", "b"), [
+    ("udenafil", "nicorandil"),          # Korean PDE5 inhibitor + NO donor (no FDA label for either)
+    ("isotretinoin", "doxycycline"),     # pseudotumor cerebri
+    ("phentermine", "phendimetrazine"),  # two anorectics
+    ("dihydroergotamine", "clarithromycin"),
+    ("domperidone", "ondansetron"),      # EMA 2014: QT
+    ("domperidone", "ketoconazole"),     # EMA 2014: strong CYP3A inhibitor
+    ("cyclosporine", "tacrolimus"),
+    ("rifampin", "midazolam"),           # strong inducer x sensitive substrate (exposure -80% or more)
+])
+def test_documented_rules_from_dur_development_half(eng, a, b):
+    """Rules added from the DEVELOPMENT half of the DUR validation only (scripts/validate_external.py)."""
+    assert level(eng, a, b) == "높음"
+
+
 def test_intended_combination_is_capped_and_explained(eng):
     r = eng.predict([{"input": "olanzapine", "ingredients": eng.resolve("olanzapine")},
                      {"input": "fluoxetine", "ingredients": eng.resolve("fluoxetine")}], Patient(age=40))

@@ -753,9 +753,23 @@ DRUG_CLASSES["opioid"] = (DRUG_CLASSES["opioid"][0], DRUG_CLASSES["opioid"][1] |
 DRUG_CLASSES["sedative"] = (DRUG_CLASSES["sedative"][0], DRUG_CLASSES["sedative"][1] | {"flunitrazepam"})
 DRUG_CLASSES["stimulant"] = ("중추신경 흥분제(암페타민·코카인 계열)", frozenset({
     "cocaine", "methamphetamine", "amphetamine", "dextroamphetamine", "lisdexamfetamine", "methylphenidate",
-    "dexmethylphenidate", "phentermine", "phendimetrazine", "diethylpropion", "midomafetamine", "mda", "mephedrone",
-    "cathinone", "alpha-pvp"}))
+    "dexmethylphenidate", "phentermine", "phendimetrazine", "diethylpropion", "mazindol", "midomafetamine", "mda",
+    "mephedrone", "cathinone", "alpha-pvp"}))
 DRUG_GROUPS.update({
+    # v2.18 (from the development half of the DUR external validation; each rule cites its label / regulator)
+    "nitrate": NITRATES | frozenset({"molsidomine", "nitroprusside", "sodium nitroprusside"}),  # NO donors
+    "anorectic": frozenset({"phentermine", "phendimetrazine", "diethylpropion", "mazindol", "sibutramine",
+                            "benzphetamine"}),
+    "retinoid_systemic": frozenset({"isotretinoin", "acitretin", "alitretinoin", "tretinoin"}),
+    "ergot": frozenset({"ergotamine", "dihydroergotamine", "methylergonovine", "methylergometrine", "ergonovine",
+                        "ergometrine"}),
+    # strong CYP3A inhibitors + the macrolides the ergotamine boxed warning names (azithromycin is not one)
+    "cyp3a_inh_ergot": CYP_FDA["CYP3A"]["strong_inh"] | frozenset({"erythromycin", "roxithromycin", "telithromycin",
+                                                                  "troleandomycin"}),
+    "cyp3a_strong_inh": CYP_FDA["CYP3A"]["strong_inh"],
+    "domperidone": frozenset({"domperidone"}),
+    "menatetrenone": frozenset({"menatetrenone"}),
+    "calcineurin": frozenset({"cyclosporine", "tacrolimus", "voclosporin"}),
     "gabapentinoid": frozenset({"gabapentin", "pregabalin", "mirogabalin"}),
     "dabigatran": frozenset({"dabigatran", "dabigatran etexilate"}),
     "metronidazole": frozenset({"metronidazole", "tinidazole", "secnidazole"}),
@@ -896,6 +910,23 @@ PAIR_RULES: list[tuple[str, str, str, str]] = [
     ("alcohol", "sulfonylurea", "주의", "술이 저혈당을 일으키거나 숨길 수 있습니다"),
     ("alcohol", "insulin", "주의", "술이 저혈당을 일으키거나 숨길 수 있습니다"),
     ("alcohol", "warfarin", "주의", "술이 와파린 효과(INR)를 흔들어 출혈·혈전 위험이 생깁니다 — 과음 금지"),
+    # v2.18 - documented contraindications the label text could not show (Korean-only drugs, no FDA label)
+    ("pde5", "nitrate", "높음", "질산염·NO 공여제(니트로글리세린·니코란딜 등)와 발기부전 치료제를 함께 쓰면 혈압이 급격히 떨어질 수 "
+                              "있습니다 — 함께 쓰지 마세요 (PDE5 억제제 허가사항 병용금기)"),
+    ("retinoid_systemic", "tetracycline", "높음", "먹는 레티노이드(이소트레티노인·아시트레틴 등)와 테트라사이클린계 항생제를 함께 "
+                                                "쓰면 뇌압이 오르는 가성뇌종양 위험이 있습니다 — 함께 쓰지 마세요 (허가사항 병용금기)"),
+    ("anorectic", "anorectic", "높음", "식욕억제제를 두 가지 이상 함께 쓰면 심장판막병·폐동맥고혈압 위험이 커집니다 — 함께 쓰지 "
+                                    "마세요 (허가사항: 다른 체중 감량 약과 병용 금지)"),
+    ("ergot", "cyp3a_inh_ergot", "높음", "맥각 알칼로이드(에르고타민 등)와 강한 CYP3A 억제제(마크롤리드·아졸·HIV 약 등)를 함께 "
+                                       "쓰면 혈관 경련으로 손발·장기 허혈이 생길 수 있습니다 (에르고타민 박스경고·병용금기)"),
+    ("domperidone", "qt_prolonging", "높음", "돔페리돈을 QT 간격을 늘리는 약과 함께 쓰면 심각한 부정맥(염전성 심실빈맥) 위험이 "
+                                           "커집니다 — 함께 쓰지 마세요 (유럽 EMA 2014 권고·국내 허가사항 병용금기)"),
+    ("domperidone", "cyp3a_strong_inh", "높음", "강한 CYP3A 억제제가 돔페리돈 농도를 크게 올려 심장 부정맥 위험이 커집니다 — 함께 "
+                                              "쓰지 마세요 (EMA 2014 권고·국내 허가사항 병용금기)"),
+    ("menatetrenone", "warfarin", "높음", "골다공증 치료제 메나테트레논(고용량 비타민K2)은 와파린 효과를 없앱니다 — 함께 쓰지 "
+                                        "마세요 (메나테트레논 허가사항: 와파린 복용 환자 금기)"),
+    ("calcineurin", "calcineurin", "높음", "사이클로스포린과 타크로리무스를 함께 쓰면 신장 독성이 겹칩니다 — 함께 쓰지 마세요 "
+                                         "(허가사항: 병용 회피, 바꿀 때는 24시간 간격)"),
     # warfarin label (drug interactions: acetaminophen); INR rises with regular use of more than ~2 g a day (Hylek 1998)
     ("acetaminophen", "warfarin", "주의", "아세트아미노펜을 며칠 이상 매일 많이(하루 2g 이상) 먹으면 INR이 올라 출혈 위험이 생길 수 "
                                        "있습니다 — 가끔 먹는 것은 괜찮습니다"),
@@ -1199,7 +1230,7 @@ NAME_GROUPS: list[tuple[re.Pattern, set[str]]] = [
     (re.compile(r"^potassium (chloride|citrate|gluconate|bicarbonate)", re.I), {"potassium_supplement"}),
     (re.compile(r"\bnitrite\b", re.I), {"nitrite"}),  # amyl / isobutyl nitrite (poppers)
     # (not 'vitamin k foods': a food is not a supplement - it has its own rule and advice)
-    (re.compile(r"phytonadione|vitamin k\b(?! foods)|vitamin k ?[12]|menaquinone|phylloquinone", re.I),
+    (re.compile(r"phytonadione|vitamin k\b(?! foods)|vitamin k ?[12]|menaquinone|menatetrenone|phylloquinone", re.I),
      {"vitamin_k_supplement"}),
 ]
 

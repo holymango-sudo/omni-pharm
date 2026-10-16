@@ -1,0 +1,31 @@
+{
+ "source": "American Geriatrics Society Beers Criteria Update Expert Panel. American Geriatrics Society 2023 updated AGS Beers Criteria for potentially inappropriate medication use in older adults. J Am Geriatr Soc. 2023;71(7):2052-2081. Table 5: Potentially clinically important drug-drug interactions that should be avoided in older adults (most entries unchanged since the 2019 update).",
+ "note": "Entered by the developers from the published table (one or two representative drugs per class). CHECK EVERY ROW AGAINST THE ORIGINAL TABLE before citing these numbers; the list was not used to write or tune any rule before it was measured.",
+ "patient": {"age": 75, "sex": "F", "weight_kg": 58, "height_cm": 155, "scr": 0.9},
+ "cases": [
+  {"drugs": ["lisinopril", "losartan"], "class": "RAS 억제제 + 다른 RAS 억제제", "risk": "고칼륨혈증", "recommendation": "avoid (CKD 3a 이상)"},
+  {"drugs": ["lisinopril", "amiloride"], "class": "RAS 억제제 + 칼륨 보존 이뇨제", "risk": "고칼륨혈증", "recommendation": "avoid (CKD 3a 이상)"},
+  {"drugs": ["losartan", "triamterene"], "class": "RAS 억제제 + 칼륨 보존 이뇨제", "risk": "고칼륨혈증", "recommendation": "avoid (CKD 3a 이상)"},
+  {"drugs": ["oxycodone", "lorazepam"], "class": "오피오이드 + 벤조디아제핀", "risk": "과다복용(호흡 억제)", "recommendation": "avoid"},
+  {"drugs": ["tramadol", "alprazolam"], "class": "오피오이드 + 벤조디아제핀", "risk": "과다복용(호흡 억제)", "recommendation": "avoid"},
+  {"drugs": ["oxycodone", "gabapentin"], "class": "오피오이드 + 가바펜티노이드", "risk": "진정·호흡 억제", "recommendation": "avoid"},
+  {"drugs": ["tramadol", "pregabalin"], "class": "오피오이드 + 가바펜티노이드", "risk": "진정·호흡 억제", "recommendation": "avoid"},
+  {"drugs": ["oxybutynin", "diphenhydramine"], "class": "항콜린제 + 항콜린제", "risk": "인지 저하", "recommendation": "avoid, minimize"},
+  {"drugs": ["amitriptyline", "oxybutynin"], "class": "항콜린제 + 항콜린제", "risk": "인지 저하", "recommendation": "avoid, minimize"},
+  {"drugs": ["sertraline", "zolpidem", "tramadol"], "class": "중추신경계 작용 약 3개 이상", "risk": "낙상·골절", "recommendation": "avoid total of 3 or more"},
+  {"drugs": ["quetiapine", "lorazepam", "gabapentin"], "class": "중추신경계 작용 약 3개 이상", "risk": "낙상·골절", "recommendation": "avoid total of 3 or more"},
+  {"drugs": ["prednisone", "naproxen"], "class": "전신 코르티코스테로이드 + NSAID", "risk": "위장관 출혈·궤양", "recommendation": "avoid; if unavoidable, GI protection"},
+  {"drugs": ["prednisolone", "ibuprofen"], "class": "전신 코르티코스테로이드 + NSAID", "risk": "위장관 출혈·궤양", "recommendation": "avoid; if unavoidable, GI protection"},
+  {"drugs": ["lithium", "lisinopril"], "class": "리튬 + ACE 억제제", "risk": "리튬 독성", "recommendation": "avoid; monitor lithium"},
+  {"drugs": ["lithium", "losartan"], "class": "리튬 + ARB", "risk": "리튬 독성", "recommendation": "avoid; monitor lithium"},
+  {"drugs": ["lithium", "furosemide"], "class": "리튬 + 루프 이뇨제", "risk": "리튬 독성", "recommendation": "avoid; monitor lithium"},
+  {"drugs": ["doxazosin", "furosemide"], "class": "말초 알파1 차단제 + 루프 이뇨제", "risk": "요실금(노인 여성)", "recommendation": "avoid in older women"},
+  {"drugs": ["phenytoin", "sulfamethoxazole"], "class": "페니토인 + TMP-SMX", "risk": "페니토인 독성", "recommendation": "avoid"},
+  {"drugs": ["theophylline", "cimetidine"], "class": "테오필린 + 시메티딘", "risk": "테오필린 독성", "recommendation": "avoid"},
+  {"drugs": ["theophylline", "ciprofloxacin"], "class": "테오필린 + 시프로플록사신", "risk": "테오필린 독성", "recommendation": "avoid"},
+  {"drugs": ["warfarin", "amiodarone"], "class": "와파린 + 아미오다론", "risk": "출혈", "recommendation": "avoid when possible; monitor INR"},
+  {"drugs": ["warfarin", "ciprofloxacin"], "class": "와파린 + 시프로플록사신", "risk": "출혈", "recommendation": "avoid when possible; monitor INR"},
+  {"drugs": ["warfarin", "clarithromycin"], "class": "와파린 + 마크롤리드(아지트로마이신 제외)", "risk": "출혈", "recommendation": "avoid when possible; monitor INR"},
+  {"drugs": ["warfarin", "sulfamethoxazole"], "class": "와파린 + TMP-SMX", "risk": "출혈", "recommendation": "avoid when possible; monitor INR"}
+ ]
+}

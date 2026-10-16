@@ -415,6 +415,22 @@ def _own(lev: list[dict]) -> list[dict]:
     return out
 
 
+PATHOGEN_TARGET = re.compile(r"virus|viral|\bHIV|hepatitis|bacteri|penicillin-binding|plasmodium|mycobacter|fung|"
+                             r"ergosterol|parasit", re.I)
+
+
+def _serotonergic(moa: list[dict]) -> bool:
+    """A mechanism that INCREASES serotonin activity (serotonin syndrome): transporter / MAO inhibition, full receptor
+    agonism or release. Antagonists and partial agonists at 5-HT receptors do not."""
+    for m in moa:
+        t, act = str(m.get("text", "")).lower(), str(m.get("action", "")).upper()
+        if ("serotonin transporter" in t or "monoamine oxidase" in t) and act == "INHIBITOR":
+            return True
+        if "serotonin" in t and act in ("AGONIST", "RELEASING AGENT"):
+            return True
+    return False
+
+
 DILUENTS = frozenset({"sodium chloride", "dextrose", "glucose", "water", "sterile water", "lactated ringer's"})
 
 
@@ -1215,8 +1231,13 @@ class Engine:
                     out.append({"kind": "CYP-FDA", "severe": strong and sens and not prodrug and not equiactive,
                                 "text": f"{self.ko(w)}은(는) {enz} {'강한' if strong else '중간'} 억제제 → {effect} (FDA 지표 약물표)"})
                 elif wn in t["strong_ind"] or wn in t["moderate_ind"]:
-                    out.append({"kind": "CYP-FDA", "severe": False,
-                                "text": f"{self.ko(w)}은(는) {enz} 유도제 → {self.ko(v)}의 농도가 떨어져 효과가 줄 수 있습니다 "
+                    # a strong inducer lowers a sensitive substrate's exposure by >= 80% (FDA index definition): the
+                    # medicine may stop working (rifampin + HIV / anticoagulant / cancer drugs) - as major as the
+                    # inhibitor case; a prodrug is activated MORE, a wide-margin drug barely matters
+                    strong = wn in t["strong_ind"]
+                    out.append({"kind": "CYP-FDA", "severe": strong and sens and not prodrug and not equiactive,
+                                "text": f"{self.ko(w)}은(는) {enz} {'강한 ' if strong else ''}유도제 → {self.ko(v)}의 농도가 "
+                                        f"{'80% 넘게 ' if strong and sens else ''}떨어져 효과가 줄 수 있습니다 "
                                         "(FDA 지표 약물표)"})
         return out
 
@@ -1269,16 +1290,19 @@ class Engine:
         if pa["herg"] and pb["herg"] and min(pa["herg"], pb["herg"]) >= HERG_P:
             out.append({"kind": "QT", "text": f"두 약 모두 심장 hERG 채널을 차단(IC50 {conc(pa['herg'])}, {conc(pb['herg'])}) → "
                         "QT 연장·부정맥 위험이 더해질 수 있습니다"})
-        ta = {(m["target"], m["action"]) for m in pa["moa"] if m.get("target")}
+        # a PATHOGEN's target shared by two anti-infectives (HIV reverse transcriptase: NRTI + NNRTI) is how
+        # combination therapy works, not an overlap of effects in the patient
+        ta = {(m["target"], m["action"]) for m in pa["moa"] if m.get("target") and not PATHOGEN_TARGET.search(
+            str(m.get("text", "")))}
         tb = {(m["target"], m["action"]) for m in pb["moa"] if m.get("target")}
         same = ta & tb
         if same:
             txt = next((m["text"] for m in pa["moa"] if (m["target"], m["action"]) in same), "같은 작용점")
             out.append({"kind": "PD", "text": f"두 약의 작용 기전이 같습니다({txt}) → 효과·부작용이 겹칩니다"})
-        sero = [m for m in pa["moa"] + pb["moa"] if "serotonin" in str(m.get("text", "")).lower()
-                or "monoamine oxidase" in str(m.get("text", "")).lower()]
-        if not same and any(m in pa["moa"] for m in sero) and any(m in pb["moa"] for m in sero):
-            out.append({"kind": "PD", "text": "두 약 모두 세로토닌계에 작용 → 세로토닌 증후군(고열·떨림·혼돈) 위험이 있습니다"})
+        # serotonin syndrome needs MORE serotonin activity on both sides (reuptake / MAO inhibition, receptor
+        # agonism, release) - a 5-HT2A antagonist (aripiprazole, risperidone, mirtazapine) does not add to it
+        if not same and _serotonergic(pa["moa"]) and _serotonergic(pb["moa"]):
+            out.append({"kind": "PD", "text": "두 약 모두 세로토닌 작용을 늘림 → 세로토닌 증후군(고열·떨림·혼돈) 위험이 있습니다"})
         return out
 
     def _label_evidence(self, a: Ingredient, b: Ingredient) -> list[dict]:
