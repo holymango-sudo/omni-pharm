@@ -67,7 +67,8 @@ export default function App() {
   const [help, setHelp] = useState(() => { try { return !localStorage.getItem("omnipharm.seenHelp"); } catch { return true; } });
   const [needPin, setNeedPin] = useState(false);
   const [clock, setClock] = useState(new Date());
-  const [expert, setExpert] = useState(false);
+  // who is using it (chosen on the first visit): health professionals start with the expert view
+  const [expert, setExpert] = useState(() => { try { return localStorage.getItem("omnipharm.userType") === "pro"; } catch { return false; } });
   const [diseases, setDiseases] = useState([]);
   const [assessment, setAssessment] = useState(null);
   const anim = useRef({ phase: "idle", t0: now() });
@@ -120,7 +121,14 @@ export default function App() {
     return () => clearInterval(t);
   }, []);
   useEffect(() => { try { localStorage.setItem("omnipharm.sound", sound ? "1" : "0"); } catch { /* ignore */ } }, [sound]);
-  const closeHelp = () => { setHelp(false); try { localStorage.setItem("omnipharm.seenHelp", "1"); } catch { /* ignore */ } };
+  const closeHelp = (type) => {
+    setHelp(false);
+    if (type) setExpert(type === "pro");
+    try {
+      localStorage.setItem("omnipharm.seenHelp", "1");
+      if (type) localStorage.setItem("omnipharm.userType", type);
+    } catch { /* ignore */ }
+  };
 
   // live body / kidney / liver / capacity summary computed by the server (single source of truth)
   useEffect(() => {

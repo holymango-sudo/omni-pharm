@@ -2,7 +2,7 @@ import React, { useState } from "react";
 
 export function HelpModal({ onClose }) {
   return (
-    <div className="modal-bg" onClick={onClose}>
+    <div className="modal-bg" onClick={() => onClose()}>
       <div className="modal help" onClick={(e) => e.stopPropagation()}>
         <h3>OMNI-PHARM 사용법</h3>
         <ol className="steps">
@@ -25,10 +25,17 @@ export function HelpModal({ onClose }) {
           <li><b>인쇄/PDF</b>로 환자용 안내문 또는 전문가용 리포트를 출력할 수 있습니다.</li>
         </ul>
         <p className="disclaimer">
-          이 프로그램은 의사·약사의 판단을 돕는 <b>참고용 도구</b>이며 의료기기 인허가를 받지 않았습니다.
-          약을 끊거나 바꾸기 전에는 반드시 의사·약사와 상의하세요. 입력한 환자 정보는 이 컴퓨터 밖으로 전송·저장되지 않습니다.
+          <b>사용 목적</b>: 연구·교육용 의사결정 보조 도구입니다. 의료기기 인허가를 받지 않았으며, 진단·처방 결정을 이것만으로 하면
+          안 됩니다. 응급 상황이면 바로 119에 연락하세요. 약을 끊거나 바꾸기 전에는 반드시 의사·약사와 상의하세요.
+          입력한 환자 정보는 이 컴퓨터 밖으로 전송·저장되지 않습니다.
         </p>
-        <button className="btn predict" onClick={onClose}>시작하기</button>
+        <h4>누가 사용하시나요?</h4>
+        <div className="usertype">
+          <button className="btn predict" onClick={() => onClose("public")}>일반인(환자·보호자)으로 시작
+            <small>쉬운 말과 할 일 중심, 숫자는 숨김</small></button>
+          <button className="btn ghost" onClick={() => onClose("pro")}>의료인(약사·의사·학생)으로 시작
+            <small>전문가 보기: 확률·배수·근거 원문까지</small></button>
+        </div>
       </div>
     </div>
   );
