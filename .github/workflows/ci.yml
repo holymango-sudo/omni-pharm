@@ -1,0 +1,43 @@
+# OMNI-PHARM continuous integration - the 'quick' half of scripts/ci.ps1 (lint, rule files, fast tests) plus the
+# frontend build. The built data and models (data/processed, artifacts: several GB, some licensed for research only)
+# are not in git, so the slow tests, clinical audits and the behaviour snapshot run locally: scripts\ci.ps1 full
+# (docs/CONTRIBUTING.md). The fast tests are checked to pass without any local data.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (CPU torch here; the local install uses the CUDA build)
+        run: |
+          python -m pip install --upgrade pip
+          pip install "torch==2.13.0" --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check src scripts tests
+      - name: Rule files (sources, levels, unhandled review requests)
+        run: pytest tests/test_rules.py -q -p no:cacheprovider
+      - name: Fast tests (no data or models needed)
+        env:
+          OMNIPHARM_ONLINE_LOOKUP: "0"
+        run: pytest tests -q -p no:cacheprovider -m "not slow"
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend

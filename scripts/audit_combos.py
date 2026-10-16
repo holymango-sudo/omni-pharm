@@ -276,7 +276,7 @@ def message_problems(r: dict) -> list[str]:
     return out
 
 
-def patients(eng: Engine) -> None:
+def patients(eng: Engine) -> int:
     ok = 0
     for desc, names, pt, expected in PATIENT_CASES:
         prods = [{"input": n, "ingredients": eng.resolve(n)} for n in names]
@@ -287,13 +287,14 @@ def patients(eng: Engine) -> None:
         print(f"{mark} {desc:28s} {' + '.join(names):32s} 기대 {'/'.join(sorted(expected)):12s} 결과 {v}"
               + ("" if v in expected else f"\n     {[x['text'][:110] for x in r['summary']['reasons'][:3]]}"))
     print(f"PATIENT  {ok}/{len(PATIENT_CASES)} 정답")
+    return 0 if ok == len(PATIENT_CASES) else 1
 
 
-def main() -> None:
+def main() -> int:
+    """Exit code 0 = every case right and no wording problem (scripts/ci.ps1 full)."""
     holdout = "--holdout" in sys.argv
     if "--patients" in sys.argv:
-        patients(Engine())
-        return
+        return patients(Engine())
     cases = HOLDOUT if holdout else FOOD_CASES if "--foods" in sys.argv else CASES
     eng = Engine()
     rows = []
@@ -320,7 +321,8 @@ def main() -> None:
     for _, r in df[~df["ok"] | (df["problems"] != "")].iterrows():
         print(f"\n✗ [{r['category']}] {r['drugs']}: 기대 {r['expected']} / 결과 {r['verdict']}"
               + (f"\n   문제: {r['problems']}" if r["problems"] else "") + f"\n   {r['reasons'][:400]}")
+    return 0 if df["ok"].all() and (df["problems"] == "").all() else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

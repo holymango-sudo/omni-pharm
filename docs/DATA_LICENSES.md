@@ -25,6 +25,8 @@
 | BDPM (ANSM, 프랑스) | 프랑스 제품 | Licence Ouverte / Open Licence (Etalab) |
 | 후생노동성 약가기준 수재품목 리스트 | 일본 제품 | 일본 정부 웹사이트 이용규약(출처 표시) |
 | ⚠ KEGG DRUG (교토대) | 일본어 성분명 → 영어 | **학술 이용 무료, 상업적 이용은 별도 라이선스(Pathway Solutions) 필요** |
+| AGS Beers Criteria 2023, Table 5 (J Am Geriatr Soc 2023;71:2052) | 외부 검증 시험 자료만(`tests/fixtures/external/beers_ddi.json`: 약 조합 24개와 분류명). 판정 규칙에는 쓰지 않음 | 논문 저작물(미국노인의학회). 표 문구를 옮기지 않고 약 조합(사실)만 적고 출처를 표시. 배포·출판 시 인용 필수 |
+| 임상 규칙의 출처 문서(`src/omnipharm/rules/*.json`의 source: 각국 허가사항, FDA·EMA 안전성 서한, 논문) | 규칙마다 근거 표시 | 문서를 옮기지 않고 출처만 적음. 규칙 문장은 개발 측이 쓴 요약 |
 
 ## 소프트웨어
 | 구성요소 | 라이선스 |

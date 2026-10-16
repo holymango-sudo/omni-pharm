@@ -88,7 +88,8 @@ def problems(r: dict) -> list[str]:
     return out
 
 
-def main(n: int = 1000, seed: int = 11) -> None:
+def main(n: int = 1000, seed: int = 11) -> int:
+    """Exit code 0 = no crash and no problem found (scripts/ci.ps1 full)."""
     rng = random.Random(seed)
     eng = Engine()
     pool = rs.POOL + EXTRA
@@ -121,7 +122,8 @@ def main(n: int = 1000, seed: int = 11) -> None:
     print(f"{sum(cnt.values())} analyses in {time.time() - t0:.0f}s | verdicts {dict(cnt)} | crashes {crashes}")
     if len(df):
         print(df["problem"].str.slice(0, 60).value_counts().head(15).to_string())
+    return 1 if len(df) else 0
 
 
 if __name__ == "__main__":
-    main(int(sys.argv[1]) if len(sys.argv) > 1 else 1000)
+    raise SystemExit(main(int(sys.argv[1]) if len(sys.argv) > 1 else 1000))

@@ -28,7 +28,9 @@ try {
         if (-not $Message) { $Message = "Snapshot " + (Get-Date -Format "yyyy-MM-dd HH:mm") }
         $msgFile = Join-Path $env:TEMP "omnipharm_commit_$stamp.txt"
         [System.IO.File]::WriteAllText($msgFile, $Message + "`n", (New-Object System.Text.UTF8Encoding($false)))
+        $env:OMNIPHARM_SNAPSHOT = "1"  # the pre-commit checks (install_hooks.ps1) never block a backup
         & $git commit -q -F $msgFile
+        Remove-Item Env:OMNIPHARM_SNAPSHOT -ErrorAction SilentlyContinue
         Remove-Item $msgFile -ErrorAction SilentlyContinue
         Say ("Committed " + @($pending).Count + " changed file(s): " + $Message) "Cyan"
     } else {
