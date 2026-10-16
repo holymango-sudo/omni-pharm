@@ -11,6 +11,7 @@ import collections
 import importlib.util
 import os
 import random
+import re
 import sys
 import time
 import traceback
@@ -37,12 +38,39 @@ EXTRA = ["콜대원코프에스시럽", "판콜에이내복액", "게보린정",
          "Lipitor", "Xarelto", "Keytruda", "ozempic", "Tylenol", "Advil", "nyquil"]
 
 
+# wording that must never reach a person (v2.18 hidden-error checks)
+_STOP = re.compile(r"(복용을|약을)\s*(멈추|중단)|중단하세요|끊으세요|그만\s*드세요")  # never 'stop your medicine'
+_INTERNAL = re.compile(r"\b(lab|ing|food|bio|smiles|kr):[a-z0-9]", re.I)  # internal ingredient keys
+_BROKEN = re.compile(r"\bnan\b|\bNone\b|\{[a-z_]+\}|을\(를\)을|\(\)")  # NaN, None, unformatted templates
+
+
 def problems(r: dict) -> list[str]:
     s, out = r["summary"], list(ac.message_problems(r))
     if s["verdict"] == "위험" and not any(x["sev"] == "high" for x in s["reasons"]):
         out.append("위험 판정인데 '높음' 이유 없음")
     if s["verdict"] == "주의" and not any(x["sev"] in ("high", "mid") for x in s["reasons"]):
         out.append("주의 판정인데 이유 없음")
+    texts = [s["headline"], *(x["text"] for x in s["reasons"]), *s["advice"]]
+    for t in texts:
+        if _STOP.search(t) and "함께 쓰지 마세요" not in t:
+            out.append(f"처방약을 멈추라는 안내: {t[:50]}")
+        if _INTERNAL.search(t):
+            out.append(f"내부 성분 키 노출: {t[:50]}")
+        if _BROKEN.search(t):
+            out.append(f"깨진 문구(NaN·None·템플릿): {t[:50]}")
+        if len(t) > 700:
+            out.append("지나치게 긴 문장")
+    if len({x["text"] for x in s["reasons"]}) < len(s["reasons"]):
+        out.append("같은 이유가 두 번")
+    if s["verdict"] != "주의" and s["headline"].startswith(("함께 먹어도", "가끔 먹는", "마신다면", "출혈 위험이")):
+        out.append("판정과 맞지 않는 제목")
+    if s["verdict"] == "위험" and all(a.startswith("새로운 증상이 생기면") for a in s["advice"]):
+        out.append("위험 판정인데 구체적 할 일 없음")
+    # an AI line about the illness a medicine of the regimen is given for (warfarin -> stroke)
+    ind = {e["ko"] for e in r["events"] if e.get("indication_any")}
+    for x in s["reasons"]:
+        if "AI" in x["text"] and any(f"'{k}'" in x["text"] for k in ind):
+            out.append(f"치료 중인 질환을 AI 위험으로 표시: {x['text'][:50]}")
     doc = any(p["level"] != "낮음" for p in r["pairs"])
     if doc and any("이것만으로 상호작용이라고 보지는" in x["text"] for x in s["reasons"]):
         out.append("문서화된 상호작용과 모순되는 AI 문구")

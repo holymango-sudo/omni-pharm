@@ -15,8 +15,11 @@ function Verdict({ res, expert }) {
       <div className="siren-light" />
       <div className="siren-body">
         <div className="siren-k">종합 판정</div>
-        <div className="siren-level">{s.verdict}</div>
+        <div className="siren-level">{s.verdict}
+          {s.action && <span className={`action-tag act-${s.action.level === "알아두기" ? "know" : lv}`}
+            title={s.action.text}>{s.action.level}</span>}</div>
         <div className="siren-head">{s.headline}</div>
+        {s.action && s.verdict !== "비교적 안전" && <div className="siren-action">{s.action.text}</div>}
         {expert && h && (
           <div className="siren-sub mono">{h.title}: 환자 맞춤 {pct(h.prob)} · 일반 보고 대비 ×{fx(h.lift)} · 표준 환자 대비 ×{fx(h.patient_factor)}</div>
         )}

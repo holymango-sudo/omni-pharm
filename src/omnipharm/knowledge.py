@@ -493,8 +493,14 @@ SEROTONERGIC = frozenset({"sertraline", "fluoxetine", "paroxetine", "citalopram"
 
 PGP_INHIBITORS = frozenset({"ketoconazole", "itraconazole", "dronedarone", "amiodarone", "verapamil", "quinidine",
                             "clarithromycin", "erythromycin", "cyclosporine", "ritonavir", "lopinavir", "tacrolimus",
-                            "ticagrelor", "carvedilol", "lapatinib", "glecaprevir", "velpatasvir"})
+                            "ticagrelor", "carvedilol", "lapatinib", "glecaprevir", "velpatasvir", "cobicistat",
+                            "propafenone", "ranolazine"})
 PGP_INDUCERS = frozenset({"rifampin", "carbamazepine", "phenytoin", "st john's wort", "hypericum perforatum"})
+BENZODIAZEPINES = frozenset({
+    "alprazolam", "bromazepam", "brotizolam", "chlordiazepoxide", "clobazam", "clonazepam", "clorazepate",
+    "clotiazepam", "cloxazolam", "diazepam", "estazolam", "ethyl loflazepate", "etizolam", "fludiazepam",
+    "flunitrazepam", "flurazepam", "lorazepam", "lormetazepam", "mexazolam", "midazolam", "nitrazepam", "oxazepam",
+    "prazepam", "quazepam", "remimazolam", "temazepam", "tofisopam", "triazolam"})
 
 
 def _class_terms() -> dict[str, tuple[tuple[str, ...], frozenset[str]]]:
@@ -511,12 +517,16 @@ def _class_terms() -> dict[str, tuple[tuple[str, ...], frozenset[str]]]:
                              c3["strong_ind"] | frozenset(sjw)),
         "cyp2d6_strong_inh": (("strong CYP2D6 inhibitors", "potent CYP2D6 inhibitors"), CYP_FDA["CYP2D6"]["strong_inh"]),
         "cyp2c19_strong_inh": (("strong CYP2C19 inhibitors",), CYP_FDA["CYP2C19"]["strong_inh"]),
-        "qt": (("prolong the QT interval", "QT prolonging", "QT-prolonging", "prolong QT", "QTc prolonging"),
-               DRUG_GROUPS["qt_prolonging"]),
+        # (a sentence must use it for a CLASS of drugs - engine.QT_CLASS_USE: 'Pimozide and thioridazine prolong the
+        # QT interval' is about those two drugs)
+        "qt": (("prolong the QT interval", "QT prolonging", "QT-prolonging", "prolong QT", "QTc prolonging",
+                "prolong the QTc interval"), DRUG_GROUPS["qt_prolonging"]),
         "maoi": (("MAO inhibitors", "MAOIs", "MAOI", "monoamine oxidase inhibitors"), MAOI),
         "serotonergic": (("serotonergic drugs", "serotonergic agents"), SEROTONERGIC),
-        "cns_depressant": (("CNS depressants", "central nervous system depressants", "benzodiazepines"),
+        "cns_depressant": (("CNS depressants", "central nervous system depressants"),
                            DRUG_CLASSES["sedative"][1] | DRUG_CLASSES["opioid"][1] | DRUG_GROUPS["gabapentinoid"]),
+        # (a separate class: 'avoid benzodiazepines' is not about methadone)
+        "benzodiazepine": (("benzodiazepines", "benzodiazepine"), BENZODIAZEPINES),
         "anticoagulant": (("anticoagulants", "antiplatelet agents", "antiplatelet drugs"),
                           DRUG_CLASSES["anticoagulant"][1]),
         "nsaid": (("NSAIDs", "nonsteroidal anti-inflammatory drugs"), DRUG_CLASSES["nsaid"][1]),
@@ -536,6 +546,28 @@ def _class_terms() -> dict[str, tuple[tuple[str, ...], frozenset[str]]]:
 
 
 PRODRUGS_ACTIVATED_BY = {"clopidogrel": "CYP2C19", "codeine": "CYP2D6", "tramadol": "CYP2D6", "tamoxifen": "CYP2D6"}
+# Combinations prescribed ON PURPOSE that no single marketed product in our data contains (those are found from the
+# product data: engine.combo_pairs). The interaction is the point of the combination (boosting) or the regimen is the
+# approved use; their labels' wording about each other is not a warning against using them together.
+_BOOSTED = ("atazanavir", "darunavir", "lopinavir", "saquinavir", "fosamprenavir", "tipranavir", "elvitegravir",
+            "nirmatrelvir")
+INTENDED_COMBINATIONS: list[tuple[str, str, str]] = [
+    *((b, d, "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)")
+      for b in ("ritonavir", "cobicistat") for d in _BOOSTED),
+    ("stiripentol", "clobazam", "스티리펜톨은 클로바잠을 복용 중인 드라베증후군 환자에게 허가된 약(Diacomit 허가사항)"),
+    ("dapsone", "rifampin", "한센병 다제요법(WHO MDT)의 표준 병용"),
+    ("isoniazid", "rifampin", "결핵 표준 치료의 병용(복합제 Rifamate 등)"),
+    ("pyrazinamide", "rifampin", "결핵 표준 치료의 병용"),
+    ("ethambutol", "rifampin", "결핵 표준 치료의 병용"),
+]
+# sensitive substrates whose metabolite by that enzyme is equally active: an inhibitor shifts parent <-> metabolite
+# but not the total active moiety (venlafaxine label: CYP2D6 inhibitors need no dose adjustment)
+EQUIACTIVE_METABOLITE = {"venlafaxine": "CYP2D6"}
+# FDA 'sensitive index substrates' are chosen for pharmacokinetic STUDIES, not for clinical danger: proton pump
+# inhibitors have a wide therapeutic margin (labels: no dose adjustment with CYP2C19 inhibitors) - a higher level is
+# not a dangerous one
+WIDE_MARGIN_SUBSTRATES = frozenset({"omeprazole", "esomeprazole", "lansoprazole", "dexlansoprazole", "pantoprazole",
+                                    "rabeprazole"})
 
 
 def drug_groups(name: str) -> set[str]:
@@ -1214,10 +1246,14 @@ def food_key(text: str) -> str | None:
 CLASS_TERMS = _class_terms()  # built last: needs the DRUG_GROUPS additions above
 
 
-def class_phrases(name: str) -> list[str]:
-    """Label phrases for every drug class this ingredient belongs to."""
+def class_phrases(name: str, label_of: str | None = None) -> list[str]:
+    """Label phrases for every drug class this ingredient belongs to; with label_of, only the classes the label's own
+    drug ALSO belongs to (there the sentence must say 'other ...': 'contraindicated with other MAOIs' in a safinamide
+    label is about another MAOI, 'Benzodiazepines are contraindicated in glaucoma' in a midazolam label is not)."""
     n = name.removeprefix("ing:").removeprefix("bio:").removeprefix("lab:")
-    return [p for phrases, members in CLASS_TERMS.values() if n in members for p in phrases]
+    own = (label_of or "").removeprefix("ing:").removeprefix("bio:").removeprefix("lab:")
+    return [p for phrases, members in CLASS_TERMS.values() if n in members and (not own or own in members)
+            for p in phrases]
 
 
 def bio_key(text: str) -> str | None:

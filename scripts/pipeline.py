@@ -17,6 +17,7 @@
   chembl-dump   ChEMBL 37 full dump: drug indications + pharmacology for every molecule (after download_data.py)
   supplements   Korean health functional foods (건강기능식품정보, API key)
   food-nutrients  Korean food nutrient DB: caffeine / vitamin K / potassium / calcium per food (API key)
+  calibration   patient model calibration (Brier, reliability) + subgroup AUROC: where the AI helps (GPU)
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ def main() -> None:
                                       "chembl", "chembl-drugs", "labelsearch", "pk",
                                       "labels", "fdalabels",
                                       "train-pair", "train-patient", "mol3d", "stats", "kr-labels", "offsides",
-                                      "chembl-dump", "supplements", "food-nutrients", "all"])
+                                      "chembl-dump", "supplements", "food-nutrients", "calibration", "all"])
     ap.add_argument("--faers-start", default="2004Q1")  # legacy AERS 2004Q1-2012Q3 + FAERS
     ap.add_argument("--epochs", type=int, default=None)
     ap.add_argument("--max-drugs", type=int, default=None)
@@ -125,6 +126,9 @@ def main() -> None:
         elif s == "food-nutrients":
             from omnipharm.pipeline import food_nutrients
             food_nutrients.build()
+        elif s == "calibration":
+            from omnipharm.pipeline import calibration
+            calibration.build()
     log.info(f"done in {(time.time() - t0) / 60:.1f} min")
 
 

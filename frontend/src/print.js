@@ -25,7 +25,8 @@ function patientHandout(res, patient) {
     .foot{margin-top:28px;font-size:13px;color:#666}
   </style></head><body>
   <h1>복용하시는 약의 안전 안내</h1><div>${new Date().toLocaleDateString("ko-KR")} · ${patient.age}세 ${patient.sex === "F" ? "여성" : "남성"}</div>
-  <div class="v">${esc(s.verdict)}</div><div><b>${esc(s.headline)}</b></div>
+  <div class="v">${esc(s.verdict)}${s.action ? ` · ${esc(s.action.level)}` : ""}</div><div><b>${esc(s.headline)}</b></div>
+  ${s.action && s.verdict !== "비교적 안전" ? `<div>${esc(s.action.text)}</div>` : ""}
   <h2>함께 확인한 약</h2><ul>${drugs}</ul>
   ${warn.length ? `<h2>${s.verdict === "위험" ? "왜 위험한가요?" : "확인할 점"}</h2><ul>${warn.map((r) => `<li>${esc(r.text)}</li>`).join("")}</ul>`
     : `<h2>확인 결과</h2><p>함께 드셔서 문제가 되는 조합은 확인되지 않았습니다.</p>`}

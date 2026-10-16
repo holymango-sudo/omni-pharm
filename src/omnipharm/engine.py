@@ -42,17 +42,21 @@ from omnipharm.knowledge import (
     DRUG_CLASSES,
     DRUG_DISEASE_RULES,
     DRUG_SYNONYMS,
+    EQUIACTIVE_METABOLITE,
     EVENT_INDICATION,
     FOODS,
+    INTENDED_COMBINATIONS,
     KR_BRANDS,
     KR_INGREDIENTS,
     KR_LABEL_KINDS,
     ORGANS,
     PAIR_NOTES,
     PAIR_RULES,
+    PGP_INHIBITORS,
     PRODRUGS_ACTIVATED_BY,
     RULE_DETAIL,
     SERIOUS_CONDITIONS,
+    WIDE_MARGIN_SUBSTRATES,
     bio_key,
     class_phrases,
     drug_class,
@@ -112,6 +116,16 @@ SEVERE_LABEL = re.compile(
 BOXED_COMBINATION = re.compile(r"concomitant use|co-?administration|in combination with|used together", re.I)
 
 
+# action level shown with the verdict (summary["action"]): '주의' alone said too little
+ACTIONS = {
+    "위험": {"level": "즉시 상담", "text": "함께 쓰기 전에(이미 쓰고 있다면 바로) 의사·약사와 상의하세요."},
+    "check": {"level": "확인 필요", "text": "문서로 확인된 주의점입니다 — 의사·약사에게 함께 쓰는 약을 알리고 아래 할 일을 지키세요."},
+    "know": {"level": "알아두기", "text": "근거가 약한 신호(시험관 자료·통계)입니다 — 따로 조치할 필요는 없고, 이상 증상이 생기면 "
+                                     "상담하세요."},
+    "safe": {"level": "조치 없음", "text": "정해진 용법·용량을 지키세요."},
+}
+
+
 def added_risk(e: dict) -> float:
     """How much of an event's risk is *added* by combining the drugs or by this patient's condition,
     as opposed to the inherent risk of a drug taken alone by an average patient."""
@@ -153,8 +167,11 @@ def _about(e: dict, lead: int = 0) -> str:
     """The sentences of a label excerpt that name the other drug (an excerpt may also cover unrelated drugs);
     lead = also include that many sentences before each one (table rows: 'Clinical Impact: ...  Examples: X')."""
     terms = [t.lower() for t in (e.get("terms") or BIOLOGICS.get(e["mentions"], {}).get("terms", [e["mentions"]]))]
-    # whole name only, and not part of another product's name ("sacubitril/valsartan" is not valsartan)
-    pats = [re.compile(r"(?<![\w/])" + re.escape(t) + r"(?![\w/])", re.I) for t in terms]
+    # whole name only, and not part of another product's name ("sacubitril/valsartan" is not valsartan) nor this
+    # drug's own salt ("rosuvastatin calcium" is not calcium)
+    own = re.escape(e.get("label_of", "").lower())
+    pats = [re.compile((rf"(?<!{own} )" if own else "") + r"(?<![\w/])" + re.escape(t) + r"(?![\w/])", re.I)
+            for t in terms]
     sents = re.split(r"(?<=[.;!?])\s+|\s+[●•]\s*|\s+\(\s*\d", e["excerpt"])
     keep = set()
     for i, s in enumerate(sents):
@@ -182,7 +199,7 @@ NO_INTERACTION = re.compile(
     r"(did|does|do) not result in (any |a )?clinically (significant|relevant|meaningful)|"
     r"(does|do|did) not (alter|affect|change|influence) the (exposure|pharmacokinetics|plasma)|"
     r"no (clinically )?(meaningful|relevant|significant|important) (drug-drug |drug )?(pharmacokinetic |pk )?"
-    r"(drug )?interactions?", re.I)
+    r"(drug )?interactions?|(dose|dosage) adjustments? (is|are) not (recommended|needed|necessary|required)", re.I)
 # an interaction-section mention must say SOMETHING about an effect (table headings / bare lists do not)
 EFFECT_WORDS = re.compile(
     r"increas|decreas|reduc|elevat|lower|rais|risk|monitor|avoid|caution|concomitant|co-?administ|potentiat|"
@@ -192,7 +209,8 @@ AMOUNT_ONLY = re.compile(r"large (quantities|amounts|volumes)|excessive( \w+){0,
                          r"binge drinking|heavy (drinking|alcohol use)|risk factors (for [\w\s-]{0,60})?include|"
                          r"more than [\d.,]+ ?(l|liters?|litres?|quarts?|cups?|glasses|drinks)\b|"
                          r"(drastic|sudden|major) changes|consistent (intake|amount|diet)", re.I)
-XREF = re.compile(r"for (more |additional |complete |further )?information (about|on|regarding|concerning)", re.I)
+XREF = re.compile(r"for (more |additional |complete |further |specific )?information (about|on|regarding|concerning)",
+                  re.I)
 STRONG_WORDS = re.compile(r"contraindicat|\bavoid|do not|must not|should not|life[- ]threatening|fatal", re.I)
 CO_THERAPY = re.compile(
     r"indicated (for use )?in combination with|combination therapy with|triple therapy|dual therapy|"
@@ -208,10 +226,130 @@ CONTRA_VERB = re.compile(
 INTERACTION_SECTIONS = ("상호작용", "병용금기/금기", "박스 경고", "일반약: 복용 전 상담")
 
 
+def _bare(key: str) -> str:
+    return key.removeprefix("ing:").removeprefix("bio:").removeprefix("lab:").removeprefix("food:")
+
+
+def _same_moiety(a: str, b: str) -> bool:
+    """One name contains the other as whole words (estradiol / ethinyl estradiol, testosterone / testosterone
+    undecanoate): each label's mentions of that name are about its own active moiety."""
+    return a != b and bool(re.search(rf"(?<![\w-]){re.escape(a)}(?![\w-])", b) or
+                           re.search(rf"(?<![\w-]){re.escape(b)}(?![\w-])", a))
+
+
+# '[see Contraindications (4)]', 'See CONTRAINDICATIONS, WARNINGS': a cross-reference is not the label's wording
+_SEC = r"(contraindications|warnings( and precautions)?|precautions|boxed warning|dosage and administration|" \
+       r"drug interactions)"
+_XREF_MARK = re.compile(r"\[\s*see [^\]]{0,120}\]|\(\s*see [^)]{0,120}\)|\bsee (the )?" + _SEC
+                        + r"(\s*(,|and)\s*" + _SEC + r")*", re.I)
+QT_CLASS_USE = re.compile(r"(drugs?|agents?|medications?|medicines?|products?|substances?|those)\b[^.;]{0,60}?"
+                          r"\b(that|which|known to|shown to)\s+([\w-]+\s+){0,2}prolong|qtc?[- ]prolonging", re.I)
+# a boxed warning about spinal / epidural hematoma during neuraxial anaesthesia (anticoagulants): conditional
+BOXED_CONDITIONAL = re.compile(r"neuraxial|epidural|spinal (puncture|anesthesia|anaesthesia|hematoma)", re.I)
+
+
+def _lead_in(e: dict, n: int = 450) -> str:
+    """The section text right before the first mention of the other drug (the list's lead-in)."""
+    terms = e.get("terms") or [e["mentions"]]
+    m = min((m.start() for t in terms if (m := re.search(r"(?<![\w/])" + re.escape(t) + r"(?![\w/])", e["excerpt"],
+                                                         re.I))), default=None)
+    return e["excerpt"][max(0, m - n):m] if m is not None else ""
+
+
+def _is_contra(e: dict) -> bool:
+    """A contraindication / boxed-warning statement ABOUT taking the two together."""
+    about = _about(e)
+    if AMOUNT_ONLY.search(about):
+        return False  # 'in the presence of LARGE AMOUNTS of CNS depressants'
+    if e["section"] == "병용금기/금기":  # (a list item: the lead-in 'X is contraindicated in patients: • ...' counts)
+        if ADDITIVE_HEDGE.search(about):
+            return False
+        return bool(CONTRA_STRICT.search(_about(e, lead=1)) or CONTRA_STRICT.search(_lead_in(e))
+                    or CONTRA_ITEM.search(about))
+    return (e["section"] == "박스 경고" and bool(BOXED_COMBINATION.search(about))
+            and not BOXED_CONDITIONAL.search(e["excerpt"]))
+
+
+def _is_strong(e: dict) -> bool:
+    """Strong wording (contraindicated / avoid / reduce the dose ...) in the sentences naming the other drug - near
+    the name (a table without full stops runs many rows into one 'sentence'), and not a sentence about the label's
+    own drug ('... Corticosteroids Theophylline Epinephrine should not be used to counteract circulatory collapse')."""
+    if e["section"] not in ("상호작용", "병용금기/금기", "박스 경고"):
+        return False
+    if e["section"] == "박스 경고" and BOXED_CONDITIONAL.search(e["excerpt"]):
+        return False
+    about = _XREF_MARK.sub(" ", _about(e))
+    if AMOUNT_ONLY.search(about):
+        return False
+    terms = e.get("terms") or [e["mentions"]]
+    pat = "|".join(r"(?<![\w/])" + re.escape(t) + r"(?![\w/])" for t in terms)
+    pos = [m.start() for m in re.finditer(pat, about, re.I)]
+    own = re.escape(e.get("label_of", "").lower())
+    for m in SEVERE_LABEL.finditer(about):
+        if pos and min(abs(m.start() - p) for p in pos) > 350:
+            continue  # far from the name in a run-on table
+        if re.search(pat, about[m.end():m.end() + 80], re.I):
+            return True  # 'should avoid ergotamine', 'contraindicated with cyclosporine'
+        before = about[max(0, m.start() - 40):m.start()].lower()
+        # the label's own drug as the SUBJECT right before it ('... Theophylline Epinephrine should not be used to
+        # counteract ...'), not as an object ('use of cyclosporine with pitavastatin is contraindicated'); a table
+        # row's 'Intervention: Fosaprepitant is contraindicated' is about that row's drug
+        if (own and not m.group(0).lower().startswith("contraindicat") and "intervention" not in before
+                and re.search(rf"(?<!with )(?<!of )(?<!and ){own}[\w\s(),-]{{0,20}}$", before)
+                and not re.search(pat, before, re.I)):
+            continue
+        return True
+    return False
+
+
+# "When using fluoxetine and olanzapine in combination, also refer to the Contraindications section of ... Symbyax":
+# a pointer to the combination's own label (the combination is intended), not a contraindication of the pair
+COMBINATION_USE = re.compile(
+    r"when (using|used|administered|given|taking|coadministered) [^.;]{0,80}?\bin combination\b|"
+    r"in combination,? (also )?refer to|also refer to the [^.;]{0,60}(contraindications section|package inserts?|"
+    r"prescribing information)|"
+    # a boxed warning describing the approved regimen: 'patients receiving ONIVYDE in combination with fluorouracil'
+    r"patients (receiving|treated with) [\w-]+ in combination with|"
+    # 'Due to the need for co-administration of darunavir with ritonavir, refer to ritonavir prescribing information'
+    r"need for co-?administration|must be co-?administered with|"
+    # a medication-error warning about NAMES ('avoid cisplatin overdose due to confusion with carboplatin')
+    r"confusion (with|between)|mix-?ups?|look-?alike|sound-?alike", re.I)
+# a contraindication-section sentence must itself forbid something (old labels file 'Synergistic effects: ... may
+# produce additive CNS depressant effects' under contraindications)
+CONTRA_STRICT = re.compile(r"contraindicat|do not|must not|should not|not (be )?(used|given|administered|"
+                           r"co-?administered|taken|combined)", re.I)
+# a contraindication sentence that names the other drug only as an ALLERGY ('hypersensitivity to aspirin or other
+# NSAIDs', 'history of sensitivity to benzodiazepines') - not about taking the two together
+SENSITIVITY = re.compile(r"sensitivity to|allerg|hypersensitiv|anaphyla|asthma|urticaria|bronchospasm", re.I)
+TAKING_TOGETHER = re.compile(r"concomitant|co-?administ|in patients (who are )?(taking|receiving|treated with)|"
+                             r"while (taking|receiving)|currently (taking|receiving)|patients (taking|receiving)|"
+                             r"\b(are|is) (now |currently )?(taking|receiving|using)\b", re.I)
+# an 'additive effect' remark filed under contraindications by an old label ('The concomitant use of alcohol or other
+# CNS depressants may produce additive CNS depressant effects') - a caution, not a contraindication
+ADDITIVE_HEDGE = re.compile(r"may (produce|potentiate|enhance|result in) (an )?additive|additive (cns )?depressant "
+                            r"effects? (may|can)", re.I)
+# a contraindication LIST item: '• Concomitant use of strong CYP3A inhibitors, such as ...' (the list's lead-in
+# 'X is contraindicated in patients with:' may be far above)
+CONTRA_ITEM = re.compile(r"\b(concomitant|concurrent)\s+(use|administration|therapy|treatment)\b|\bco-?administration "
+                         r"(of|with)\b|\b(taking|receiving)\b", re.I)
+
+
+def _contra_names_use(e: dict) -> bool:
+    """True when a contraindication-section sentence naming the other drug is about USING it with this one."""
+    about = _about(e)
+    if SENSITIVITY.search(about) and not TAKING_TOGETHER.search(about):
+        return False  # 'Known hypersensitivity to meloxicam ... reactions after taking aspirin or other NSAIDs'
+    terms = e.get("terms") or [e["mentions"]]
+    # the other drug's CLASS with its own contraindication: 'Benzodiazepines are contraindicated in patients with
+    # acute narrow-angle glaucoma', 'Topical corticosteroids are contraindicated in ... hypersensitivity'
+    return not any(re.search(r"(?<!\w)(topical |systemic |other |all )?" + re.escape(t) + r"\s+(are|is)\s+"
+                             r"contraindicated\s+(in|for)\b", about, re.I) for t in terms)
+
+
 def _context(e: dict) -> str | None:
     """'no_interaction' / 'co_therapy' when the sentences naming the other drug say so."""
     about = _about(e)
-    if XREF.search(about):
+    if XREF.search(about) or COMBINATION_USE.search(about):
         return "co_therapy"  # "For information about contraindications of amoxicillin ... refer to its label"
     terms = [t for t in (e.get("terms") or BIOLOGICS.get(e["mentions"], {}).get("terms", [e["mentions"]]))]
     if any(re.search(r"(combination|triple|dual) therapy with [^.:;]{0,80}?\b" + re.escape(t) + r"\b", about, re.I)
@@ -255,10 +393,35 @@ def _own(lev: list[dict]) -> list[dict]:
         if e["section"] == "병용금기/금기" and not (CONTRA_VERB.search(about)
                                                      or EFFECT_WORDS.search(_about(e, lead=1))):
             continue  # "ketoacidosis should be treated with insulin" in a contraindication section
+        if e["section"] == "병용금기/금기" and not _contra_names_use(e):
+            continue  # an allergy / the other class's own contraindication, not taking the two together
+        # 'combined P-gp and moderate CYP3A inhibitors (e.g., erythromycin)': only for a drug that inhibits both
+        # (strong CYP3A inhibitors - ketoconazole, ritonavir, posaconazole - inhibit P-gp as well)
+        if (e.get("via_class") and re.search(r"combined p-?gp and moderate", about, re.I)
+                and _bare(e["mentions"]) not in PGP_INHIBITORS):
+            continue
+        # a class the label's own drug belongs to: only with 'other' ('MAOIs, including other MAO-B inhibitors');
+        # QT labels name the class of the drug itself without 'other' - their own check is below
+        if (e.get("own_class") and "qt" not in e["via_class"].lower()
+                and not re.search(r"\b(other|any)\b", about, re.I)):
+            continue
+        # 'QT' phrases name a CLASS only as 'drugs ... that prolong the QT interval' / 'QT-prolonging drugs':
+        # 'Pimozide and thioridazine prolong the QT interval. Fluoxetine can also prolong ...' is about those drugs
+        if e.get("via_class") and "qt" in e["via_class"].lower() and not QT_CLASS_USE.search(about):
+            continue
         if e["section"] == "상호작용" and not EFFECT_WORDS.search(_about(e, lead=2)):
             continue  # a table heading / bare list ("Oral Antidiabetic Agents Metformin") with no effect stated
         out.append(e)
     return out
+
+
+DILUENTS = frozenset({"sodium chloride", "dextrose", "glucose", "water", "sterile water", "lactated ringer's"})
+
+
+def _diluent_pair(a: Ingredient, b: Ingredient) -> bool:
+    """IV saline / dextrose (the vehicle of an injection: 'Midazolam in 0.9% Sodium Chloride') with another drug -
+    except lithium, whose clearance does depend on sodium."""
+    return (a.bare in DILUENTS or b.bare in DILUENTS) and "lithium" not in (a.bare, b.bare)
 
 
 def _minor(g: Ingredient) -> bool:
@@ -379,6 +542,13 @@ class Engine:
         prod["otc"] = prod["kind"].str.contains("일반|OTC", regex=True)
         prod["key"] = prod["name"].map(_key)
         self.products = prod
+        # ingredient pairs combined in one marketed product (Symbyax olanzapine + fluoxetine, Prezcobix darunavir +
+        # cobicistat, bupivacaine + epinephrine, midazolam in sodium chloride): an approved combination, so the
+        # labels' wording about them is not an interaction warning - also when the two are entered separately
+        self.combo_pairs: set[frozenset[str]] = {
+            frozenset(pr) for ings in prod["ingredients"]
+            if 2 <= len(b := {_bare(k) for k in ings}) <= 6 for pr in itertools.combinations(sorted(b), 2)}
+        self.combo_pairs |= {frozenset((a, b)) for a, b, _ in INTENDED_COMBINATIONS}  # boosters, regimens
         self.prod_by_key: dict[str, list[int]] = {}
         for i, k in enumerate(prod["key"]):
             self.prod_by_key.setdefault(k, []).append(i)
@@ -933,6 +1103,8 @@ class Engine:
         for src, other in ((a, b), (b, a)):
             if src.key.startswith("smiles:") or other.key.startswith("smiles:") or src.food:
                 continue  # a typed structure has no name to find; a food has no drug label of its own
+            if _same_moiety(src.bare, other.bare):
+                continue  # 'Testosterone can cause virilization' in a testosterone undecanoate label is about itself
             terms = (FOODS.get(other.bare, {}).get("terms") if other.food else
                      BIOLOGICS.get(other.bare, {}).get("terms", [other.bare]))
             rowids = self._hits(terms)
@@ -965,6 +1137,8 @@ class Engine:
                     if len(seen_lid) > 6:
                         break
                     excerpt, local = self._window(r, terms)
+                    if not any(t.lower() in excerpt.lower() for t in terms):
+                        continue  # matched only through a word stem ('estrogens' ~ 'estrogen-containing'): no excerpt
                     actual = sec
                     if sec in contra_codes and ALLERGY_CONTEXT.search(local):
                         actual = "경고·주의"  # a contraindication about allergy to the other drug
@@ -982,6 +1156,7 @@ class Engine:
                 out += [e for _, e in best.values()]
             # the label may name the other drug's CLASS instead ("avoid strong CYP3A4 inducers", "MAOIs")
             phrases = [] if other.food else class_phrases(other.key)
+            own_class = set(class_phrases(other.key, label_of=src.key)) if phrases else set()
             if phrases:
                 found = {e["source_section"] for e in out if e["label_of"] == src.bare}
                 rows = self._hits(phrases)
@@ -998,6 +1173,7 @@ class Engine:
                     ex, _ = self._window(items[0][2], phrases)
                     via = next((p for p in phrases if p.lower() in ex.lower()), phrases[0])
                     out.append({"label_of": src.bare, "mentions": other.bare, "via_class": via, "terms": list(phrases),
+                                "own_class": via in own_class,
                                 "section": "병용금기/금기" if sec in contra_codes else sec,
                                 "excerpt": ex, "n_labels": len({i[1] for i in items}),
                                 "source_section": sec, "combo": False})
@@ -1030,11 +1206,13 @@ class Engine:
                 if not (sens or mod):
                     continue
                 prodrug = PRODRUGS_ACTIVATED_BY.get(vn) == enz
+                # venlafaxine -> O-desmethylvenlafaxine is as active: the total active moiety barely changes
+                equiactive = EQUIACTIVE_METABOLITE.get(vn) == enz or vn in WIDE_MARGIN_SUBSTRATES
                 if wn in t["strong_inh"] or wn in t["moderate_inh"]:
                     strong = wn in t["strong_inh"]
                     effect = (f"{self.ko(v)}의 활성화가 줄어 효과가 떨어질 수 있습니다" if prodrug else
                               f"{self.ko(v)}의 혈중 농도가 {'5배 이상' if strong and sens else '2~5배'} 오를 수 있습니다")
-                    out.append({"kind": "CYP-FDA", "severe": strong and sens and not prodrug,
+                    out.append({"kind": "CYP-FDA", "severe": strong and sens and not prodrug and not equiactive,
                                 "text": f"{self.ko(w)}은(는) {enz} {'강한' if strong else '중간'} 억제제 → {effect} (FDA 지표 약물표)"})
                 elif wn in t["strong_ind"] or wn in t["moderate_ind"]:
                     out.append({"kind": "CYP-FDA", "severe": False,
@@ -1125,21 +1303,21 @@ class Engine:
 
     def pair_level(self, A: Ingredient, B: Ingredient) -> tuple[str, str | None]:
         """The pair verdict of predict() for one pair, with its main reason (used to screen suggested medicines)."""
-        lev = [] if (_minor(A) and _minor(B)) else self._label_evidence(A, B)
+        lev = [] if (_minor(A) and _minor(B)) or _diluent_pair(A, B) else self._label_evidence(A, B)
         for e in lev:
             e["context"] = _context(e)
         own = _own(lev)
-        contra = any(e["section"] == "병용금기/금기"
-                     or (e["section"] == "박스 경고" and BOXED_COMBINATION.search(_about(e))
-                         and not AMOUNT_ONLY.search(_about(e))) for e in own)
-        strong = any(SEVERE_LABEL.search(_about(e)) and not AMOUNT_ONLY.search(_about(e)) for e in own
-                     if e["section"] in ("상호작용", "병용금기/금기", "박스 경고"))
+        contra = any(_is_contra(e) for e in own)
+        strong = any(_is_strong(e) for e in own)
         mech = self._mechanism(A, B)
+        intended = frozenset((A.bare, B.bare)) in self.combo_pairs
+        if intended:  # same rules as predict(): an approved combination's pharmacology is its purpose
+            mech = [m for m in mech if m["kind"] not in ("CYP-FDA", "CYP", "QT", "PD")]
         dur = self.dur_pairs.get(frozenset((A.bare, B.bare)))
         if dur:
             return "높음", "식약처 DUR 병용금기" + (f" — {dur['content']}" if dur.get("content") else "")
         severe = next((m["text"] for m in mech if m.get("severe")), None)
-        if contra or strong or severe:
+        if (contra or strong or severe) and not (intended and not severe):
             return "높음", severe or "허가 문서에 피해야 하는 조합으로 기재"
         if own or mech:
             return "주의", mech[0]["text"] if mech else "허가 문서에 상호작용으로 기재"
@@ -1192,7 +1370,10 @@ class Engine:
             mem = [g for g in U if drug_class(g.key) == cid]
             src = set().union(*(prods_of[g.key] for g in mem)) if mem else set()
             if len(mem) >= 2 and len(src) >= 2:
-                class_dups.append({"class": cname, "ingredients": [self.ko(g) for g in mem], "products": sorted(src)})
+                class_dups.append({"class": cname, "ingredients": [self.ko(g) for g in mem], "products": sorted(src),
+                                   # sold together in one product (aspirin + clopidogrel): a regimen, not a mistake
+                                   "intended": all(frozenset((x.bare, y.bare)) in self.combo_pairs
+                                                   for x, y in itertools.combinations(mem, 2))})
         # MFDS DUR same-efficacy-group duplication (효능군중복) across different products
         # compared within the same SERIES (ARB + ARB, SSRI + SSRI); different series of one efficacy group
         # (ARB + CCB, metformin + DPP-4 inhibitor) are standard combination therapy, not duplication
@@ -1315,6 +1496,7 @@ class Engine:
                     pair_probs[(a, b)] = (np.mean([v[k] for v in out.values()], axis=0), self.pair_thr,
                                           "GNN+지문 앙상블")
         same_product = 0
+        intended_pairs: list[str] = []
         for a, b in itertools.combinations(range(len(U)), 2):
             A, B = U[a], U[b]
             pa_, pb_ = prods_of[A.key], prods_of[B.key]
@@ -1324,7 +1506,7 @@ class Engine:
             obs = self.observed.get(frozenset((A.idx, B.idx)), []) if A.idx is not None and B.idx is not None else []
             # two vitamins / minerals / nutrients: labels list them side by side ("thiamine, niacinamide and ascorbic
             # acid decrease ...") but they do not interact with each other
-            lev = [] if (_minor(A) and _minor(B)) else self._label_evidence(A, B)
+            lev = [] if (_minor(A) and _minor(B)) or _diluent_pair(A, B) else self._label_evidence(A, B)
             model, model_kind = [], None
             if (a, b) in pair_probs:
                 pp, thr, model_kind = pair_probs[(a, b)]
@@ -1337,19 +1519,20 @@ class Engine:
             # Documented interaction = caution by default; "high" only when the label itself uses strong wording
             # (contraindicated / avoid / reduce the dose / fatal ...) or lists it as a contraindication / boxed
             # warning. Report signals and model flags alone can raise "caution", never "high".
+            intended = frozenset((A.bare, B.bare)) in self.combo_pairs  # sold together in one product
             for e in lev:
                 e["context"] = _context(e)  # shown in the details: 'no interaction' / co-therapy mentions
             own = _own(lev)
-            contra = any(e["section"] == "병용금기/금기"
-                         or (e["section"] == "박스 경고" and BOXED_COMBINATION.search(_about(e))
-                             and not AMOUNT_ONLY.search(_about(e))) for e in own)
+            contra = any(_is_contra(e) for e in own)
             # strong wording counts only in interaction-specific sections (general warnings mention many drugs)
             # and only in the sentences that name the other drug
             # "avoid LARGE quantities of grapefruit juice", "avoid DRASTIC changes in vitamin K intake": an amount /
-            # consistency caution, not a contraindication
-            strong = any(SEVERE_LABEL.search(_about(e)) and not AMOUNT_ONLY.search(_about(e)) for e in own
-                         if e["section"] in ("상호작용", "병용금기/금기", "박스 경고"))
+            # consistency caution, not a contraindication; "[see Contraindications (4)]" is a cross-reference
+            strong = any(_is_strong(e) for e in own)
             mech = self._mechanism(A, B) + self._kr_label(A, B, kr_avoid)
+            if intended:  # the pharmacology of an approved combination is its purpose (cobicistat boosts darunavir);
+                mech = [m for m in mech if m["kind"] not in ("CYP-FDA", "CYP", "QT", "PD")]  # curated rules still apply
+                intended_pairs.append(f"{self.ko(A)} + {self.ko(B)}")
             # Pair-level statistics (TWOSIDES signals, pair model) are shown as information only: they are confounded
             # by indication (antihistamine + angioedema) and the pair model learned TWOSIDES, so their agreement is
             # not independent. Statistical evidence reaches the verdict through the patient model's ADDED risk.
@@ -1360,6 +1543,12 @@ class Engine:
                 level = "주의"
             else:
                 level = "낮음"
+            # an approved combination product contains both (aspirin + clopidogrel, olanzapine + fluoxetine): label
+            # wording about the pair is about using them together as intended - at most 'caution' (its real risks,
+            # e.g. bleeding, stay visible), unless the official Korean DUR or a curated rule says otherwise
+            if (intended and level == "높음" and not dur
+                    and not any(m.get("severe") and m["kind"] == "규칙" for m in mech)):
+                level = "주의"
             pair_rows.append({"a": self.ko(A), "b": self.ko(B), "a_key": A.key, "b_key": B.key,
                               "novel": any(g.idx is None and not g.biologic for g in (A, B)),
                               "biologic": A.biologic or B.biologic, "level": level, "model_kind": model_kind,
@@ -1396,13 +1585,19 @@ class Engine:
         # interaction warning; otherwise nearly every combination would be '주의' and alerts would be ignored).
         # ... and only when it is not vanishingly rare (>= 1% of comparable reports): 0.4% jaundice for caffeine +
         # paracetamol reflects overdoses of combination tablets in FAERS, not normal use
-        # ... and the combination effect must be strong (>= 3x the riskier drug alone) or come from this patient:
-        # weaker co-prescription signals are confounded (metformin + atorvastatin 'jaundice' 1.7x in sicker
-        # patients), while true interactions are far above (sertraline + tramadol serotonin syndrome 12.6x)
+        # ... and the combination effect must be strong (>= 3x the riskier drug alone): weaker co-prescription
+        # signals are confounded (metformin + atorvastatin 'jaundice' 1.7x in sicker patients), while true
+        # interactions are far above (sertraline + tramadol serotonin syndrome 12.6x).
+        # v2.18: a signal that comes only from THIS PATIENT (age, body - 'falls' at 65) is not an interaction and no
+        # longer raises the verdict on its own - on real FAERS regimens it was the only reason for 1 in 4 '주의'
+        # (alert fatigue). Validated patient risks (Beers, kidney dosing, pregnancy, DUR age, disease rules) are
+        # documented rules and still decide; the AI patient signal is shown as information ('알아두기').
         for e in events:
             e["drives_verdict"] = bool(e["serious"] and e["lift"] >= 1.5 and e["prob"] >= SIGNAL_P
-                                       and (_combo(e) >= COMBO_X or e["patient_factor"] >= 1.5)
-                                       and not e.get("indication_any"))
+                                       and _combo(e) >= COMBO_X and not e.get("indication_any"))
+            e["patient_note"] = bool(e["serious"] and e["lift"] >= 1.5 and e["prob"] >= SIGNAL_P
+                                     and not e["drives_verdict"] and e["patient_factor"] >= 1.5
+                                     and not e.get("indication_any"))
         added_signal = any(e["drives_verdict"] for e in events)
         if any(not d["minor"] for d in duplicates):
             overall = "높음"
@@ -1410,13 +1605,16 @@ class Engine:
             overall = "주의"
         severe_classes = {DRUG_CLASSES[c][0] for c in ("nsaid", "opioid", "sedative", "anticoagulant", "pde5")}
         for d in class_dups:
-            d["severe"] = d["class"] in severe_classes
+            d["severe"] = d["class"] in severe_classes and not d.get("intended")
         if any(d["severe"] for d in class_dups):
             overall = "높음"
         elif class_dups and overall == "낮음":
             overall = "주의"
         if same_product:
             notes.append(f"같은 복합제 안에 함께 배합된 성분끼리의 조합 {same_product}쌍은 의도된 배합이므로 상호작용 평가에서 제외했습니다.")
+        if intended_pairs:
+            notes.append(f"{', '.join(intended_pairs[:3])}{' 등' if len(intended_pairs) > 3 else ''}은(는) 함께 쓰도록 허가된 "
+                         "복합제에 들어 있는 조합입니다 — 처방받아 함께 쓰는 것이라면 정상적인 병용이며, 남은 주의점만 표시했습니다.")
 
         # the products each ingredient comes in (DUR age rules can be limited to a dosage form: '서방정')
         forms: dict[str, list[tuple[str | None, str]]] = {}
@@ -1656,7 +1854,6 @@ class Engine:
         details: list[dict] = []  # plain-language explanations (knowledge.RULE_DETAIL) of the interactions found
         for r in pair_rows:
             own = _own(r["label_evidence"])
-            secs = {e["section"] for e in own}
             if r["level"] == "낮음":
                 note = self._pair_note(r)
                 if any(e.get("context") == "no_interaction" for e in r["label_evidence"]):
@@ -1671,7 +1868,7 @@ class Engine:
                 reasons.append({"sev": "high", "icon": "⛔",
                                 "text": f"{r['a']}과(와) {r['b']}은(는) 식약처 DUR 병용금기 성분 조합입니다{why}."})
                 advice.append(f"{r['a']}과(와) {r['b']}을(를) 함께 복용하지 마세요 (식약처 병용금기).")
-            elif "병용금기/금기" in secs:
+            elif r["level"] == "높음" and any(e["section"] == "병용금기/금기" and _is_contra(e) for e in own):
                 reasons.append({"sev": "high", "icon": "⛔",
                                 "text": f"{r['a']}과(와) {r['b']}은(는) 허가 문서에 함께 쓰지 말라고 되어 있습니다."})
                 advice.append(avoid(r) or f"{r['a']}과(와) {r['b']}을(를) 함께 복용하지 마세요.")
@@ -1716,10 +1913,13 @@ class Engine:
         drivers = [e for e in events if e.get("drives_verdict")][:2]
         for e in drivers:
             organ, ev = ORGANS[e["organ"]], e["ko"]
+            # the model learned which events are REPORTED (FAERS), so it is said as a report statistic, not as a risk
             if _combo(e) >= COMBO_X:
-                text = f"{organ} (AI 예측): 함께 먹으면 '{ev}' 위험이 한 가지만 먹을 때보다 크게 늘 수 있습니다."
+                text = (f"{organ} (AI 예측·부작용 보고 통계): 비슷한 환자의 부작용 보고에서 함께 쓸 때 '{ev}' 보고가 한 가지만 "
+                        "쓸 때보다 3배 넘게 많습니다 — 위험을 직접 잰 값은 아니지만, 문서에 없는 상호작용일 수 있는 신호입니다.")
             else:
-                text = f"{organ} (AI 예측): 이 환자의 몸 상태 때문에 '{ev}' 위험이 평균보다 커질 수 있습니다."
+                text = (f"{organ} (AI 예측·부작용 보고 통계): 이 환자와 비슷한 사람의 보고에서 '{ev}' 보고가 평균보다 "
+                        "많습니다 — 위험을 직접 잰 값은 아닙니다.")
             reasons.append({"sev": "mid", "icon": "📈", "text": text})
         top = [e for e in events if e["serious"] and e["lift"] >= 2 and e["prob"] >= MIN_P
                and not e.get("drives_verdict") and not e.get("indication_any")][:max(0, 2 - len(drivers))]
@@ -1738,7 +1938,8 @@ class Engine:
             elif _combo(e) >= 1.5:
                 text, sev = f"{organ} (AI 참고): 함께 먹을 때 '{ev}' 보고가 다소 많습니다.", "low"
             elif e["patient_factor"] >= 1.5:
-                text, sev = f"{organ} (AI 참고): 이 환자의 몸 상태에서 '{ev}' 보고가 평균보다 다소 많습니다.", "low"
+                text, sev = (f"{organ} (AI 참고): 이 환자와 비슷한 나이·몸 상태의 보고에서 '{ev}' 보고가 평균보다 다소 "
+                             "많습니다 — 약 조합 때문이 아니라 환자 특성에 따른 통계입니다(알아두기).", "low")
             else:
                 # a drug's own risk: information, not an interaction warning - shown only when OFFSIDES (single-drug
                 # analysis against matched reports) finds the same signal; otherwise it may be confounding
@@ -1788,7 +1989,15 @@ class Engine:
                           else "정해진 용법·용량을 지키세요.")
         cap = 5 if details else 4
         advice = list(dict.fromkeys(advice + steps))[:cap - len(signs)] + signs
-        return {"verdict": verdict, "headline": headline, "reasons": reasons, "advice": advice}
+        # what to DO, by the strength of the evidence behind the verdict: a documented interaction / rule / duplicate /
+        # disease or dose alert needs checking; in-vitro pharmacology or a statistical signal alone is to know about
+        documented_any = (bool(duplicates or class_dups or disease_alerts or (dosing or {}).get("alerts")) or any(
+            r["level"] != "낮음" and (r.get("dur") or _own(r["label_evidence"]) or any(
+                m["kind"] in ("규칙", "CYP-FDA", *KR_LABEL_KINDS) for m in r.get("mechanism", [])))
+            for r in pair_rows))
+        action = (ACTIONS["위험"] if verdict == "위험" else ACTIONS["safe"] if verdict == "비교적 안전"
+                  else ACTIONS["check"] if documented_any else ACTIONS["know"])
+        return {"verdict": verdict, "headline": headline, "reasons": reasons, "advice": advice, "action": action}
 
     # ------------------------------------------------------------------ catalog
     def catalog(self) -> dict:
