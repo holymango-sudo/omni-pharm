@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from omnipharm import assistant, fhir, recommend, recreational, rx_photo, security
+from omnipharm import assistant, chat_checks, fhir, recommend, recreational, rx_photo, security
 from omnipharm.clinical import Patient, assess
 from omnipharm.config import VERSION, settings
 from omnipharm.dosing import Dose
@@ -385,8 +385,16 @@ async def chat(req: ChatRequest, request: Request):
         if found:  # tell the UI which products were checked (shown as chips above the answer)
             chips = [{"name": f["확인한 제품"].split(" = ")[0], "verdict": f["함께 먹을 때 판정"]} for f in found]
             yield f"event: checked\ndata: {json.dumps(chips, ensure_ascii=False)}\n\n"
+        parts = []
         async for tok in llm.stream_chat(ctx, [h.model_dump() for h in req.history], req.question, found):
+            parts.append(tok)
             yield f"data: {json.dumps({'t': tok}, ensure_ascii=False)}\n\n"
+        # v2.18: clinical claims about these medicines that nothing given to the model supports are pointed out under
+        # the answer (the model's memory must not look like a checked result)
+        claims = chat_checks.unsupported_claims("".join(parts), [ctx, found], req.question,
+                                                assistant.conversation_names(eng, base, found))
+        if claims:
+            yield f"event: review\ndata: {json.dumps([s for _, s in claims], ensure_ascii=False)}\n\n"
         yield "event: done\ndata: {}\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream",

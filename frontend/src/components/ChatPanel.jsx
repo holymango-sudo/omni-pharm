@@ -53,7 +53,8 @@ export default function ChatPanel({ res, open, onClose, patientPayload, drugName
     stop.current = api.chat(body,
       (t) => patch((x) => ({ ...x, content: x.content + t })),
       () => setBusy(false),
-      (checked) => patch((x) => ({ ...x, checked })));
+      (checked) => patch((x) => ({ ...x, checked })),
+      (review) => patch((x) => ({ ...x, review })));
   };
 
   return (
@@ -94,6 +95,12 @@ export default function ChatPanel({ res, open, onClose, patientPayload, drugName
             {m.role === "assistant"
               ? <Markdown text={clean(m.content) || "…"} cursor={busy && i === msgs.length - 1} />
               : <p>{m.content}</p>}
+            {m.review?.length > 0 && (
+              <div className="chat-review">
+                ⚠ 아래 내용은 이 분석·검사 결과에는 근거가 없는 AI의 일반 지식입니다 — 약사·의사에게 확인하세요.
+                <ul>{m.review.map((s) => <li key={s}>{s}</li>)}</ul>
+              </div>
+            )}
           </div>
         ))}
         <div ref={end} />

@@ -213,6 +213,18 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
             "_product": new}
 
 
+def conversation_names(eng, base: list[dict], found: list[dict]) -> list[str]:
+    """Medicines / foods of this conversation: what the person entered, their ingredients, what the question checked
+    (chat_checks.unsupported_claims looks for clinical claims about these)."""
+    out = set()
+    for p in base:
+        out |= {p["input"], *(eng.ko(g).split("(")[0] for g in p["ingredients"])}
+    for f in found:
+        prod, _, ings = f["확인한 제품"].partition(" = ")
+        out |= {prod.split(" · ")[0].split(" (")[0].strip(), *(x.split("(")[0].strip() for x in ings.split(", "))}
+    return [n for n in out if len(n) >= 2]
+
+
 def label_cautions(text: str, limit: int = 420) -> str:
     """The first articles of a Korean label's cautions (who must not take it, who should ask first), shortened."""
     out, n = [], 0

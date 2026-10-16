@@ -142,6 +142,7 @@ EFFECT_TERMS: list[tuple[str, re.Pattern]] = [(k, re.compile(p)) for k, p in [
     ("칼륨", r"칼륨"), ("근육", r"근육|횡문근"), ("경련", r"경련|발작"), ("위장", r"위궤양|속쓰림|위\s*점막|위장\s*출혈"),
     ("흡수", r"흡수"), ("혈중 농도", r"혈중\s*농도|농도가\s*(올라|높아|떨어|낮아)")]]
 _BOILERPLATE = re.compile(r"응급 신호일 수 있습니다|새로운 증상|근거\s*[:：]|119|의사|약사")
+GENERAL_MARK = "(일반 상식)"
 _PARTICLE = re.compile(r"(은|는|이|가|을|를|과|와|도|의|에|로|으로|만|이나|랑|이랑)$")
 
 
@@ -160,8 +161,8 @@ def unsupported_claims(answer: str, facts: object, question: str, names: list[st
     known = json.dumps(facts, ensure_ascii=False) + " " + question
     out = []
     for s in _sentences(answer):
-        if _BOILERPLATE.search(s) or not _names_in(s, names):
-            continue
+        if _BOILERPLATE.search(s) or GENERAL_MARK in s or not _names_in(s, names):
+            continue  # (a sentence the model marked as general knowledge is honest about where it comes from)
         for label, pat in EFFECT_TERMS:
             if pat.search(s) and not pat.search(known):
                 out.append((label, s.strip()[:120]))

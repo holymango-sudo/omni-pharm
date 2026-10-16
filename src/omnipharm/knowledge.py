@@ -927,6 +927,8 @@ PAIR_RULES: list[tuple[str, str, str, str]] = [
                                         "마세요 (메나테트레논 허가사항: 와파린 복용 환자 금기)"),
     ("calcineurin", "calcineurin", "높음", "사이클로스포린과 타크로리무스를 함께 쓰면 신장 독성이 겹칩니다 — 함께 쓰지 마세요 "
                                          "(허가사항: 병용 회피, 바꿀 때는 24시간 간격)"),
+    ("iron_supplement", "tea_tannin", "주의", "차(녹차·홍차)의 탄닌이 철분과 결합해 흡수를 줄입니다 — 철분제는 차와 1~2시간 "
+                                            "간격을 두세요 (철분제 허가사항)"),
     # warfarin label (drug interactions: acetaminophen); INR rises with regular use of more than ~2 g a day (Hylek 1998)
     ("acetaminophen", "warfarin", "주의", "아세트아미노펜을 며칠 이상 매일 많이(하루 2g 이상) 먹으면 INR이 올라 출혈 위험이 생길 수 "
                                        "있습니다 — 가끔 먹는 것은 괜찮습니다"),
@@ -1227,6 +1229,8 @@ NAME_GROUPS: list[tuple[re.Pattern, set[str]]] = [
     (re.compile(r"red yeast rice|monascus", re.I), {"statin"}),
     (re.compile(r"\bcalcium\b|\bmagnesium\b|\bferrous\b|\bferric\b|\biron\b|\bzinc\b|alumin|sucralfate|"
                 r"\bbismuth\b|sevelamer|lanthanum", re.I), {"polyvalent_cation"}),
+    (re.compile(r"\bferrous\b|\bferric\b|\biron\b|polysaccharide-iron", re.I), {"iron_supplement"}),
+    (re.compile(r"green tea|black tea|camellia sinensis", re.I), {"tea_tannin"}),
     (re.compile(r"^potassium (chloride|citrate|gluconate|bicarbonate)", re.I), {"potassium_supplement"}),
     (re.compile(r"\bnitrite\b", re.I), {"nitrite"}),  # amyl / isobutyl nitrite (poppers)
     # (not 'vitamin k foods': a food is not a supplement - it has its own rule and advice)
