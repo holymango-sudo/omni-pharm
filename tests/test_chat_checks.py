@@ -15,6 +15,25 @@ def test_danger_note_is_attached_to_questions_about_the_analysed_drugs():
     assert llm.danger_note({**ctx, "종합등급": "주의"}, "심바스타틴 괜찮아요?") == ""
 
 
+def test_unsupported_clinical_claims_are_found():
+    """v2.18: the model's memory said as if it were checked ('홍삼은 혈압을 낮춥니다' with no such fact) is found; a claim the
+    facts support, a sentence marked '(일반 상식)', a drug class name ('혈압약') and boilerplate are not."""
+    facts = {"이유": ["메트포르민 + 인삼: 인삼·홍삼이 혈당을 더 낮출 수 있습니다"]}
+    names = ["고려홍삼정", "인삼", "메트포르민"]
+    ans = ("홍삼은 혈당을 낮출 수 있어요. 홍삼은 혈압을 낮추는 효과도 있습니다. 홍삼은 피로 회복에 좋아요(일반 상식). "
+           "지금 드시는 혈압약은 그대로 드세요. 새로운 증상이 생기면 의사·약사와 상의하세요.")
+    claims = C.unsupported_claims(ans, facts, "고려홍삼정 먹어도 되나요?", names)
+    assert [k for k, _ in claims] == ["혈압"]
+    marked = "녹차의 탄닌이 철분 흡수를 방해합니다. (일반 상식)"
+    assert C.unsupported_claims(marked, {}, "녹차 마셔도 돼요?", ["녹차", "철분"]) == []
+    assert C.unsupported_claims("오늘은 날씨가 좋네요.", {}, "날씨?", ["타이레놀"]) == []
+
+
+def test_emergency_words_include_a_swallowed_pack():
+    assert llm.EMERGENCY.search("아이가 약을 한 통 다 먹었어요")
+    assert llm.EMERGENCY.search("약을 전부 먹어 버렸어요")
+
+
 def test_refusal_and_style():
     assert C.no_refusal("죄송하지만 그 질문에는 답변할 수 없습니다.")
     assert C.no_refusal("오늘 날씨는 확인할 수 없지만, 창밖을 보세요.") is None

@@ -770,6 +770,8 @@ DRUG_GROUPS.update({
     "domperidone": frozenset({"domperidone"}),
     "menatetrenone": frozenset({"menatetrenone"}),
     "calcineurin": frozenset({"cyclosporine", "tacrolimus", "voclosporin"}),
+    "penicillin": frozenset({"amoxicillin", "ampicillin", "penicillin v", "phenoxymethylpenicillin", "penicillin g",
+                             "benzylpenicillin", "dicloxacillin", "piperacillin", "nafcillin", "oxacillin"}),
     "gabapentinoid": frozenset({"gabapentin", "pregabalin", "mirogabalin"}),
     "dabigatran": frozenset({"dabigatran", "dabigatran etexilate"}),
     "metronidazole": frozenset({"metronidazole", "tinidazole", "secnidazole"}),
@@ -929,6 +931,8 @@ PAIR_RULES: list[tuple[str, str, str, str]] = [
                                          "(허가사항: 병용 회피, 바꿀 때는 24시간 간격)"),
     ("iron_supplement", "tea_tannin", "주의", "차(녹차·홍차)의 탄닌이 철분과 결합해 흡수를 줄입니다 — 철분제는 차와 1~2시간 "
                                             "간격을 두세요 (철분제 허가사항)"),
+    ("iron_supplement", "dairy", "주의", "우유·유제품의 칼슘이 철분 흡수를 줄입니다 — 철분제는 우유와 1~2시간 간격을 두세요 "
+                                       "(철분제 허가사항)"),
     # warfarin label (drug interactions: acetaminophen); INR rises with regular use of more than ~2 g a day (Hylek 1998)
     ("acetaminophen", "warfarin", "주의", "아세트아미노펜을 며칠 이상 매일 많이(하루 2g 이상) 먹으면 INR이 올라 출혈 위험이 생길 수 "
                                        "있습니다 — 가끔 먹는 것은 괜찮습니다"),
@@ -1065,9 +1069,11 @@ RULE_DETAIL: dict[tuple[str, str], dict] = {
 # Pairs that people often ASK about but that do not interact (documented): shown as information when nothing else is
 # found - 'vitamin K + apixaban' gets an answer instead of silence
 PAIR_NOTES: list[tuple[str, str, str]] = [
-    (vk, "doac", "비타민K는 와파린과 달리 아픽사반·리바록사반·다비가트란·에독사반(새 항응고제)의 효과에는 영향을 주지 않습니다 — "
-                 "이 약을 먹을 때는 비타민K 음식을 따로 조절하지 않아도 됩니다")
-    for vk in ("vitamin_k_food", "vitamin_k_supplement")
+    *((vk, "doac", "비타민K는 와파린과 달리 아픽사반·리바록사반·다비가트란·에독사반(새 항응고제)의 효과에는 영향을 주지 "
+                   "않습니다 — 이 약을 먹을 때는 비타민K 음식을 따로 조절하지 않아도 됩니다")
+      for vk in ("vitamin_k_food", "vitamin_k_supplement")),
+    ("dairy", "penicillin", "우유·유제품은 아목시실린 같은 페니실린계 항생제의 흡수에 영향을 주지 않습니다 — 음식과 관계없이 "
+                            "먹어도 됩니다 (허가사항; 테트라사이클린·퀴놀론계와 다름)"),
 ]
 
 

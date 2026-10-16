@@ -159,16 +159,10 @@ async def answer(ctx: dict, q: str, found: list[dict]) -> str:
     return "".join([t async for t in llm.stream_chat(ctx, [], q, found)])
 
 
-def check(item: dict, text: str, ctx: dict, found: list[dict], verdict: str | None,
-          names: list[str] | None = None) -> list[str]:
+def check(item: dict, text: str, ctx: dict, found: list[dict], verdict: str | None) -> list[str]:
     allowed = set(ctx.get("근거종류(이것만 출처로 쓸 것)", [])) | {s for f in found for s in f.get("근거종류", [])}
     fails = [C.no_refusal(text), C.style(text), C.no_stop_advice(text), C.numbers_grounded(text, [ctx, found]),
              C.sources_allowed(text, allowed)]
-    # v2.18: a clinical claim about a medicine / food of the conversation that nothing given to the model supports
-    # (the model's memory shown as if it were checked) - keyword checks alone did not catch it
-    claims = C.unsupported_claims(text, [ctx, found], item["q"], names or [])
-    if claims:
-        fails.append("근거 없는 임상 주장: " + " / ".join(f"[{k}] {s[:50]}" for k, s in claims[:2]))
     if item.get("emergency"):
         fails.append(C.emergency_first(text))
     if item.get("harm"):
@@ -202,24 +196,34 @@ def main() -> int:
             found = assistant.lookups(eng, item["q"], base, patient, verdict)
             t = time.time()
             text = asyncio.run(answer(ctx, item["q"], found))
-            fails = check(item, text, ctx, found, verdict, assistant.conversation_names(eng, base, found))
+            fails = check(item, text, ctx, found, verdict)
+            # v2.18: clinical claims about a medicine / food of the conversation that nothing given to the model
+            # supports and that the model did not mark '(일반 상식)' - the app shows them under the answer as
+            # unverified (api.py 'review' event); counted here as a separate metric
+            claims = C.unsupported_claims(text, [ctx, found], item["q"], assistant.conversation_names(eng, base, found))
             rows.append({"scenario": sc["id"], "title": sc["title"], "q": item["q"], "checked": [f["확인한 제품"] for f in found],
-                         "seconds": round(time.time() - t, 1), "fails": fails, "answer": text})
-            print(f"[{'PASS' if not fails else 'FAIL'}] {sc['id']} {item['q']}" + ("" if not fails else f"  → {'; '.join(fails)}"))
+                         "seconds": round(time.time() - t, 1), "fails": fails, "answer": text,
+                         "unsupported": [f"[{k}] {s}" for k, s in claims]})
+            print(f"[{'PASS' if not fails else 'FAIL'}] {sc['id']} {item['q']}" + ("" if not fails else f"  → {'; '.join(fails)}")
+                  + (f"  (근거 없는 주장 → 화면 경고: {claims[0][0]})" if claims else ""))
     n_fail = sum(bool(r["fails"]) for r in rows)
+    n_unsup = sum(bool(r["unsupported"]) for r in rows)
     out = PROJECT_ROOT / "logs" / "chat_eval"
     out.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d_%H%M")
     (out / f"{stamp}.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
     md = [f"# AI 복약 상담 자동 평가 {time.strftime('%Y-%m-%d %H:%M')}", "",
-          f"모델 {settings.llm_model} · 질문 {len(rows)}개 · 통과 {len(rows) - n_fail} · 실패 {n_fail} · {time.time() - t0:.0f}초", ""]
+          f"모델 {settings.llm_model} · 질문 {len(rows)}개 · 통과 {len(rows) - n_fail} · 실패 {n_fail} · "
+          f"근거 없는 임상 주장(화면에서 경고) {n_unsup}문항 · {time.time() - t0:.0f}초", ""]
     for r in rows:
         md += [f"## [{'통과' if not r['fails'] else '실패'}] {r['scenario']} {r['title']} — {r['q']}",
                f"함께 검사: {', '.join(r['checked']) or '없음'} · {r['seconds']}초"]
         md += [f"- ❌ {f}" for f in r["fails"]]
+        md += [f"- ⚠ 근거 없는 주장(화면 경고): {u[:120]}" for u in r["unsupported"]]
         md += ["", "> " + r["answer"].replace("\n", "\n> "), ""]
     (out / f"{stamp}.md").write_text("\n".join(md), encoding="utf-8")
-    print(f"\n{len(rows) - n_fail}/{len(rows)} passed → {out / (stamp + '.md')}")
+    print(f"\n{len(rows) - n_fail}/{len(rows)} passed · unsupported claims (flagged on screen) in {n_unsup} answers "
+          f"→ {out / (stamp + '.md')}")
     return 1 if n_fail else 0
 
 

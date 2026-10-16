@@ -167,6 +167,9 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     # (never for a controlled substance: harm reduction names the dangerous combinations, not amounts)
     st = {} if ctl else info.get("strength") or {}
     content = [f"{eng.ko(g)} {fmt_mg(st['mg'][g.key])}" for g in ings if (st.get("mg") or {}).get(g.key)]
+    # a brand typed without its strength ('타이레놀 10알?'): the marketed products of that name and their content,
+    # so a count of tablets rests on real products, not on an invented '500 mg'
+    brands = brand_contents(eng, name, ings) if not content and not ctl else []
     pa = r.get("patient") or {}
     lctx = {"crcl": (pa.get("kidney") or {}).get("clearance"), "age": patient.age,
             "sex": (patient.sex or "").upper()[:1] or None, "weight": patient.weight_kg,
@@ -182,7 +185,9 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
         if lim:
             # no content per unit (의약외품 박카스): the mg limit cannot be turned into bottles - the label usage answers
             limits.append(limit_text(eng.ko(g), lim) + " (다른 약·음료의 같은 성분과 합쳐서"
-                          + (")" if content else " — 1개당 함량 자료가 없어 개수로 바꿀 수 없음: 개수는 제품 설명서 용법)"))
+                          + (")" if content else
+                             " — 개수는 '같은 이름 시판 제품의 1개당 함량'의 제품별로 계산)" if brands else
+                             " — 1개당 함량 자료가 없어 개수로 바꿀 수 없음: 개수는 제품 설명서 용법)"))
     lab = info.get("label_ko") or {}
     src = _sources(r, keys, [*names, name]) | ({"허가 용량 기준"} if limits else set())
     if lab:
@@ -192,14 +197,28 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     if not src:  # checked, and no documented problem: that is the source of a '괜찮다' answer
         src.add("상호작용 검사(문서·규칙 근거 없음)")
     usage = (lab.get("usage") or "")[:300] or None
+    # v2.18: each ingredient's key FDA label warning (boxed warning, else the start of the warnings), so the usual
+    # explanations ('acetaminophen and the liver') rest on a document, not on the model's memory
+    labels = getattr(eng, "labels", None)
+    key_warn = []
+    for g in [] if ctl or labels is None else ings[:3]:
+        if g.key in labels.index:
+            row = labels.loc[g.key]
+            w = " ".join(str(row.get("boxed_warning") or row.get("warnings") or "").split())[:320]
+            if w:
+                key_warn.append(f"{eng.ko(g)}: {w}")
+    if key_warn:
+        src.add("FDA 허가 라벨")
     # this patient's daily limit (kidney / liver / age / self-medication) comes first: a label's general maximum
     # ('1일 최대 4그램(8정)') is higher than what an elderly patient on warfarin should take on their own
     return {"확인한 제품": f"{name} = {shown}", "함께 먹을 때 판정": verdict,
             "1개당 함량": f"{st.get('unit') or '1회 단위'}당 " + ", ".join(content) if content else None,
+            "같은 이름 시판 제품의 1개당 함량(식약처)": brands or None,
             LIMIT_KEY: limits,
             # Korean label (박카스 '1일 1회 1병', 일반의약품 용법): answers '하루 몇 병?' when the mg limit cannot
             (USAGE_KEY_LIMITED if limits and content else USAGE_KEY): usage,
             "제품 설명서 주의사항(요약)": label_cautions(lab.get("cautions") or "") or None,
+            "허가 문서 핵심 경고(FDA 원문)": key_warn or None,
             NUTRIENT_KEY: nutrient_text(info["nutrients"]) if info.get("nutrients") else None,
             "이 제품 관련 이유": [x["text"] for x in s["reasons"] if x["sev"] != "low" and mine(x["text"])][:5],
             # not the FAERS 'drug's own risk' associations: they are report statistics, not known side effects
@@ -211,6 +230,26 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
                       if ctl else None,
             "근거종류": sorted(src),
             "_product": new}
+
+
+def brand_contents(eng, name: str, ings: list, limit: int = 3) -> list[str]:
+    """'타이레놀' -> ['타이레놀정500밀리그람: 아세트아미노펜 500mg', ...]: active Korean products whose name starts with
+    the typed word and their per-unit content of these ingredients (product_strengths)."""
+    P = getattr(eng, "products", None)
+    if P is None or not len(P) or len(name) < 2:
+        return []
+    keys = {g.key for g in ings}
+    rows = P[(P["country"] == "KR") & P["active"] & P["name"].str.startswith(name)]
+    out = []
+    for r in rows.sort_values("name", key=lambda s: s.str.len()).head(12).itertuples():
+        st = getattr(eng, "strengths", {}).get(("KR", str(r.item_seq))) or {}
+        mg = {k: v for k, v in (st.get("mg") or {}).items() if k in keys}
+        if mg:
+            out.append(f"{r.name}: " + ", ".join(f"{eng.ko(next(g for g in ings if g.key == k))} {fmt_mg(v)}"
+                                                 for k, v in mg.items()) + f" (1{st.get('unit') or '개'}당)")
+        if len(out) >= limit:
+            break
+    return out
 
 
 def conversation_names(eng, base: list[dict], found: list[dict]) -> list[str]:

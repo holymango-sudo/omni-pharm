@@ -136,7 +136,7 @@ def mentions(answer: str, words: list[str]) -> str | None:
 
 # clinical effects an answer may claim about a medicine / food; each must be in the facts the model was given
 EFFECT_TERMS: list[tuple[str, re.Pattern]] = [(k, re.compile(p)) for k, p in [
-    ("혈압", r"혈압"), ("혈당", r"혈당"), ("간", r"(?<![가-힣])간(?=[ 에이을의]|독성|기능|손상|수치|부담|부전|질환)"),
+    ("혈압", r"혈압(?!\s*약)"), ("혈당", r"혈당(?!\s*약)"), ("간", r"(?<![가-힣])간(?=[ 에이을의]|독성|기능|손상|수치|부담|부전|질환)"),
     ("신장", r"신장|콩팥|신기능"), ("출혈", r"출혈|피가\s*(잘\s*)?멈추지"), ("혈전", r"혈전|뇌졸중|색전"),
     ("세로토닌", r"세로토닌"), ("심장 리듬", r"QT|부정맥|심장\s*박동|맥박"), ("진정", r"졸음|진정|호흡\s*억제"),
     ("칼륨", r"칼륨"), ("근육", r"근육|횡문근"), ("경련", r"경련|발작"), ("위장", r"위궤양|속쓰림|위\s*점막|위장\s*출혈"),
@@ -159,6 +159,8 @@ def unsupported_claims(answer: str, facts: object, question: str, names: list[st
     conversation although nothing given to the model says it: the model's own memory, shown as if checked.
     -> [(effect, sentence)]."""
     known = json.dumps(facts, ensure_ascii=False) + " " + question
+    # '... 방해하기 때문이에요. (일반 상식)': a mark written after the full stop belongs to that sentence
+    answer = re.sub(r"([.!?])\s*\(일반 상식\)", r" (일반 상식)\1", answer)
     out = []
     for s in _sentences(answer):
         if _BOILERPLATE.search(s) or GENERAL_MARK in s or not _names_in(s, names):
