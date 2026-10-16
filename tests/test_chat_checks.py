@@ -26,6 +26,9 @@ def test_unsupported_clinical_claims_are_found():
     assert [k for k, _ in claims] == ["혈압"]
     marked = "녹차의 탄닌이 철분 흡수를 방해합니다. (일반 상식)"
     assert C.unsupported_claims(marked, {}, "녹차 마셔도 돼요?", ["녹차", "철분"]) == []
+    # the mark as the model actually writes it (eval_chat 10-17: '(일반 복약 상식)')
+    variant = "오메가3는 지방과 함께 먹으면 흡수가 잘 됩니다(일반 복약 상식). 녹차는 철분 흡수를 막아요. (일반 지식)"
+    assert C.unsupported_claims(variant, {}, "언제 먹어요?", ["오메가3", "녹차", "철분"]) == []
     assert C.unsupported_claims("오늘은 날씨가 좋네요.", {}, "날씨?", ["타이레놀"]) == []
 
 
