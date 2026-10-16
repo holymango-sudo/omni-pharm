@@ -29,7 +29,8 @@ function Pairs({ res }) {
             <div>
               {p.mechanism?.length > 0 && (<>
                 <h5>임상 규칙 · 약리 기전 (허가사항 · FDA 대사효소 지표표 · ChEMBL)</h5>
-                {p.mechanism.map((m) => <p key={m.text}>{m.kind === "규칙" ? "📋" : m.kind.startsWith("식약처") ? "🇰🇷" : "🧬"} {m.text}</p>)}
+                {p.mechanism.map((m) => <p key={m.text}>{m.kind === "규칙" ? "📋" : m.kind.startsWith("식약처") ? "🇰🇷" : "🧬"} {m.text}
+                  {m.source && <span className="muted small"> — 출처: {m.source}{m.review === "미검토" ? " · 약사 검토 전" : m.review ? ` · 약사 검토: ${m.review}` : ""}</span>}</p>)}
               </>)}
               <h5>② 실제 병용 보고 신호 (TWOSIDES)</h5>
               {p.observed.length ? <p>{p.observed.map((e) => e.ko).join(", ")}</p> : <p className="muted">유의한 신호 없음 / 데이터 부족</p>}

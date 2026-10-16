@@ -1,0 +1,1575 @@
+{
+ "_about": "두 약(계열·그룹·성분·음식) 사이의 상호작용 규칙. 허가 문서가 계열 이름으로 적어 이름 검색으로 못 찾는 것, 한국 전용 약, 음식·건강기능식품·규제 물질. 순서대로 검사(결과 표시 순서).",
+ "_fields": {
+  "a, b": "knowledge.drug_groups()의 그룹 id 또는 성분 이름",
+  "level": "높음(함께 쓰지 않음) / 주의",
+  "reason": "화면에 보이는 한 줄 이유",
+  "source": "근거 문서(모르면 '출처 확인 필요')",
+  "evidence": "근거 종류: 병용금기(허가) / 박스경고 / 허가사항 경고·주의 / 규제기관 권고 / 표시사항(일반약·건강기능식품) / 임상 연구 / 증례·문헌 / 위해 감소 문헌 / 약리 원칙 / 출처 확인 필요",
+  "since": "이 규칙이 처음 들어간 버전",
+  "review": "약사·의사 검토 기록: status(미검토/동의/수정 필요/삭제 필요), reviewer, date(YYYY-MM-DD), note"
+ },
+ "_status": "개발 측 작성 — 출처 원문 대조·약사 검토 전",
+ "rules": [
+  {
+   "a": "qt_prolonging",
+   "b": "qt_prolonging",
+   "level": "주의",
+   "reason": "두 약 모두 QT 간격을 늘려 돌연 부정맥(Torsade de Pointes) 위험이 더해집니다 — 심전도 확인",
+   "source": "각 약 허가사항(QT 연장 약 병용 주의), CredibleMeds QT 목록",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "opioid",
+   "b": "sedative",
+   "level": "높음",
+   "reason": "함께 쓰면 깊은 진정·호흡 억제·혼수·사망 위험이 있습니다 (FDA 박스경고)",
+   "source": "FDA 박스경고(2016-08 오피오이드+벤조디아제핀 등 중추신경억제제)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "opioid",
+   "b": "gabapentinoid",
+   "level": "주의",
+   "reason": "호흡 억제 위험이 커집니다 (FDA 안전성 서한 2019)",
+   "source": "FDA 의약품 안전성 서한(2019-12, 가바펜티노이드 호흡 억제)",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "glp1",
+   "b": "insulin",
+   "level": "주의",
+   "reason": "함께 쓰면 저혈당 위험이 커져 인슐린 감량이 필요할 수 있습니다 (허가사항)",
+   "source": "GLP-1 작용제 허가사항(인슐린 병용 시 저혈당)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "glp1",
+   "b": "sulfonylurea",
+   "level": "주의",
+   "reason": "함께 쓰면 저혈당 위험이 커져 설포닐우레아 감량이 필요할 수 있습니다 (허가사항)",
+   "source": "GLP-1 작용제 허가사항(설포닐우레아 병용 시 저혈당)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "insulin",
+   "b": "sulfonylurea",
+   "level": "주의",
+   "reason": "둘 다 혈당을 낮춰 저혈당 위험이 커집니다",
+   "source": "인슐린·설포닐우레아 허가사항(저혈당)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "tirzepatide",
+   "b": "oral_contraceptive",
+   "level": "주의",
+   "reason": "위 배출이 늦어져 먹는 피임약 효과가 떨어질 수 있습니다 — 시작·증량 후 4주간 다른 피임법을 함께 쓰세요 (허가사항)",
+   "source": "티르제파타이드(Mounjaro) 허가사항 7.2 경구 피임제",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "glp1",
+   "b": "warfarin",
+   "level": "주의",
+   "reason": "위 배출이 늦어져 흡수가 달라질 수 있어 INR을 더 자주 확인하세요",
+   "source": "엑세나타이드 등 GLP-1 작용제 허가사항(와파린 병용 시 INR 변동 보고)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "botulinum",
+   "b": "aminoglycoside",
+   "level": "주의",
+   "reason": "근육 마비 효과가 강해질 수 있습니다 (허가사항)",
+   "source": "보툴리눔 톡신 허가사항(아미노글리코사이드 병용)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "licorice",
+   "b": "thiazide",
+   "level": "주의",
+   "reason": "감초가 칼륨을 더 떨어뜨려 저칼륨혈증·부정맥 위험이 커집니다",
+   "source": "표준 상호작용 참고문헌(감초 글리시리진 저칼륨혈증)",
+   "evidence": "증례·문헌",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "licorice",
+   "b": "loop_diuretic",
+   "level": "주의",
+   "reason": "감초가 칼륨을 더 떨어뜨려 저칼륨혈증·부정맥 위험이 커집니다",
+   "source": "표준 상호작용 참고문헌(감초 글리시리진 저칼륨혈증)",
+   "evidence": "증례·문헌",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "licorice",
+   "b": "digoxin",
+   "level": "주의",
+   "reason": "감초로 칼륨이 떨어지면 디곡신 독성이 커집니다",
+   "source": "표준 상호작용 참고문헌(저칼륨혈증 → 디곡신 독성)",
+   "evidence": "증례·문헌",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "dabigatran",
+   "b": "strong_pgp_inh",
+   "level": "높음",
+   "reason": "강한 P-당단백 억제제가 다비가트란 농도를 크게 올려 출혈 위험이 큽니다 (유럽 허가사항 병용금기, 미국은 신기능 저하 시 회피)",
+   "source": "다비가트란 유럽 허가사항(SmPC 4.3 병용금기), 미국 허가사항",
+   "evidence": "병용금기(허가)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "digoxin",
+   "b": "loop_diuretic",
+   "level": "주의",
+   "reason": "이뇨제로 칼륨·마그네슘이 떨어지면 디곡신 독성(부정맥)이 생기기 쉽습니다 — 전해질 확인",
+   "source": "디곡신 허가사항(저칼륨·저마그네슘혈증 시 독성)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "digoxin",
+   "b": "thiazide",
+   "level": "주의",
+   "reason": "이뇨제로 칼륨·마그네슘이 떨어지면 디곡신 독성(부정맥)이 생기기 쉽습니다 — 전해질 확인",
+   "source": "디곡신 허가사항(저칼륨·저마그네슘혈증 시 독성)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "fluoroquinolone",
+   "b": "corticosteroid",
+   "level": "주의",
+   "reason": "힘줄염·힘줄 파열 위험이 커집니다 (퀴놀론 박스경고) — 특히 60세 이상",
+   "source": "플루오로퀴놀론 박스경고(코르티코스테로이드 병용 시 힘줄 파열)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "metronidazole",
+   "level": "높음",
+   "reason": "술과 함께 먹으면 구토·두근거림·홍조(디설피람 유사 반응)가 생깁니다 — 복용 중과 끝난 뒤 3일은 금주",
+   "source": "메트로니다졸 허가사항(복용 중·종료 후 3일 금주)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "opioid",
+   "level": "높음",
+   "reason": "술이 진정·호흡 억제를 크게 키웁니다 (FDA 박스경고) — 함께 마시지 마세요",
+   "source": "오피오이드 박스경고(알코올 등 중추신경억제제)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "sedative",
+   "level": "높음",
+   "reason": "술이 진정 작용을 크게 키워 호흡 억제·낙상·기억 상실 위험이 있습니다 — 함께 마시지 마세요",
+   "source": "벤조디아제핀·졸피뎀 허가사항(알코올 병용)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "gabapentinoid",
+   "level": "주의",
+   "reason": "술이 졸음·어지러움·호흡 억제를 키웁니다",
+   "source": "프레가발린·가바펜틴 허가사항(알코올 병용)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "sedating_antihistamine",
+   "level": "주의",
+   "reason": "술이 졸음을 크게 키웁니다 — 운전·기계 조작 금지",
+   "source": "일반의약품 표시사항(음주 시 졸음 증가)",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "acetaminophen",
+   "level": "주의",
+   "reason": "매일 3잔 이상 술을 마시면 아세트아미노펜으로 간이 손상될 위험이 커집니다",
+   "source": "일반의약품 표시사항(매일 3잔 이상 음주자 간 손상 경고, FDA 2009)",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "nsaid",
+   "level": "주의",
+   "reason": "술과 함께 먹으면 위장 출혈 위험이 커집니다",
+   "source": "일반의약품 표시사항(매일 3잔 이상 음주자 위장 출혈 경고, FDA 2009)",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "metformin",
+   "level": "주의",
+   "reason": "과음은 메트포르민의 젖산산증 위험을 키웁니다",
+   "source": "메트포르민 허가사항(과음 시 젖산산증)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "sulfonylurea",
+   "level": "주의",
+   "reason": "술이 저혈당을 일으키거나 숨길 수 있습니다",
+   "source": "설포닐우레아 허가사항(알코올 저혈당)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "insulin",
+   "level": "주의",
+   "reason": "술이 저혈당을 일으키거나 숨길 수 있습니다",
+   "source": "인슐린 허가사항(알코올 저혈당)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "alcohol",
+   "b": "warfarin",
+   "level": "주의",
+   "reason": "술이 와파린 효과(INR)를 흔들어 출혈·혈전 위험이 생깁니다 — 과음 금지",
+   "source": "와파린 허가사항(알코올)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "pde5",
+   "b": "nitrate",
+   "level": "높음",
+   "reason": "질산염·NO 공여제(니트로글리세린·니코란딜 등)와 발기부전 치료제를 함께 쓰면 혈압이 급격히 떨어질 수 있습니다 — 함께 쓰지 마세요 (PDE5 억제제 허가사항 병용금기)",
+   "source": "PDE5 억제제 허가사항 병용금기(질산염·NO 공여제)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "retinoid_systemic",
+   "b": "tetracycline",
+   "level": "높음",
+   "reason": "먹는 레티노이드(이소트레티노인·아시트레틴 등)와 테트라사이클린계 항생제를 함께 쓰면 뇌압이 오르는 가성뇌종양 위험이 있습니다 — 함께 쓰지 마세요 (허가사항 병용금기)",
+   "source": "이소트레티노인·아시트레틴 허가사항 병용금기(가성뇌종양), 식약처 DUR",
+   "evidence": "병용금기(허가)",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "anorectic",
+   "b": "anorectic",
+   "level": "높음",
+   "reason": "식욕억제제를 두 가지 이상 함께 쓰면 심장판막병·폐동맥고혈압 위험이 커집니다 — 함께 쓰지 마세요 (허가사항: 다른 체중 감량 약과 병용 금지)",
+   "source": "펜터민 등 식욕억제제 허가사항(다른 체중 감량 약과 병용 금지), 식약처 DUR",
+   "evidence": "병용금기(허가)",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ergot",
+   "b": "cyp3a_inh_ergot",
+   "level": "높음",
+   "reason": "맥각 알칼로이드(에르고타민 등)와 강한 CYP3A 억제제(마크롤리드·아졸·HIV 약 등)를 함께 쓰면 혈관 경련으로 손발·장기 허혈이 생길 수 있습니다 (에르고타민 박스경고·병용금기)",
+   "source": "에르고타민 박스경고·병용금기(강한 CYP3A 억제제)",
+   "evidence": "박스경고",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "domperidone",
+   "b": "qt_prolonging",
+   "level": "높음",
+   "reason": "돔페리돈을 QT 간격을 늘리는 약과 함께 쓰면 심각한 부정맥(염전성 심실빈맥) 위험이 커집니다 — 함께 쓰지 마세요 (유럽 EMA 2014 권고·국내 허가사항 병용금기)",
+   "source": "EMA PRAC 권고(2014), 국내 돔페리돈 허가사항 병용금기",
+   "evidence": "병용금기(허가)",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "domperidone",
+   "b": "cyp3a_strong_inh",
+   "level": "높음",
+   "reason": "강한 CYP3A 억제제가 돔페리돈 농도를 크게 올려 심장 부정맥 위험이 커집니다 — 함께 쓰지 마세요 (EMA 2014 권고·국내 허가사항 병용금기)",
+   "source": "EMA PRAC 권고(2014), 국내 돔페리돈 허가사항 병용금기",
+   "evidence": "병용금기(허가)",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "menatetrenone",
+   "b": "warfarin",
+   "level": "높음",
+   "reason": "골다공증 치료제 메나테트레논(고용량 비타민K2)은 와파린 효과를 없앱니다 — 함께 쓰지 마세요 (메나테트레논 허가사항: 와파린 복용 환자 금기)",
+   "source": "메나테트레논(글라케이) 허가사항: 와파린 복용 환자 금기",
+   "evidence": "병용금기(허가)",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "calcineurin",
+   "b": "calcineurin",
+   "level": "높음",
+   "reason": "사이클로스포린과 타크로리무스를 함께 쓰면 신장 독성이 겹칩니다 — 함께 쓰지 마세요 (허가사항: 병용 회피, 바꿀 때는 24시간 간격)",
+   "source": "타크로리무스 허가사항(사이클로스포린 병용 회피·24시간 간격)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "iron_supplement",
+   "b": "tea_tannin",
+   "level": "주의",
+   "reason": "차(녹차·홍차)의 탄닌이 철분과 결합해 흡수를 줄입니다 — 철분제는 차와 1~2시간 간격을 두세요 (철분제 허가사항)",
+   "source": "국내 철분제 허가사항(차·탄닌과 동시 복용 시 흡수 저하)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "iron_supplement",
+   "b": "dairy",
+   "level": "주의",
+   "reason": "우유·유제품의 칼슘이 철분 흡수를 줄입니다 — 철분제는 우유와 1~2시간 간격을 두세요 (철분제 허가사항)",
+   "source": "국내 철분제 허가사항(우유·제산제와 동시 복용 시 흡수 저하)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "acetaminophen",
+   "b": "warfarin",
+   "level": "주의",
+   "reason": "아세트아미노펜을 며칠 이상 매일 많이(하루 2g 이상) 먹으면 INR이 올라 출혈 위험이 생길 수 있습니다 — 가끔 먹는 것은 괜찮습니다",
+   "source": "와파린 허가사항(아세트아미노펜), Hylek 1998 JAMA",
+   "evidence": "임상 연구",
+   "since": "v2.17.1",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "grapefruit",
+   "b": "grapefruit_major",
+   "level": "높음",
+   "reason": "자몽(주스)이 약의 혈중 농도를 크게 올립니다 — 복용 중 자몽을 피하세요",
+   "source": "각 약 허가사항(자몽 주스 회피·금기)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "grapefruit",
+   "b": "grapefruit_moderate",
+   "level": "주의",
+   "reason": "자몽(주스)이 약의 혈중 농도를 올릴 수 있습니다 — 많이 마시지 마세요",
+   "source": "각 약 허가사항(자몽 주스 다량 섭취 주의)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "dairy",
+   "b": "tetracycline",
+   "level": "주의",
+   "reason": "우유·유제품이 항생제 흡수를 막습니다 — 2~3시간 간격을 두세요",
+   "source": "테트라사이클린계 허가사항(유제품과 간격)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "dairy",
+   "b": "fluoroquinolone",
+   "level": "주의",
+   "reason": "우유·유제품이 항생제 흡수를 막습니다 — 2시간 이상 간격을 두세요",
+   "source": "시프로플록사신 등 허가사항(유제품 단독 섭취와 간격)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "vitamin_k_food",
+   "b": "warfarin",
+   "level": "주의",
+   "reason": "비타민K가 많은 음식은 와파린 효과를 줄입니다 — 끊지 말고 매일 비슷한 양을 드세요",
+   "source": "와파린 허가사항·복약안내서(비타민K 섭취 일정하게)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "vitamin_k_supplement",
+   "b": "warfarin",
+   "level": "주의",
+   "reason": "비타민K 영양제는 와파린 효과(INR)를 떨어뜨립니다 — 시작하거나 끊기 전에 의사와 상의하고 INR을 확인하세요",
+   "source": "와파린 허가사항(비타민K 함유 보충제)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.17.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "high_potassium_food",
+   "b": "k_sparing",
+   "level": "주의",
+   "reason": "칼륨이 많은 음식을 많이 먹으면 칼륨이 지나치게 올라갈 수 있습니다(고칼륨혈증) — 특히 콩팥 기능이 떨어졌을 때",
+   "source": "칼륨 보존 이뇨제 허가사항(칼륨 보충·칼륨 함유 대체염) — 음식 적용은 개발 측 확장",
+   "evidence": "약리 원칙",
+   "since": "v2.17.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "high_potassium_food",
+   "b": "ace_arb",
+   "level": "주의",
+   "reason": "칼륨이 많은 음식을 많이 먹으면 칼륨이 지나치게 올라갈 수 있습니다(고칼륨혈증) — 특히 콩팥 기능이 떨어졌을 때",
+   "source": "ACE 억제제·ARB 허가사항(칼륨 보충·칼륨 함유 대체염) — 음식 적용은 개발 측 확장",
+   "evidence": "약리 원칙",
+   "since": "v2.17.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "smoking",
+   "b": "oral_contraceptive",
+   "level": "주의",
+   "reason": "흡연자(특히 35세 이상)는 피임약으로 혈전·심혈관 사고 위험이 큽니다 (박스경고)",
+   "source": "복합 경구피임제 박스경고(35세 이상 흡연자 심혈관 사고)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "smoking",
+   "b": "smoking_cyp1a2",
+   "level": "주의",
+   "reason": "흡연이 약의 분해를 빠르게 해 효과가 떨어질 수 있습니다 — 금연·흡연 시작 시 용량 조절 필요",
+   "source": "테오필린·클로자핀 등 허가사항(흡연의 CYP1A2 유도)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "anticoagulant",
+   "b": "nsaid",
+   "level": "주의",
+   "reason": "출혈(특히 위장관 출혈) 위험이 커집니다 — 검은 변·멍·잇몸 출혈을 살피세요",
+   "source": "항응고제·항혈소판제 허가사항(NSAID 병용 출혈)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "anticoagulant",
+   "b": "ssri",
+   "level": "주의",
+   "reason": "SSRI·SNRI는 혈소판 기능을 떨어뜨려 출혈 위험을 더합니다 — 출혈 징후를 살피세요",
+   "source": "SSRI·SNRI 허가사항(비정상 출혈, 항응고제 병용)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "nsaid",
+   "b": "ssri",
+   "level": "주의",
+   "reason": "위장관 출혈 위험이 커집니다 — 속쓰림·검은 변이 생기면 상담하세요",
+   "source": "SSRI·SNRI 허가사항(NSAID 병용 위장관 출혈)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "bleeding_herb",
+   "b": "anticoagulant",
+   "level": "주의",
+   "reason": "은행잎·마늘·강황 같은 성분은 혈액 응고를 늦춰 출혈 위험을 더할 수 있습니다",
+   "source": "표준 상호작용 참고문헌(은행잎·마늘·강황 출혈 경향) — 근거 수준 낮음",
+   "evidence": "증례·문헌",
+   "since": "v2.12.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "bleeding_herb",
+   "b": "nsaid",
+   "level": "주의",
+   "reason": "은행잎·마늘·강황 같은 성분은 혈액 응고를 늦춰 출혈 위험을 더할 수 있습니다",
+   "source": "표준 상호작용 참고문헌(은행잎·마늘·강황 출혈 경향) — 근거 수준 낮음",
+   "evidence": "증례·문헌",
+   "since": "v2.12.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ginseng",
+   "b": "warfarin",
+   "level": "주의",
+   "reason": "인삼이 와파린 효과(INR)를 떨어뜨릴 수 있습니다",
+   "source": "Yuan 2004 Ann Intern Med(미국삼 무작위 시험: 와파린 효과 감소)",
+   "evidence": "임상 연구",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ginseng",
+   "b": "antidiabetic",
+   "level": "주의",
+   "reason": "인삼·홍삼이 혈당을 더 낮출 수 있습니다 — 저혈당 증상을 살피세요(식약처 홍삼 제품 표시: '당뇨치료제 복용 시 섭취에 주의')",
+   "source": "식약처 홍삼 제품 표시사항('당뇨치료제 복용 시 섭취에 주의')",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.17.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "omega3",
+   "b": "anticoagulant",
+   "level": "주의",
+   "reason": "오메가3를 많이(하루 3g 이상) 먹으면 출혈 경향이 커질 수 있습니다 — 멍·잇몸 출혈을 살피세요",
+   "source": "오메가-3 처방약(Lovaza) 허가사항(출혈 시간 연장)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.12.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "coq10",
+   "b": "warfarin",
+   "level": "주의",
+   "reason": "코엔자임Q10이 와파린 효과(INR)를 떨어뜨릴 수 있습니다 — 시작하거나 끊을 때 INR을 확인하세요",
+   "source": "와파린 허가사항 보충제 표·증례 보고",
+   "evidence": "증례·문헌",
+   "since": "v2.12.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cranberry",
+   "b": "warfarin",
+   "level": "주의",
+   "reason": "크랜베리 주스·농축 제품을 많이 먹으면 INR이 올라 출혈 위험이 생길 수 있습니다",
+   "source": "와파린 허가사항(크랜베리 제품 INR 변동 보고)",
+   "evidence": "증례·문헌",
+   "since": "v2.12.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "probiotic",
+   "b": "antibacterial",
+   "level": "주의",
+   "reason": "항생제가 유산균을 죽여 효과가 줄어듭니다 — 항생제와 2시간 이상 간격을 두고 드세요",
+   "source": "프로바이오틱스 제품 표시사항(항생제와 간격)",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.12.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "st_johns_wort",
+   "b": "immunosuppressant",
+   "level": "높음",
+   "reason": "세인트존스워트가 면역억제제 농도를 크게 낮춰 거부반응 위험이 있습니다",
+   "source": "사이클로스포린·타크로리무스 허가사항(세인트존스워트 병용 회피)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "st_johns_wort",
+   "b": "oral_contraceptive",
+   "level": "주의",
+   "reason": "세인트존스워트가 피임약 효과를 떨어뜨립니다",
+   "source": "경구피임제 허가사항(CYP3A 유도제)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "st_johns_wort",
+   "b": "anticoagulant",
+   "level": "주의",
+   "reason": "세인트존스워트가 항응고 효과를 떨어뜨립니다",
+   "source": "와파린·DOAC 허가사항(세인트존스워트 병용 회피)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "st_johns_wort",
+   "b": "ssri",
+   "level": "주의",
+   "reason": "세로토닌 증후군 위험이 있습니다",
+   "source": "SSRI 허가사항(세로토닌 증후군: 세인트존스워트)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "statin",
+   "b": "statin",
+   "level": "주의",
+   "reason": "스타틴 성분이 겹쳐 근육 손상 위험이 커집니다",
+   "source": "같은 계열 중복(식약처 DUR 효능군 중복 원칙)",
+   "evidence": "약리 원칙",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "polyvalent_cation",
+   "b": "fluoroquinolone",
+   "level": "주의",
+   "reason": "칼슘·철·마그네슘 등이 항생제 흡수를 막습니다 — 2시간 이상 간격을 두세요",
+   "source": "플루오로퀴놀론 허가사항(다가 양이온과 간격)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "polyvalent_cation",
+   "b": "tetracycline",
+   "level": "주의",
+   "reason": "칼슘·철·마그네슘 등이 항생제 흡수를 막습니다 — 2~3시간 간격을 두세요",
+   "source": "테트라사이클린계 허가사항(다가 양이온과 간격)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "polyvalent_cation",
+   "b": "levothyroxine",
+   "level": "주의",
+   "reason": "칼슘·철 등이 갑상선 호르몬 흡수를 막습니다 — 4시간 간격을 두세요",
+   "source": "레보티록신 허가사항(칼슘·철과 4시간 간격)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "polyvalent_cation",
+   "b": "bisphosphonate",
+   "level": "주의",
+   "reason": "골다공증약 흡수를 막습니다 — 골다공증약을 먼저, 30분 이상 뒤에 드세요",
+   "source": "비스포스포네이트 허가사항(복용 후 30분 이상 다른 약·음식 금지)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "potassium_supplement",
+   "b": "ace_arb",
+   "level": "주의",
+   "reason": "칼륨이 지나치게 올라갈 수 있습니다(고칼륨혈증)",
+   "source": "ACE 억제제·ARB 허가사항(칼륨 보충제 병용 고칼륨혈증)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "potassium_supplement",
+   "b": "k_sparing",
+   "level": "높음",
+   "reason": "칼륨이 위험하게 올라갈 수 있습니다(고칼륨혈증)",
+   "source": "칼륨 보존 이뇨제 허가사항(칼륨 보충제 병용 금기·회피)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "botulinum",
+   "b": "neuromuscular_blocker",
+   "level": "주의",
+   "reason": "근육 마비 효과가 강해질 수 있습니다 (허가사항)",
+   "source": "보툴리눔 톡신 허가사항(신경근 차단제 병용)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "tnf_inhibitor",
+   "b": "immunosuppressant",
+   "level": "주의",
+   "reason": "면역 억제가 겹쳐 감염 위험이 커집니다",
+   "source": "TNF 억제제 박스경고(면역억제제 병용 중 중증 감염)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ghb",
+   "b": "alcohol",
+   "level": "높음",
+   "reason": "GHB(물뽕)와 술을 함께 쓰면 의식 소실·호흡 정지로 사망할 수 있습니다 (옥시베이트 허가사항 병용금기)",
+   "source": "옥시베이트(Xyrem) 허가사항 병용금기(알코올)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ghb",
+   "b": "sedative",
+   "level": "높음",
+   "reason": "GHB와 수면·진정제를 함께 쓰면 호흡 억제·혼수 위험이 큽니다 (옥시베이트 허가사항 병용금기)",
+   "source": "옥시베이트(Xyrem) 허가사항 병용금기(수면·진정제)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ghb",
+   "b": "opioid",
+   "level": "높음",
+   "reason": "GHB와 오피오이드를 함께 쓰면 호흡 억제·혼수·사망 위험이 큽니다 (옥시베이트 박스경고)",
+   "source": "옥시베이트(Xyrem) 박스경고(중추신경억제제)",
+   "evidence": "박스경고",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ghb",
+   "b": "dissociative",
+   "level": "높음",
+   "reason": "GHB와 케타민 계열을 함께 쓰면 의식을 잃은 채 토해 질식하거나 호흡이 억제될 수 있습니다",
+   "source": "중독 사례·위해 감소 문헌(GHB+케타민)",
+   "evidence": "위해 감소 문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ghb",
+   "b": "gabapentinoid",
+   "level": "주의",
+   "reason": "진정·호흡 억제가 커집니다",
+   "source": "옥시베이트 허가사항(중추신경억제제 병용)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "dissociative",
+   "b": "alcohol",
+   "level": "높음",
+   "reason": "케타민 계열과 술을 함께 쓰면 의식이 떨어진 채 토해 질식(흡인)하거나 호흡이 억제될 수 있습니다",
+   "source": "위해 감소 문헌(케타민+알코올 흡인·호흡 억제)",
+   "evidence": "위해 감소 문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "dissociative",
+   "b": "opioid",
+   "level": "주의",
+   "reason": "케타민 계열과 오피오이드를 함께 쓰면 호흡 억제가 커집니다 (허가사항)",
+   "source": "케타민 허가사항(오피오이드 병용 호흡 억제)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "dissociative",
+   "b": "sedative",
+   "level": "주의",
+   "reason": "케타민 계열과 수면·진정제를 함께 쓰면 진정·호흡 억제가 커집니다 (허가사항)",
+   "source": "케타민 허가사항(벤조디아제핀 등 병용)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cocaine",
+   "b": "alcohol",
+   "level": "높음",
+   "reason": "코카인과 술을 함께 쓰면 몸속에서 코카에틸렌이 생겨 심장 독성·돌연사 위험이 커집니다",
+   "source": "코카에틸렌 독성 문헌(Andrews 1997 등)",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cocaine",
+   "b": "opioid",
+   "level": "높음",
+   "reason": "코카인+오피오이드(스피드볼)는 흥분 효과가 먼저 끝나면 호흡 억제가 남아 과다복용 사망이 많습니다",
+   "source": "과다복용 사망 통계·문헌(스피드볼, 미국 CDC)",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "street_stimulant",
+   "b": "opioid",
+   "level": "주의",
+   "reason": "흥분제가 오피오이드의 진정을 가려 더 쓰게 만들고, 흥분 효과가 끝나면 호흡 억제가 남습니다",
+   "source": "과다복용 사망 통계·위해 감소 문헌",
+   "evidence": "위해 감소 문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "street_stimulant",
+   "b": "alcohol",
+   "level": "주의",
+   "reason": "흥분제가 술 취한 느낌을 가려 과음하게 되고 탈수·체온 상승·심장 부담이 커집니다",
+   "source": "위해 감소 문헌",
+   "evidence": "위해 감소 문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "stimulant",
+   "b": "maoi",
+   "level": "높음",
+   "reason": "흥분제와 MAO 억제제를 함께 쓰면 고혈압 위기·고열로 위험합니다 (허가사항 병용금기 — 끊은 뒤 14일 간격)",
+   "source": "암페타민계 허가사항 병용금기(MAO 억제제, 14일 간격)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "mdma_like",
+   "b": "maoi",
+   "level": "높음",
+   "reason": "MDMA 계열과 MAO 억제제를 함께 쓰면 세로토닌 증후군·고혈압 위기로 사망한 사례가 있습니다",
+   "source": "증례 보고(MDMA+MAO 억제제 사망, Vuori 2003 등)",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "mdma_like",
+   "b": "hiv_booster",
+   "level": "높음",
+   "reason": "리토나비르·코비시스타트가 MDMA 분해를 막아 농도가 크게 올라 사망한 사례가 보고되었습니다",
+   "source": "증례 보고(Henry & Hill 1998 Lancet, 리토나비르+MDMA 사망)",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "mdma_like",
+   "b": "serotonergic",
+   "level": "주의",
+   "reason": "세로토닌 증후군(고열·근육 경직·혼돈) 위험이 있습니다 — SSRI 계열은 MDMA 효과를 줄여 더 많이 쓰게 만들 수 있습니다",
+   "source": "세로토닌 증후군 문헌·위해 감소 문헌",
+   "evidence": "위해 감소 문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "psychedelic",
+   "b": "lithium",
+   "level": "높음",
+   "reason": "LSD·환각버섯 계열과 리튬을 함께 쓰면 경련(발작)·의식 저하가 여러 차례 보고되었습니다",
+   "source": "Nayak 2021 J Psychopharmacol(리튬+고전 환각제 경련 보고 분석)",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "psychedelic",
+   "b": "maoi",
+   "level": "주의",
+   "reason": "MAO 억제제가 환각제(특히 DMT 계열)의 작용을 크게 키워 세로토닌 증후군·혈압 상승 위험이 있습니다",
+   "source": "약리 문헌(MAO 억제제 + 트립타민 환각제)",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "harmala",
+   "b": "serotonergic",
+   "level": "높음",
+   "reason": "아야와스카의 하르민은 MAO 억제제라 항우울제(SSRI) 등 세로토닌 약과 함께 쓰면 세로토닌 증후군 위험이 큽니다 (MAO 억제제 병용금기와 같은 이유)",
+   "source": "Callaway 1998 등 아야와스카 약리 문헌, MAO 억제제 병용금기 원칙",
+   "evidence": "약리 원칙",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "synthetic_cannabinoid",
+   "b": "alcohol",
+   "level": "주의",
+   "reason": "술과 함께 쓰면 구토·의식 저하·판단력 저하가 커집니다",
+   "source": "출처 확인 필요",
+   "evidence": "출처 확인 필요",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "psychedelic",
+   "b": "cannabinoid",
+   "level": "주의",
+   "reason": "대마가 환각 작용을 예측할 수 없게 키워 공황·정신병적 반응이 생길 수 있습니다",
+   "source": "위해 감소 문헌",
+   "evidence": "위해 감소 문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cannabinoid",
+   "b": "warfarin",
+   "level": "주의",
+   "reason": "대마 성분(THC·CBD)이 와파린 분해를 늦춰 INR이 오르고 출혈 위험이 생길 수 있습니다",
+   "source": "칸나비디올(Epidiolex) 허가사항·증례 보고(INR 상승)",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cannabinoid",
+   "b": "sedative",
+   "level": "주의",
+   "reason": "졸음·운동 능력 저하가 커집니다 — 운전하지 마세요",
+   "source": "드로나비놀·칸나비디올 허가사항(중추신경억제제 병용)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cannabinoid",
+   "b": "alcohol",
+   "level": "주의",
+   "reason": "술과 함께 쓰면 어지러움·구토·판단력 저하가 커집니다 — 운전하지 마세요",
+   "source": "드로나비놀·칸나비디올 허가사항(알코올 병용)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "nitrite",
+   "b": "pde5",
+   "level": "높음",
+   "reason": "파퍼스(아질산 알킬)와 발기부전 치료제를 함께 쓰면 혈압이 급격히 떨어져 실신·심근경색·사망 위험이 있습니다 (허가사항 병용금기)",
+   "source": "PDE5 억제제 허가사항 병용금기(아질산 아밀 등)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "kratom",
+   "b": "opioid",
+   "level": "주의",
+   "reason": "크라톰도 오피오이드 수용체에 작용해 호흡 억제가 더해집니다 — 사망 사례 대부분이 다른 약물과 함께 쓴 경우입니다",
+   "source": "미국 CDC MMWR 2019(크라톰 관련 사망), FDA 크라톰 공지",
+   "evidence": "규제기관 권고",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "kratom",
+   "b": "sedative",
+   "level": "주의",
+   "reason": "진정·호흡 억제가 커집니다",
+   "source": "미국 CDC MMWR 2019(크라톰 관련 사망 대부분 다약물)",
+   "evidence": "규제기관 권고",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "kratom",
+   "b": "alcohol",
+   "level": "주의",
+   "reason": "진정·호흡 억제가 커집니다",
+   "source": "미국 CDC MMWR 2019(크라톰 관련 사망 대부분 다약물)",
+   "evidence": "규제기관 권고",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "xylazine",
+   "b": "opioid",
+   "level": "높음",
+   "reason": "자일라진(트랑크)이 오피오이드의 진정·호흡 억제를 키우며 날록손으로 풀리지 않습니다 (미국 FDA 경고)",
+   "source": "미국 FDA 경고(2022-11, 자일라진 혼입 오피오이드)",
+   "evidence": "규제기관 권고",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "gaba_depressant",
+   "b": "alcohol",
+   "level": "주의",
+   "reason": "진정·호흡 억제가 커집니다",
+   "source": "출처 확인 필요",
+   "evidence": "출처 확인 필요",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "gaba_depressant",
+   "b": "sedative",
+   "level": "주의",
+   "reason": "진정·호흡 억제가 커집니다",
+   "source": "출처 확인 필요",
+   "evidence": "출처 확인 필요",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "gaba_depressant",
+   "b": "opioid",
+   "level": "주의",
+   "reason": "진정·호흡 억제가 커집니다",
+   "source": "출처 확인 필요",
+   "evidence": "출처 확인 필요",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  }
+ ]
+}

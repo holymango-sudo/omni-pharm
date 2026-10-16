@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import re
 
+from omnipharm import rules as _rules
+
 ORGANS = {
     "brain": "뇌·신경계",
     "heart": "심장·순환계",
@@ -366,52 +368,9 @@ DISEASES: dict[str, dict] = {
     "myasthenia": {"ko": "중증근무력증", "kw": ("근무력", "myasthenia"), "flag": None},
 }
 
-# (disease, drug class/group/name, severity, plain-language reason). Severity "금기" = avoid, "주의" = caution.
-# Sources: AGS Beers Criteria (2023) drug-disease table, FDA/MFDS labelling (contraindications & warnings).
-DRUG_DISEASE_RULES: list[tuple[str, str, str, str]] = [
-    ("peptic_ulcer", "nsaid", "금기", "위궤양·위장 출혈이 다시 생기거나 커질 수 있습니다"),
-    ("peptic_ulcer", "anticoagulant", "주의", "위장관 출혈 위험이 커집니다"),
-    ("peptic_ulcer", "corticosteroid", "주의", "궤양이 악화될 수 있습니다"),
-    ("bleeding", "anticoagulant", "금기", "출혈이 멈추지 않을 위험이 큽니다"),
-    ("bleeding", "nsaid", "주의", "혈소판 기능을 떨어뜨려 출혈 위험이 커집니다"),
-    ("glaucoma", "sedating_antihistamine", "주의", "(폐쇄각) 녹내장의 안압을 올릴 수 있습니다"),
-    ("glaucoma", "anticholinergic", "주의", "(폐쇄각) 녹내장의 안압을 올릴 수 있습니다"),
-    ("glaucoma", "decongestant", "주의", "동공을 넓혀 (폐쇄각) 녹내장을 악화시킬 수 있습니다"),
-    ("bph", "sedating_antihistamine", "주의", "소변이 막히는 요폐가 생길 수 있습니다"),
-    ("bph", "anticholinergic", "주의", "소변이 막히는 요폐가 생길 수 있습니다"),
-    ("bph", "decongestant", "주의", "방광 출구를 조여 소변이 잘 안 나올 수 있습니다"),
-    ("asthma", "nonselective_beta_blocker", "금기", "기관지를 수축시켜 천식 발작을 일으킬 수 있습니다"),
-    ("asthma", "nsaid", "주의", "아스피린·진통제 과민 천식을 유발할 수 있습니다"),
-    ("heart_failure", "nsaid", "금기", "몸에 물이 차게 해 심부전을 악화시킵니다"),
-    ("heart_failure", "thiazolidinedione", "금기", "체액 저류로 심부전을 악화시킵니다"),
-    ("heart_failure", "nondhp_ccb", "주의", "심장 수축력을 떨어뜨려 심부전이 악화될 수 있습니다"),
-    ("heart_failure", "decongestant", "주의", "심장에 부담을 줍니다"),
-    ("hypertension", "decongestant", "주의", "혈압을 올립니다"),
-    ("hypertension", "nsaid", "주의", "혈압을 올리고 혈압약 효과를 떨어뜨립니다"),
-    ("arrhythmia", "qt_prolonging", "주의", "심장 리듬 이상(QT 연장·돌연 부정맥) 위험이 커집니다"),
-    ("arrhythmia", "decongestant", "주의", "가슴 두근거림·부정맥을 일으킬 수 있습니다"),
-    ("cardiac", "nsaid", "주의", "심근경색·뇌졸중 위험이 커질 수 있습니다"),
-    ("cardiac", "decongestant", "주의", "심장 혈관을 수축시켜 협심증을 악화시킬 수 있습니다"),
-    ("renal", "nsaid", "금기", "신장 혈류를 줄여 신기능을 더 떨어뜨립니다"),
-    ("renal", "aminoglycoside", "주의", "신장 독성이 있어 신기능이 더 나빠질 수 있습니다"),
-    ("hepatic", "acetaminophen", "주의", "간 손상 위험 — 하루 총량을 줄여야 합니다"),
-    ("hepatic", "hepatotoxic", "주의", "간 독성이 있어 간 손상이 악화될 수 있습니다"),
-    ("epilepsy", "seizure_threshold", "주의", "경련을 일으키기 쉽게 만듭니다"),
-    ("epilepsy", "fluoroquinolone", "주의", "경련을 유발할 수 있습니다"),
-    ("dementia", "sedating_antihistamine", "주의", "혼돈·섬망과 낙상을 일으키기 쉽습니다"),
-    ("dementia", "anticholinergic", "주의", "기억력 저하·섬망을 악화시킵니다"),
-    ("dementia", "sedative", "주의", "혼돈·낙상 위험이 큽니다"),
-    ("parkinson", "dopamine_antagonist", "금기", "파킨슨 증상(떨림·경직)을 악화시킵니다"),
-    ("pregnancy", "teratogen", "금기", "태아에게 기형·독성을 일으킬 수 있습니다"),
-    ("pregnancy", "nsaid", "주의", "임신 20주 이후 태아 신장·심장에 해로울 수 있습니다"),
-    ("hyperthyroid", "decongestant", "주의", "두근거림·혈압 상승이 심해질 수 있습니다"),
-    ("gout", "thiazide", "주의", "요산을 올려 통풍 발작을 일으킬 수 있습니다"),
-    ("diabetes", "corticosteroid", "주의", "혈당을 크게 올립니다"),
-    ("diabetes", "fluoroquinolone", "주의", "저혈당·고혈당을 일으킬 수 있습니다"),
-    ("myasthenia", "aminoglycoside", "금기", "근력 약화를 급격히 악화시킬 수 있습니다"),
-    ("myasthenia", "fluoroquinolone", "금기", "근력 약화를 악화시킬 수 있습니다 (FDA 박스경고)"),
-    ("myasthenia", "macrolide", "주의", "근력 약화를 악화시킬 수 있습니다"),
-]
+# (disease, drug group, '금기' = avoid | '주의', plain-language reason) - data with sources and review records:
+# rules/drug_disease_rules.json (AGS Beers 2023 drug-disease table, FDA/MFDS labelling ...)
+DRUG_DISEASE_RULES: list[tuple[str, str, str, str]] = _rules.drug_disease_rules()
 
 # English words to find the disease in FDA label contraindication / boxed-warning text
 DISEASE_LABEL_TERMS: dict[str, str] = {
@@ -550,17 +509,8 @@ PRODRUGS_ACTIVATED_BY = {"clopidogrel": "CYP2C19", "codeine": "CYP2D6", "tramado
 # Combinations prescribed ON PURPOSE that no single marketed product in our data contains (those are found from the
 # product data: engine.combo_pairs). The interaction is the point of the combination (boosting) or the regimen is the
 # approved use; their labels' wording about each other is not a warning against using them together.
-_BOOSTED = ("atazanavir", "darunavir", "lopinavir", "saquinavir", "fosamprenavir", "tipranavir", "elvitegravir",
-            "nirmatrelvir")
-INTENDED_COMBINATIONS: list[tuple[str, str, str]] = [
-    *((b, d, "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)")
-      for b in ("ritonavir", "cobicistat") for d in _BOOSTED),
-    ("stiripentol", "clobazam", "스티리펜톨은 클로바잠을 복용 중인 드라베증후군 환자에게 허가된 약(Diacomit 허가사항)"),
-    ("dapsone", "rifampin", "한센병 다제요법(WHO MDT)의 표준 병용"),
-    ("isoniazid", "rifampin", "결핵 표준 치료의 병용(복합제 Rifamate 등)"),
-    ("pyrazinamide", "rifampin", "결핵 표준 치료의 병용"),
-    ("ethambutol", "rifampin", "결핵 표준 치료의 병용"),
-]
+# Data with sources: rules/intended_combinations.json
+INTENDED_COMBINATIONS: list[tuple[str, str, str]] = _rules.intended_combinations()
 # sensitive substrates whose metabolite by that enzyme is equally active: an inhibitor shifts parent <-> metabolite
 # but not the total active moiety (venlafaxine label: CYP2D6 inhibitors need no dose adjustment)
 EQUIACTIVE_METABOLITE = {"venlafaxine": "CYP2D6"}
@@ -858,224 +808,19 @@ DISEASES.update({
     "pancreatitis": {"ko": "췌장염 병력", "kw": ("췌장염", "pancreatit"), "flag": None},
     "infection": {"ko": "활동성 감염·결핵", "kw": ("결핵", "활동성 감염", "패혈증", "tuberculosis", "sepsis"), "flag": None},
 })
-DRUG_DISEASE_RULES += [
-    ("thyroid_cancer", "glp1", "금기", "갑상선 C세포 종양 위험이 있어 쓰지 않습니다 (FDA 박스경고)"),
-    ("pancreatitis", "glp1", "주의", "췌장염이 다시 생길 수 있습니다"),
-    ("pregnancy", "glp1", "금기", "임신 중에는 쓰지 않습니다 — 임신 계획 시 미리 중단 (허가사항)"),
-    ("myasthenia", "botulinum", "금기", "근육 힘이 더 빠져 삼킴·호흡 곤란이 생길 수 있습니다 (허가사항)"),
-    ("infection", "tnf_inhibitor", "금기", "결핵·중증 감염이 악화될 수 있습니다 (FDA 박스경고)"),
-    ("heart_failure", "tnf_inhibitor", "주의", "심부전이 악화될 수 있습니다"),
-    ("hypertension", "licorice", "주의", "감초(글리시리진)가 혈압을 올리고 칼륨을 떨어뜨립니다"),
-    ("heart_failure", "licorice", "주의", "몸에 물이 차게 해 심부전을 악화시킬 수 있습니다"),
-    ("renal", "potassium_supplement", "주의", "콩팥이 칼륨을 못 내보내 고칼륨혈증 위험이 있습니다"),
-    ("bleeding", "bleeding_herb", "주의", "출혈 경향을 더할 수 있습니다"),
-    # street stimulants (cocaine, methamphetamine, MDMA ...): coronary spasm, arrhythmia, seizures, placental harm
-    ("cardiac", "street_stimulant", "금기", "관상동맥을 수축시켜 심근경색·돌연사 위험이 큽니다"),
-    ("arrhythmia", "street_stimulant", "금기", "치명적인 부정맥을 일으킬 수 있습니다"),
-    ("hypertension", "street_stimulant", "주의", "혈압을 급격히 올려 뇌출혈 위험이 있습니다"),
-    ("epilepsy", "street_stimulant", "주의", "경련을 일으킬 수 있습니다"),
-    ("pregnancy", "street_stimulant", "금기", "태반 혈류를 줄여 조산·태반 조기박리·태아 성장 지연 위험이 있습니다"),
-    ("pregnancy", "cannabinoid", "주의", "태아 발달에 해로울 수 있어 임신 중에는 쓰지 않도록 권고됩니다"),
-]
 DISEASE_LABEL_TERMS.update({"thyroid_cancer": r"medullary thyroid", "pancreatitis": r"pancreatitis"})
 
-# Pair rules that labels state by drug CLASS (so a name search cannot find them).
-# (group a, group b, "높음"|"주의", plain-language reason)
-PAIR_RULES: list[tuple[str, str, str, str]] = [
-    ("qt_prolonging", "qt_prolonging", "주의", "두 약 모두 QT 간격을 늘려 돌연 부정맥(Torsade de Pointes) 위험이 더해집니다 — 심전도 확인"),
-    ("opioid", "sedative", "높음", "함께 쓰면 깊은 진정·호흡 억제·혼수·사망 위험이 있습니다 (FDA 박스경고)"),
-    ("opioid", "gabapentinoid", "주의", "호흡 억제 위험이 커집니다 (FDA 안전성 서한 2019)"),
-    ("glp1", "insulin", "주의", "함께 쓰면 저혈당 위험이 커져 인슐린 감량이 필요할 수 있습니다 (허가사항)"),
-    ("glp1", "sulfonylurea", "주의", "함께 쓰면 저혈당 위험이 커져 설포닐우레아 감량이 필요할 수 있습니다 (허가사항)"),
-    ("insulin", "sulfonylurea", "주의", "둘 다 혈당을 낮춰 저혈당 위험이 커집니다"),
-    ("tirzepatide", "oral_contraceptive", "주의", "위 배출이 늦어져 먹는 피임약 효과가 떨어질 수 있습니다 — 시작·증량 후 "
-                                                "4주간 다른 피임법을 함께 쓰세요 (허가사항)"),
-    ("glp1", "warfarin", "주의", "위 배출이 늦어져 흡수가 달라질 수 있어 INR을 더 자주 확인하세요"),
-    ("botulinum", "aminoglycoside", "주의", "근육 마비 효과가 강해질 수 있습니다 (허가사항)"),
-    # herbal / mineral interactions documented in labelling and standard references
-    ("licorice", "thiazide", "주의", "감초가 칼륨을 더 떨어뜨려 저칼륨혈증·부정맥 위험이 커집니다"),
-    ("licorice", "loop_diuretic", "주의", "감초가 칼륨을 더 떨어뜨려 저칼륨혈증·부정맥 위험이 커집니다"),
-    ("licorice", "digoxin", "주의", "감초로 칼륨이 떨어지면 디곡신 독성이 커집니다"),
-    ("dabigatran", "strong_pgp_inh", "높음", "강한 P-당단백 억제제가 다비가트란 농도를 크게 올려 출혈 위험이 큽니다 "
-                                           "(유럽 허가사항 병용금기, 미국은 신기능 저하 시 회피)"),
-    ("digoxin", "loop_diuretic", "주의", "이뇨제로 칼륨·마그네슘이 떨어지면 디곡신 독성(부정맥)이 생기기 쉽습니다 — 전해질 확인"),
-    ("digoxin", "thiazide", "주의", "이뇨제로 칼륨·마그네슘이 떨어지면 디곡신 독성(부정맥)이 생기기 쉽습니다 — 전해질 확인"),
-    ("fluoroquinolone", "corticosteroid", "주의", "힘줄염·힘줄 파열 위험이 커집니다 (퀴놀론 박스경고) — 특히 60세 이상"),
-    # food, drink, smoking (labelling + standard references)
-    ("alcohol", "metronidazole", "높음", "술과 함께 먹으면 구토·두근거림·홍조(디설피람 유사 반응)가 생깁니다 — 복용 중과 끝난 뒤 3일은 금주"),
-    ("alcohol", "opioid", "높음", "술이 진정·호흡 억제를 크게 키웁니다 (FDA 박스경고) — 함께 마시지 마세요"),
-    ("alcohol", "sedative", "높음", "술이 진정 작용을 크게 키워 호흡 억제·낙상·기억 상실 위험이 있습니다 — 함께 마시지 마세요"),
-    ("alcohol", "gabapentinoid", "주의", "술이 졸음·어지러움·호흡 억제를 키웁니다"),
-    ("alcohol", "sedating_antihistamine", "주의", "술이 졸음을 크게 키웁니다 — 운전·기계 조작 금지"),
-    ("alcohol", "acetaminophen", "주의", "매일 3잔 이상 술을 마시면 아세트아미노펜으로 간이 손상될 위험이 커집니다"),
-    ("alcohol", "nsaid", "주의", "술과 함께 먹으면 위장 출혈 위험이 커집니다"),
-    ("alcohol", "metformin", "주의", "과음은 메트포르민의 젖산산증 위험을 키웁니다"),
-    ("alcohol", "sulfonylurea", "주의", "술이 저혈당을 일으키거나 숨길 수 있습니다"),
-    ("alcohol", "insulin", "주의", "술이 저혈당을 일으키거나 숨길 수 있습니다"),
-    ("alcohol", "warfarin", "주의", "술이 와파린 효과(INR)를 흔들어 출혈·혈전 위험이 생깁니다 — 과음 금지"),
-    # v2.18 - documented contraindications the label text could not show (Korean-only drugs, no FDA label)
-    ("pde5", "nitrate", "높음", "질산염·NO 공여제(니트로글리세린·니코란딜 등)와 발기부전 치료제를 함께 쓰면 혈압이 급격히 떨어질 수 "
-                              "있습니다 — 함께 쓰지 마세요 (PDE5 억제제 허가사항 병용금기)"),
-    ("retinoid_systemic", "tetracycline", "높음", "먹는 레티노이드(이소트레티노인·아시트레틴 등)와 테트라사이클린계 항생제를 함께 "
-                                                "쓰면 뇌압이 오르는 가성뇌종양 위험이 있습니다 — 함께 쓰지 마세요 (허가사항 병용금기)"),
-    ("anorectic", "anorectic", "높음", "식욕억제제를 두 가지 이상 함께 쓰면 심장판막병·폐동맥고혈압 위험이 커집니다 — 함께 쓰지 "
-                                    "마세요 (허가사항: 다른 체중 감량 약과 병용 금지)"),
-    ("ergot", "cyp3a_inh_ergot", "높음", "맥각 알칼로이드(에르고타민 등)와 강한 CYP3A 억제제(마크롤리드·아졸·HIV 약 등)를 함께 "
-                                       "쓰면 혈관 경련으로 손발·장기 허혈이 생길 수 있습니다 (에르고타민 박스경고·병용금기)"),
-    ("domperidone", "qt_prolonging", "높음", "돔페리돈을 QT 간격을 늘리는 약과 함께 쓰면 심각한 부정맥(염전성 심실빈맥) 위험이 "
-                                           "커집니다 — 함께 쓰지 마세요 (유럽 EMA 2014 권고·국내 허가사항 병용금기)"),
-    ("domperidone", "cyp3a_strong_inh", "높음", "강한 CYP3A 억제제가 돔페리돈 농도를 크게 올려 심장 부정맥 위험이 커집니다 — 함께 "
-                                              "쓰지 마세요 (EMA 2014 권고·국내 허가사항 병용금기)"),
-    ("menatetrenone", "warfarin", "높음", "골다공증 치료제 메나테트레논(고용량 비타민K2)은 와파린 효과를 없앱니다 — 함께 쓰지 "
-                                        "마세요 (메나테트레논 허가사항: 와파린 복용 환자 금기)"),
-    ("calcineurin", "calcineurin", "높음", "사이클로스포린과 타크로리무스를 함께 쓰면 신장 독성이 겹칩니다 — 함께 쓰지 마세요 "
-                                         "(허가사항: 병용 회피, 바꿀 때는 24시간 간격)"),
-    ("iron_supplement", "tea_tannin", "주의", "차(녹차·홍차)의 탄닌이 철분과 결합해 흡수를 줄입니다 — 철분제는 차와 1~2시간 "
-                                            "간격을 두세요 (철분제 허가사항)"),
-    ("iron_supplement", "dairy", "주의", "우유·유제품의 칼슘이 철분 흡수를 줄입니다 — 철분제는 우유와 1~2시간 간격을 두세요 "
-                                       "(철분제 허가사항)"),
-    # warfarin label (drug interactions: acetaminophen); INR rises with regular use of more than ~2 g a day (Hylek 1998)
-    ("acetaminophen", "warfarin", "주의", "아세트아미노펜을 며칠 이상 매일 많이(하루 2g 이상) 먹으면 INR이 올라 출혈 위험이 생길 수 "
-                                       "있습니다 — 가끔 먹는 것은 괜찮습니다"),
-    ("grapefruit", "grapefruit_major", "높음", "자몽(주스)이 약의 혈중 농도를 크게 올립니다 — 복용 중 자몽을 피하세요"),
-    ("grapefruit", "grapefruit_moderate", "주의", "자몽(주스)이 약의 혈중 농도를 올릴 수 있습니다 — 많이 마시지 마세요"),
-    ("dairy", "tetracycline", "주의", "우유·유제품이 항생제 흡수를 막습니다 — 2~3시간 간격을 두세요"),
-    ("dairy", "fluoroquinolone", "주의", "우유·유제품이 항생제 흡수를 막습니다 — 2시간 이상 간격을 두세요"),
-    ("vitamin_k_food", "warfarin", "주의", "비타민K가 많은 음식은 와파린 효과를 줄입니다 — 끊지 말고 매일 비슷한 양을 드세요"),
-    ("vitamin_k_supplement", "warfarin", "주의", "비타민K 영양제는 와파린 효과(INR)를 떨어뜨립니다 — 시작하거나 끊기 전에 의사와 "
-                                               "상의하고 INR을 확인하세요"),
-    ("high_potassium_food", "k_sparing", "주의", "칼륨이 많은 음식을 많이 먹으면 칼륨이 지나치게 올라갈 수 있습니다(고칼륨혈증) — "
-                                              "특히 콩팥 기능이 떨어졌을 때"),
-    ("high_potassium_food", "ace_arb", "주의", "칼륨이 많은 음식을 많이 먹으면 칼륨이 지나치게 올라갈 수 있습니다(고칼륨혈증) — "
-                                            "특히 콩팥 기능이 떨어졌을 때"),
-    ("smoking", "oral_contraceptive", "주의", "흡연자(특히 35세 이상)는 피임약으로 혈전·심혈관 사고 위험이 큽니다 (박스경고)"),
-    ("smoking", "smoking_cyp1a2", "주의", "흡연이 약의 분해를 빠르게 해 효과가 떨어질 수 있습니다 — 금연·흡연 시작 시 용량 조절 필요"),
-    ("anticoagulant", "nsaid", "주의", "출혈(특히 위장관 출혈) 위험이 커집니다 — 검은 변·멍·잇몸 출혈을 살피세요"),
-    ("anticoagulant", "ssri", "주의", "SSRI·SNRI는 혈소판 기능을 떨어뜨려 출혈 위험을 더합니다 — 출혈 징후를 살피세요"),
-    ("nsaid", "ssri", "주의", "위장관 출혈 위험이 커집니다 — 속쓰림·검은 변이 생기면 상담하세요"),
-    ("bleeding_herb", "anticoagulant", "주의", "은행잎·마늘·강황 같은 성분은 혈액 응고를 늦춰 출혈 위험을 더할 수 있습니다"),
-    ("bleeding_herb", "nsaid", "주의", "은행잎·마늘·강황 같은 성분은 혈액 응고를 늦춰 출혈 위험을 더할 수 있습니다"),
-    ("ginseng", "warfarin", "주의", "인삼이 와파린 효과(INR)를 떨어뜨릴 수 있습니다"),
-    # every diabetes medicine: the MFDS standard caution of 홍삼 products ('의약품(당뇨치료제, 혈액항응고제) 복용 시
-    # 섭취에 주의' - 4,012 of 4,313 ginseng products in 건강기능식품정보)
-    ("ginseng", "antidiabetic", "주의", "인삼·홍삼이 혈당을 더 낮출 수 있습니다 — 저혈당 증상을 살피세요(식약처 홍삼 제품 "
-                                     "표시: '당뇨치료제 복용 시 섭취에 주의')"),
-    # common supplements (product labelling and standard interaction references); never above '주의'
-    ("omega3", "anticoagulant", "주의", "오메가3를 많이(하루 3g 이상) 먹으면 출혈 경향이 커질 수 있습니다 — 멍·잇몸 출혈을 살피세요"),
-    ("coq10", "warfarin", "주의", "코엔자임Q10이 와파린 효과(INR)를 떨어뜨릴 수 있습니다 — 시작하거나 끊을 때 INR을 확인하세요"),
-    ("cranberry", "warfarin", "주의", "크랜베리 주스·농축 제품을 많이 먹으면 INR이 올라 출혈 위험이 생길 수 있습니다"),
-    ("probiotic", "antibacterial", "주의", "항생제가 유산균을 죽여 효과가 줄어듭니다 — 항생제와 2시간 이상 간격을 두고 드세요"),
-    ("st_johns_wort", "immunosuppressant", "높음", "세인트존스워트가 면역억제제 농도를 크게 낮춰 거부반응 위험이 있습니다"),
-    ("st_johns_wort", "oral_contraceptive", "주의", "세인트존스워트가 피임약 효과를 떨어뜨립니다"),
-    ("st_johns_wort", "anticoagulant", "주의", "세인트존스워트가 항응고 효과를 떨어뜨립니다"),
-    ("st_johns_wort", "ssri", "주의", "세로토닌 증후군 위험이 있습니다"),
-    ("statin", "statin", "주의", "스타틴 성분이 겹쳐 근육 손상 위험이 커집니다"),
-    ("polyvalent_cation", "fluoroquinolone", "주의", "칼슘·철·마그네슘 등이 항생제 흡수를 막습니다 — 2시간 이상 간격을 두세요"),
-    ("polyvalent_cation", "tetracycline", "주의", "칼슘·철·마그네슘 등이 항생제 흡수를 막습니다 — 2~3시간 간격을 두세요"),
-    ("polyvalent_cation", "levothyroxine", "주의", "칼슘·철 등이 갑상선 호르몬 흡수를 막습니다 — 4시간 간격을 두세요"),
-    ("polyvalent_cation", "bisphosphonate", "주의", "골다공증약 흡수를 막습니다 — 골다공증약을 먼저, 30분 이상 뒤에 드세요"),
-    ("potassium_supplement", "ace_arb", "주의", "칼륨이 지나치게 올라갈 수 있습니다(고칼륨혈증)"),
-    ("potassium_supplement", "k_sparing", "높음", "칼륨이 위험하게 올라갈 수 있습니다(고칼륨혈증)"),
-    ("botulinum", "neuromuscular_blocker", "주의", "근육 마비 효과가 강해질 수 있습니다 (허가사항)"),
-    ("tnf_inhibitor", "immunosuppressant", "주의", "면역 억제가 겹쳐 감염 위험이 커집니다"),
-    # recreational / controlled substances (recreational.py): combinations documented in labelling (oxybate, PDE5
-    # inhibitor, amphetamine labels), poison-centre / overdose-death reports and the harm-reduction literature
-    ("ghb", "alcohol", "높음", "GHB(물뽕)와 술을 함께 쓰면 의식 소실·호흡 정지로 사망할 수 있습니다 (옥시베이트 허가사항 병용금기)"),
-    ("ghb", "sedative", "높음", "GHB와 수면·진정제를 함께 쓰면 호흡 억제·혼수 위험이 큽니다 (옥시베이트 허가사항 병용금기)"),
-    ("ghb", "opioid", "높음", "GHB와 오피오이드를 함께 쓰면 호흡 억제·혼수·사망 위험이 큽니다 (옥시베이트 박스경고)"),
-    ("ghb", "dissociative", "높음", "GHB와 케타민 계열을 함께 쓰면 의식을 잃은 채 토해 질식하거나 호흡이 억제될 수 있습니다"),
-    ("ghb", "gabapentinoid", "주의", "진정·호흡 억제가 커집니다"),
-    ("dissociative", "alcohol", "높음", "케타민 계열과 술을 함께 쓰면 의식이 떨어진 채 토해 질식(흡인)하거나 호흡이 억제될 수 있습니다"),
-    ("dissociative", "opioid", "주의", "케타민 계열과 오피오이드를 함께 쓰면 호흡 억제가 커집니다 (허가사항)"),
-    ("dissociative", "sedative", "주의", "케타민 계열과 수면·진정제를 함께 쓰면 진정·호흡 억제가 커집니다 (허가사항)"),
-    ("cocaine", "alcohol", "높음", "코카인과 술을 함께 쓰면 몸속에서 코카에틸렌이 생겨 심장 독성·돌연사 위험이 커집니다"),
-    ("cocaine", "opioid", "높음", "코카인+오피오이드(스피드볼)는 흥분 효과가 먼저 끝나면 호흡 억제가 남아 과다복용 사망이 많습니다"),
-    ("street_stimulant", "opioid", "주의", "흥분제가 오피오이드의 진정을 가려 더 쓰게 만들고, 흥분 효과가 끝나면 호흡 억제가 남습니다"),
-    ("street_stimulant", "alcohol", "주의", "흥분제가 술 취한 느낌을 가려 과음하게 되고 탈수·체온 상승·심장 부담이 커집니다"),
-    ("stimulant", "maoi", "높음", "흥분제와 MAO 억제제를 함께 쓰면 고혈압 위기·고열로 위험합니다 (허가사항 병용금기 — 끊은 뒤 14일 간격)"),
-    ("mdma_like", "maoi", "높음", "MDMA 계열과 MAO 억제제를 함께 쓰면 세로토닌 증후군·고혈압 위기로 사망한 사례가 있습니다"),
-    ("mdma_like", "hiv_booster", "높음", "리토나비르·코비시스타트가 MDMA 분해를 막아 농도가 크게 올라 사망한 사례가 보고되었습니다"),
-    ("mdma_like", "serotonergic", "주의", "세로토닌 증후군(고열·근육 경직·혼돈) 위험이 있습니다 — SSRI 계열은 MDMA 효과를 줄여 "
-                                          "더 많이 쓰게 만들 수 있습니다"),
-    ("psychedelic", "lithium", "높음", "LSD·환각버섯 계열과 리튬을 함께 쓰면 경련(발작)·의식 저하가 여러 차례 보고되었습니다"),
-    ("psychedelic", "maoi", "주의", "MAO 억제제가 환각제(특히 DMT 계열)의 작용을 크게 키워 세로토닌 증후군·혈압 상승 위험이 있습니다"),
-    ("harmala", "serotonergic", "높음", "아야와스카의 하르민은 MAO 억제제라 항우울제(SSRI) 등 세로토닌 약과 함께 쓰면 세로토닌 증후군 "
-                                       "위험이 큽니다 (MAO 억제제 병용금기와 같은 이유)"),
-    ("synthetic_cannabinoid", "alcohol", "주의", "술과 함께 쓰면 구토·의식 저하·판단력 저하가 커집니다"),
-    ("psychedelic", "cannabinoid", "주의", "대마가 환각 작용을 예측할 수 없게 키워 공황·정신병적 반응이 생길 수 있습니다"),
-    ("cannabinoid", "warfarin", "주의", "대마 성분(THC·CBD)이 와파린 분해를 늦춰 INR이 오르고 출혈 위험이 생길 수 있습니다"),
-    ("cannabinoid", "sedative", "주의", "졸음·운동 능력 저하가 커집니다 — 운전하지 마세요"),
-    ("cannabinoid", "alcohol", "주의", "술과 함께 쓰면 어지러움·구토·판단력 저하가 커집니다 — 운전하지 마세요"),
-    ("nitrite", "pde5", "높음", "파퍼스(아질산 알킬)와 발기부전 치료제를 함께 쓰면 혈압이 급격히 떨어져 실신·심근경색·사망 위험이 "
-                              "있습니다 (허가사항 병용금기)"),
-    ("kratom", "opioid", "주의", "크라톰도 오피오이드 수용체에 작용해 호흡 억제가 더해집니다 — 사망 사례 대부분이 다른 약물과 "
-                                 "함께 쓴 경우입니다"),
-    ("kratom", "sedative", "주의", "진정·호흡 억제가 커집니다"),
-    ("kratom", "alcohol", "주의", "진정·호흡 억제가 커집니다"),
-    ("xylazine", "opioid", "높음", "자일라진(트랑크)이 오피오이드의 진정·호흡 억제를 키우며 날록손으로 풀리지 않습니다 (미국 FDA 경고)"),
-    ("gaba_depressant", "alcohol", "주의", "진정·호흡 억제가 커집니다"),
-    ("gaba_depressant", "sedative", "주의", "진정·호흡 억제가 커집니다"),
-    ("gaba_depressant", "opioid", "주의", "진정·호흡 억제가 커집니다"),
-]
-
-# Plain-language explanation of a rule for people who are not clinicians (key = the rule's two groups as in PAIR_RULES):
-#   short  one-line takeaway (the result headline when this is the only documented interaction)
-#   why    how the interaction works and what goes wrong in BOTH directions
-#   do     what to do (replaces the generic advice) - never 'stop the medicine' for a drug that must not be stopped
-#   signs  when to see a doctor at once (shown once, after the actions of every explained pair)
-_WARFARIN_SIGNS = ("이럴 때는 바로 진료를 받으세요: 출혈 신호(쉽게 드는 멍, 잇몸·코 출혈, 검은 변·붉은 소변) 또는 혈전 신호(한쪽 "
-                   "다리가 붓고 아픔, 갑작스러운 숨참·가슴 통증, 한쪽 팔다리 마비·말이 어눌해짐) — 와파린은 임의로 끊지 마세요.")
-RULE_DETAIL: dict[tuple[str, str], dict] = {
-    ("vitamin_k_food", "warfarin"): {
-        "short": "함께 먹어도 되지만, 비타민K가 많은 음식은 매일 비슷한 양을 꾸준히 드세요 — 갑자기 늘리거나 줄이는 것이 위험합니다.",
-        "why": "와파린은 피를 굳게 하는 응고 인자를 만들 때 필요한 비타민K의 작용을 막아 피가 잘 굳지 않게 하는 약입니다. "
-               "비타민K를 평소보다 갑자기 많이 먹으면 와파린 효과가 약해져 혈전(뇌졸중·폐색전증 등) 위험이 커지고, 반대로 갑자기 "
-               "크게 줄이면 효과가 너무 강해져 출혈 위험이 커집니다. 피할 필요는 없고, 평소 먹는 양을 일정하게 유지하는 것이 핵심입니다",
-        "do": ["비타민K가 많은 음식(시금치·케일·상추·브로콜리·청국장·녹즙 등)을 끊지 말고 매일 비슷한 양을 드세요.",
-               "식단을 크게 바꾸거나(다이어트·채식 시작, 입원·여행) 녹즙·비타민K 영양제를 시작하거나 끊을 때는 의사에게 알리고 "
-               "INR 검사를 받으세요."],
-        "signs": _WARFARIN_SIGNS},
-    ("vitamin_k_supplement", "warfarin"): {
-        "short": "비타민K 영양제는 와파린 효과를 바꿉니다 — 시작하거나 끊기 전에 의사와 상의하고, 먹는다면 매일 같은 양을 드세요.",
-        "why": "와파린은 비타민K의 작용을 막아 피가 잘 굳지 않게 하는 약입니다. 비타민K(K1·K2) 영양제를 새로 먹기 시작하면 와파린 "
-               "효과가 약해져 혈전(뇌졸중·폐색전증 등) 위험이 커지고, 먹던 영양제를 갑자기 끊으면 효과가 너무 강해져 출혈 위험이 "
-               "커집니다(의사가 INR이 너무 높을 때 비타민K를 처방하는 것은 이 작용을 이용한 치료입니다)",
-        "do": ["비타민K가 든 영양제(비타민K2·종합비타민 포함)를 시작하거나 끊기 전에 의사와 상의하세요 — 먹는다면 매일 같은 양을 드세요.",
-               "영양제를 시작하거나 끊은 뒤에는 INR 검사를 평소보다 자주 받으세요."],
-        "signs": _WARFARIN_SIGNS},
-    ("acetaminophen", "warfarin"): {
-        "short": "가끔 먹는 것은 괜찮습니다 — 며칠 이상 매일 먹어야 한다면 의사에게 알리고 INR을 확인하세요.",
-        "why": "아세트아미노펜(타이레놀)은 와파린을 먹는 사람에게 소염진통제보다 안전한 진통제로 권장됩니다. 다만 며칠 이상 매일 "
-               "많이(하루 2g 이상) 먹으면 와파린 효과가 세져 INR이 오르고 출혈 위험이 커질 수 있습니다",
-        "do": ["필요할 때 가끔 먹는 것은 괜찮습니다 — 하루 최대량을 넘기지 말고, 감기약 등 다른 제품의 아세트아미노펜도 합쳐서 세세요.",
-               "며칠 이상 매일 먹어야 한다면 의사에게 알리고 INR 검사를 받으세요."],
-        "signs": _WARFARIN_SIGNS},
-    ("alcohol", "warfarin"): {
-        "short": "마신다면 적게, 매일 비슷하게 — 폭음은 와파린 효과를 크게 흔듭니다.",
-        "why": "한 번에 많이 마시면 와파린 분해가 늦어져 효과가 세지고 출혈 위험이 커지며, 오랫동안 많이 마시면 반대로 효과가 약해질 "
-               "수 있습니다. 술 자체도 위 출혈과 넘어짐(머리 출혈) 위험을 키웁니다",
-        "do": ["마신다면 적게(하루 1~2잔 이내) 마시고 폭음은 피하세요.",
-               "음주 습관이 크게 바뀌면 의사에게 알리고 INR 검사를 받으세요."],
-        "signs": _WARFARIN_SIGNS},
-    ("anticoagulant", "nsaid"): {
-        "short": "출혈 위험이 커지는 조합입니다 — 스스로 사 먹는 소염진통제는 피하고, 처방받은 약은 임의로 끊지 마세요.",
-        "why": "항응고·항혈소판제는 피가 굳는 것을 막고, 소염진통제(이부프로펜·아스피린 등)는 혈소판 기능을 떨어뜨리며 위 점막을 "
-               "상하게 합니다. 함께 쓰면 두 작용이 겹쳐 출혈, 특히 위장관 출혈 위험이 커집니다",
-        "do": ["스스로 사 먹는 소염진통제(이부프로펜·나프록센 등)는 피하고, 진통제가 필요하면 의사·약사와 상의해 아세트아미노펜 같은 "
-               "약을 쓰세요.",
-               "처방받은 아스피린·소염진통제라면 임의로 끊지 말고, 함께 쓰는 것이 의도된 처방인지 의사에게 확인하세요."],
-        "signs": "출혈 신호(검은 변, 피 섞인 구토, 쉽게 드는 멍, 잇몸·코 출혈)가 있으면 바로 진료를 받으세요."},
-}
-
-# Pairs that people often ASK about but that do not interact (documented): shown as information when nothing else is
-# found - 'vitamin K + apixaban' gets an answer instead of silence
-PAIR_NOTES: list[tuple[str, str, str]] = [
-    *((vk, "doac", "비타민K는 와파린과 달리 아픽사반·리바록사반·다비가트란·에독사반(새 항응고제)의 효과에는 영향을 주지 "
-                   "않습니다 — 이 약을 먹을 때는 비타민K 음식을 따로 조절하지 않아도 됩니다")
-      for vk in ("vitamin_k_food", "vitamin_k_supplement")),
-    ("dairy", "penicillin", "우유·유제품은 아목시실린 같은 페니실린계 항생제의 흡수에 영향을 주지 않습니다 — 음식과 관계없이 "
-                            "먹어도 됩니다 (허가사항; 테트라사이클린·퀴놀론계와 다름)"),
-]
+# Pair rules - labels state many interactions by drug CLASS, so a name search cannot find them; Korean-only medicines,
+# foods, supplements, controlled substances - with their plain-language explanations (short / why / do / signs, for
+# people who are not clinicians) and documented NON-interactions people often ask about ('vitamin K + apixaban').
+# Data with sources, evidence type and review records: rules/pair_rules.json, rule_details.json, pair_notes.json
+PAIR_RULES: list[tuple[str, str, str, str]] = _rules.pair_rules()
+RULE_DETAIL: dict[tuple[str, str], dict] = _rules.rule_details()
+PAIR_NOTES: list[tuple[str, str, str]] = _rules.pair_notes()
+# where each rule came from and whether a pharmacist has reviewed it (shown with the rule in the expert view)
+RULE_PROVENANCE: dict[tuple[str, str], dict] = {(r["a"], r["b"]): r for r in _rules.rules("pair_rules")}
+DISEASE_RULE_SOURCE: dict[tuple[str, str], str] = {(r["disease"], r["group"]): r["source"]
+                                                   for r in _rules.rules("drug_disease_rules")}
 
 
 # Korean OTC labels (식약처 허가사항, stage "kr-labels"): '이 약을 복용하는 동안 다음의 약을 복용하지 말 것' items ->

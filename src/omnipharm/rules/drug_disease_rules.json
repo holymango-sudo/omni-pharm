@@ -1,0 +1,886 @@
+{
+ "_about": "질환·임신 상태에서 피하거나 주의할 약 계열.",
+ "_fields": {
+  "disease": "knowledge.DISEASES의 id",
+  "group": "약 그룹 id",
+  "level": "금기 / 주의",
+  "reason": "화면에 보이는 이유",
+  "source": "근거 문서(모르면 '출처 확인 필요')",
+  "evidence": "근거 종류: 병용금기(허가) / 박스경고 / 허가사항 경고·주의 / 규제기관 권고 / 표시사항(일반약·건강기능식품) / 임상 연구 / 증례·문헌 / 위해 감소 문헌 / 약리 원칙 / 출처 확인 필요",
+  "since": "이 규칙이 처음 들어간 버전",
+  "review": "약사·의사 검토 기록: status(미검토/동의/수정 필요/삭제 필요), reviewer, date(YYYY-MM-DD), note"
+ },
+ "_status": "개발 측 작성 — 출처 원문 대조·약사 검토 전",
+ "rules": [
+  {
+   "disease": "peptic_ulcer",
+   "group": "nsaid",
+   "level": "금기",
+   "reason": "위궤양·위장 출혈이 다시 생기거나 커질 수 있습니다",
+   "source": "AGS Beers Criteria 2023 질환별 회피 약물 표, NSAID 허가사항",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "peptic_ulcer",
+   "group": "anticoagulant",
+   "level": "주의",
+   "reason": "위장관 출혈 위험이 커집니다",
+   "source": "항응고제 허가사항(위장관 출혈)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "peptic_ulcer",
+   "group": "corticosteroid",
+   "level": "주의",
+   "reason": "궤양이 악화될 수 있습니다",
+   "source": "코르티코스테로이드 허가사항(소화성 궤양)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "bleeding",
+   "group": "anticoagulant",
+   "level": "금기",
+   "reason": "출혈이 멈추지 않을 위험이 큽니다",
+   "source": "항응고제 허가사항 금기(활동성 출혈)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "bleeding",
+   "group": "nsaid",
+   "level": "주의",
+   "reason": "혈소판 기능을 떨어뜨려 출혈 위험이 커집니다",
+   "source": "NSAID 허가사항(출혈 경향)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "glaucoma",
+   "group": "sedating_antihistamine",
+   "level": "주의",
+   "reason": "(폐쇄각) 녹내장의 안압을 올릴 수 있습니다",
+   "source": "일반의약품 표시사항('다음 질환이 있으면 복용 전 상담')",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "glaucoma",
+   "group": "anticholinergic",
+   "level": "주의",
+   "reason": "(폐쇄각) 녹내장의 안압을 올릴 수 있습니다",
+   "source": "항콜린제 허가사항(폐쇄각 녹내장)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "glaucoma",
+   "group": "decongestant",
+   "level": "주의",
+   "reason": "동공을 넓혀 (폐쇄각) 녹내장을 악화시킬 수 있습니다",
+   "source": "일반의약품 표시사항('다음 질환이 있으면 복용 전 상담')",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "bph",
+   "group": "sedating_antihistamine",
+   "level": "주의",
+   "reason": "소변이 막히는 요폐가 생길 수 있습니다",
+   "source": "일반의약품 표시사항('다음 질환이 있으면 복용 전 상담')",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "bph",
+   "group": "anticholinergic",
+   "level": "주의",
+   "reason": "소변이 막히는 요폐가 생길 수 있습니다",
+   "source": "AGS Beers Criteria 2023 질환별 회피 약물 표(하부요로증상·BPH)",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "bph",
+   "group": "decongestant",
+   "level": "주의",
+   "reason": "방광 출구를 조여 소변이 잘 안 나올 수 있습니다",
+   "source": "일반의약품 표시사항('다음 질환이 있으면 복용 전 상담')",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "asthma",
+   "group": "nonselective_beta_blocker",
+   "level": "금기",
+   "reason": "기관지를 수축시켜 천식 발작을 일으킬 수 있습니다",
+   "source": "비선택적 베타차단제 허가사항 금기(기관지 천식)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "asthma",
+   "group": "nsaid",
+   "level": "주의",
+   "reason": "아스피린·진통제 과민 천식을 유발할 수 있습니다",
+   "source": "NSAID 허가사항(아스피린 과민 천식)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "heart_failure",
+   "group": "nsaid",
+   "level": "금기",
+   "reason": "몸에 물이 차게 해 심부전을 악화시킵니다",
+   "source": "AGS Beers Criteria 2023 질환별 회피 약물 표, NSAID 허가사항",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "heart_failure",
+   "group": "thiazolidinedione",
+   "level": "금기",
+   "reason": "체액 저류로 심부전을 악화시킵니다",
+   "source": "티아졸리딘디온 박스경고(심부전)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "heart_failure",
+   "group": "nondhp_ccb",
+   "level": "주의",
+   "reason": "심장 수축력을 떨어뜨려 심부전이 악화될 수 있습니다",
+   "source": "AGS Beers Criteria 2023 질환별 회피 약물 표(박출률 감소 심부전)",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "heart_failure",
+   "group": "decongestant",
+   "level": "주의",
+   "reason": "심장에 부담을 줍니다",
+   "source": "일반의약품 표시사항('다음 질환이 있으면 복용 전 상담')",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "hypertension",
+   "group": "decongestant",
+   "level": "주의",
+   "reason": "혈압을 올립니다",
+   "source": "일반의약품 표시사항('다음 질환이 있으면 복용 전 상담')",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "hypertension",
+   "group": "nsaid",
+   "level": "주의",
+   "reason": "혈압을 올리고 혈압약 효과를 떨어뜨립니다",
+   "source": "NSAID 허가사항(고혈압 악화·혈압약 효과 감소)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "arrhythmia",
+   "group": "qt_prolonging",
+   "level": "주의",
+   "reason": "심장 리듬 이상(QT 연장·돌연 부정맥) 위험이 커집니다",
+   "source": "각 약 허가사항(QT 연장·부정맥 환자 주의)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "arrhythmia",
+   "group": "decongestant",
+   "level": "주의",
+   "reason": "가슴 두근거림·부정맥을 일으킬 수 있습니다",
+   "source": "일반의약품 표시사항('다음 질환이 있으면 복용 전 상담')",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cardiac",
+   "group": "nsaid",
+   "level": "주의",
+   "reason": "심근경색·뇌졸중 위험이 커질 수 있습니다",
+   "source": "NSAID 박스경고(심혈관 혈전 사건)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cardiac",
+   "group": "decongestant",
+   "level": "주의",
+   "reason": "심장 혈관을 수축시켜 협심증을 악화시킬 수 있습니다",
+   "source": "일반의약품 표시사항('다음 질환이 있으면 복용 전 상담')",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal",
+   "group": "nsaid",
+   "level": "금기",
+   "reason": "신장 혈류를 줄여 신기능을 더 떨어뜨립니다",
+   "source": "AGS Beers Criteria 2023 질환별 회피 약물 표(CrCl<30 회피), NSAID 허가사항",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal",
+   "group": "aminoglycoside",
+   "level": "주의",
+   "reason": "신장 독성이 있어 신기능이 더 나빠질 수 있습니다",
+   "source": "아미노글리코사이드 박스경고(신독성)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "hepatic",
+   "group": "acetaminophen",
+   "level": "주의",
+   "reason": "간 손상 위험 — 하루 총량을 줄여야 합니다",
+   "source": "아세트아미노펜 허가사항·일반의약품 표시사항(간질환)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "hepatic",
+   "group": "hepatotoxic",
+   "level": "주의",
+   "reason": "간 독성이 있어 간 손상이 악화될 수 있습니다",
+   "source": "각 약 허가사항(간독성)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "epilepsy",
+   "group": "seizure_threshold",
+   "level": "주의",
+   "reason": "경련을 일으키기 쉽게 만듭니다",
+   "source": "트라마돌·부프로피온·테오필린 등 허가사항(경련 역치 저하)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "epilepsy",
+   "group": "fluoroquinolone",
+   "level": "주의",
+   "reason": "경련을 유발할 수 있습니다",
+   "source": "플루오로퀴놀론 허가사항(중추신경계 영향·경련)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "dementia",
+   "group": "sedating_antihistamine",
+   "level": "주의",
+   "reason": "혼돈·섬망과 낙상을 일으키기 쉽습니다",
+   "source": "AGS Beers Criteria 2023 질환별 회피 약물 표(치매·인지장애)",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "dementia",
+   "group": "anticholinergic",
+   "level": "주의",
+   "reason": "기억력 저하·섬망을 악화시킵니다",
+   "source": "AGS Beers Criteria 2023 질환별 회피 약물 표(치매·인지장애)",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "dementia",
+   "group": "sedative",
+   "level": "주의",
+   "reason": "혼돈·낙상 위험이 큽니다",
+   "source": "AGS Beers Criteria 2023 질환별 회피 약물 표(치매·인지장애)",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "parkinson",
+   "group": "dopamine_antagonist",
+   "level": "금기",
+   "reason": "파킨슨 증상(떨림·경직)을 악화시킵니다",
+   "source": "AGS Beers Criteria 2023 질환별 회피 약물 표(파킨슨병)",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pregnancy",
+   "group": "teratogen",
+   "level": "금기",
+   "reason": "태아에게 기형·독성을 일으킬 수 있습니다",
+   "source": "각 약 허가사항(임부 금기·박스경고)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pregnancy",
+   "group": "nsaid",
+   "level": "주의",
+   "reason": "임신 20주 이후 태아 신장·심장에 해로울 수 있습니다",
+   "source": "FDA 의약품 안전성 서한(2020-10, 임신 20주 이후 NSAID)",
+   "evidence": "규제기관 권고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "hyperthyroid",
+   "group": "decongestant",
+   "level": "주의",
+   "reason": "두근거림·혈압 상승이 심해질 수 있습니다",
+   "source": "일반의약품 표시사항('다음 질환이 있으면 복용 전 상담')",
+   "evidence": "표시사항(일반약·건강기능식품)",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "gout",
+   "group": "thiazide",
+   "level": "주의",
+   "reason": "요산을 올려 통풍 발작을 일으킬 수 있습니다",
+   "source": "티아지드계 허가사항(고요산혈증·통풍)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "diabetes",
+   "group": "corticosteroid",
+   "level": "주의",
+   "reason": "혈당을 크게 올립니다",
+   "source": "코르티코스테로이드 허가사항(고혈당)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "diabetes",
+   "group": "fluoroquinolone",
+   "level": "주의",
+   "reason": "저혈당·고혈당을 일으킬 수 있습니다",
+   "source": "플루오로퀴놀론 허가사항(혈당 이상)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "myasthenia",
+   "group": "aminoglycoside",
+   "level": "금기",
+   "reason": "근력 약화를 급격히 악화시킬 수 있습니다",
+   "source": "아미노글리코사이드 허가사항(신경근 차단·중증근무력증)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "myasthenia",
+   "group": "fluoroquinolone",
+   "level": "금기",
+   "reason": "근력 약화를 악화시킬 수 있습니다 (FDA 박스경고)",
+   "source": "플루오로퀴놀론 박스경고(중증근무력증 악화)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "myasthenia",
+   "group": "macrolide",
+   "level": "주의",
+   "reason": "근력 약화를 악화시킬 수 있습니다",
+   "source": "마크롤리드 허가사항(중증근무력증 악화)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "thyroid_cancer",
+   "group": "glp1",
+   "level": "금기",
+   "reason": "갑상선 C세포 종양 위험이 있어 쓰지 않습니다 (FDA 박스경고)",
+   "source": "GLP-1 작용제 박스경고(갑상선 C세포 종양)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pancreatitis",
+   "group": "glp1",
+   "level": "주의",
+   "reason": "췌장염이 다시 생길 수 있습니다",
+   "source": "GLP-1 작용제 허가사항(췌장염)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pregnancy",
+   "group": "glp1",
+   "level": "금기",
+   "reason": "임신 중에는 쓰지 않습니다 — 임신 계획 시 미리 중단 (허가사항)",
+   "source": "세마글루타이드 등 허가사항(임신 중 사용 금지·계획 시 중단)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "myasthenia",
+   "group": "botulinum",
+   "level": "금기",
+   "reason": "근육 힘이 더 빠져 삼킴·호흡 곤란이 생길 수 있습니다 (허가사항)",
+   "source": "보툴리눔 톡신 허가사항(신경근 질환)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "infection",
+   "group": "tnf_inhibitor",
+   "level": "금기",
+   "reason": "결핵·중증 감염이 악화될 수 있습니다 (FDA 박스경고)",
+   "source": "TNF 억제제 박스경고(중증 감염·결핵)",
+   "evidence": "박스경고",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "heart_failure",
+   "group": "tnf_inhibitor",
+   "level": "주의",
+   "reason": "심부전이 악화될 수 있습니다",
+   "source": "TNF 억제제 허가사항(심부전 악화)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "hypertension",
+   "group": "licorice",
+   "level": "주의",
+   "reason": "감초(글리시리진)가 혈압을 올리고 칼륨을 떨어뜨립니다",
+   "source": "표준 참고문헌(글리시리진 가성 알도스테론증)",
+   "evidence": "증례·문헌",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "heart_failure",
+   "group": "licorice",
+   "level": "주의",
+   "reason": "몸에 물이 차게 해 심부전을 악화시킬 수 있습니다",
+   "source": "표준 참고문헌(글리시리진 체액 저류)",
+   "evidence": "증례·문헌",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal",
+   "group": "potassium_supplement",
+   "level": "주의",
+   "reason": "콩팥이 칼륨을 못 내보내 고칼륨혈증 위험이 있습니다",
+   "source": "칼륨 제제 허가사항(신기능 저하 고칼륨혈증)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "bleeding",
+   "group": "bleeding_herb",
+   "level": "주의",
+   "reason": "출혈 경향을 더할 수 있습니다",
+   "source": "표준 상호작용 참고문헌 — 근거 수준 낮음",
+   "evidence": "증례·문헌",
+   "since": "v2.8.0 이전",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cardiac",
+   "group": "street_stimulant",
+   "level": "금기",
+   "reason": "관상동맥을 수축시켜 심근경색·돌연사 위험이 큽니다",
+   "source": "AHA 과학 성명(2008, 코카인 관련 흉통·심근경색)",
+   "evidence": "규제기관 권고",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "arrhythmia",
+   "group": "street_stimulant",
+   "level": "금기",
+   "reason": "치명적인 부정맥을 일으킬 수 있습니다",
+   "source": "AHA 과학 성명(2008)·독성학 문헌",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "hypertension",
+   "group": "street_stimulant",
+   "level": "주의",
+   "reason": "혈압을 급격히 올려 뇌출혈 위험이 있습니다",
+   "source": "독성학 문헌",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "epilepsy",
+   "group": "street_stimulant",
+   "level": "주의",
+   "reason": "경련을 일으킬 수 있습니다",
+   "source": "독성학 문헌",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pregnancy",
+   "group": "street_stimulant",
+   "level": "금기",
+   "reason": "태반 혈류를 줄여 조산·태반 조기박리·태아 성장 지연 위험이 있습니다",
+   "source": "ACOG·독성학 문헌(코카인·메스암페타민 임신 영향)",
+   "evidence": "증례·문헌",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pregnancy",
+   "group": "cannabinoid",
+   "level": "주의",
+   "reason": "태아 발달에 해로울 수 있어 임신 중에는 쓰지 않도록 권고됩니다",
+   "source": "ACOG 위원회 의견(2017)·미국 공중보건국장 권고(2019)",
+   "evidence": "규제기관 권고",
+   "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  }
+ ]
+}

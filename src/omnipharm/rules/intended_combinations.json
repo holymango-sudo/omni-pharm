@@ -1,0 +1,285 @@
+{
+ "_about": "일부러 함께 쓰는 조합(부스터·표준 병용 요법): 서로에 대한 라벨 문구를 '함께 쓰지 말라'로 읽지 않음. 시판 복합제에 든 성분 쌍은 제품 데이터에서 자동으로 찾으므로 여기에 없음.",
+ "_fields": {
+  "why": "화면 문구",
+  "source": "근거 문서(모르면 '출처 확인 필요')",
+  "since": "이 규칙이 처음 들어간 버전",
+  "review": "약사·의사 검토 기록: status(미검토/동의/수정 필요/삭제 필요), reviewer, date(YYYY-MM-DD), note"
+ },
+ "_status": "개발 측 작성 — 출처 원문 대조·약사 검토 전",
+ "rules": [
+  {
+   "a": "ritonavir",
+   "b": "atazanavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ritonavir",
+   "b": "darunavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ritonavir",
+   "b": "lopinavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ritonavir",
+   "b": "saquinavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ritonavir",
+   "b": "fosamprenavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ritonavir",
+   "b": "tipranavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ritonavir",
+   "b": "elvitegravir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ritonavir",
+   "b": "nirmatrelvir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cobicistat",
+   "b": "atazanavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cobicistat",
+   "b": "darunavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cobicistat",
+   "b": "lopinavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cobicistat",
+   "b": "saquinavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cobicistat",
+   "b": "fosamprenavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cobicistat",
+   "b": "tipranavir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cobicistat",
+   "b": "elvitegravir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "cobicistat",
+   "b": "nirmatrelvir",
+   "why": "약동학 부스터: 함께 써서 혈중 농도를 올리는 것이 목적(리토나비르·코비시스타트 허가사항)",
+   "source": "리토나비르·코비시스타트 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "stiripentol",
+   "b": "clobazam",
+   "why": "스티리펜톨은 클로바잠을 복용 중인 드라베증후군 환자에게 허가된 약(Diacomit 허가사항)",
+   "source": "Diacomit 허가사항",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "dapsone",
+   "b": "rifampin",
+   "why": "한센병 다제요법(WHO MDT)의 표준 병용",
+   "source": "한센병 다제요법(WHO MDT)의 표준 병용",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "isoniazid",
+   "b": "rifampin",
+   "why": "결핵 표준 치료의 병용(복합제 Rifamate 등)",
+   "source": "복합제 Rifamate 등",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "pyrazinamide",
+   "b": "rifampin",
+   "why": "결핵 표준 치료의 병용",
+   "source": "결핵 표준 치료의 병용",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "ethambutol",
+   "b": "rifampin",
+   "why": "결핵 표준 치료의 병용",
+   "source": "결핵 표준 치료의 병용",
+   "since": "v2.18.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  }
+ ]
+}

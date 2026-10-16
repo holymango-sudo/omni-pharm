@@ -38,6 +38,7 @@ from omnipharm.knowledge import (
     COMORBIDITIES,
     CYP_FDA,
     DISEASE_LABEL_TERMS,
+    DISEASE_RULE_SOURCE,
     DISEASES,
     DRUG_CLASSES,
     DRUG_DISEASE_RULES,
@@ -55,6 +56,7 @@ from omnipharm.knowledge import (
     PGP_INHIBITORS,
     PRODRUGS_ACTIVATED_BY,
     RULE_DETAIL,
+    RULE_PROVENANCE,
     SERIOUS_CONDITIONS,
     WIDE_MARGIN_SUBSTRATES,
     bio_key,
@@ -1261,7 +1263,8 @@ class Engine:
     def _pair_rules(a: Ingredient, b: Ingredient) -> list[dict]:
         """Class-level interactions stated in labelling (knowledge.PAIR_RULES), e.g. GLP-1 + insulin."""
         ga, gb = drug_groups(a.key), drug_groups(b.key)
-        return [{"kind": "규칙", "severe": sev == "높음", "text": text,
+        return [{"kind": "규칙", "severe": sev == "높음", "text": text, "source": RULE_PROVENANCE[(x, y)]["source"],
+                 "review": RULE_PROVENANCE[(x, y)]["review"]["status"],
                  **({"detail": RULE_DETAIL[(x, y)]} if (x, y) in RULE_DETAIL else {})}
                 for x, y, sev, text in PAIR_RULES if (x in ga and y in gb) or (x in gb and y in ga)]
 
@@ -1768,7 +1771,7 @@ class Engine:
             groups = drug_groups(g.key)
             for dkey, grp, sev, reason in DRUG_DISEASE_RULES:
                 if dkey in dis and grp in groups:
-                    add(dkey, g, sev, reason, "임상 기준(Beers·허가사항)")
+                    add(dkey, g, sev, reason, DISEASE_RULE_SOURCE[(dkey, grp)])
             if "metformin" in groups and kid.get("clearance") is not None and kid["clearance"] < 30:
                 add("renal", g, "금기", "콩팥 기능이 크게 떨어져 젖산산증 위험이 있습니다", "허가사항(eGFR<30 금기)")
             if patient.age is not None and patient.age >= 65:
