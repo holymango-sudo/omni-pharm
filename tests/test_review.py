@@ -40,6 +40,33 @@ def test_agreement_statistics():
     assert sr.fleiss([["위험", "안전", "주의"], ["안전", "주의", "위험"], ["주의", "위험", "안전"]]) < 0
 
 
+def test_filled_workbook_is_read_with_the_reviewer_name(tmp_path):
+    """A pharmacist's copy of 약사_검수표_배포용.xlsx: the name on the guide sheet, normalised verdicts, both memo
+    columns; blank, unknown and Excel lock files are skipped; a folder reads every workbook in it."""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    g = wb.active
+    g.title = "안내"
+    g.append(["OMNI-PHARM 약 조합 검수표", None])
+    g.append([None, None])
+    g.append(["검수자 이름", "김약사"])
+    ws = wb.create_sheet("사례")
+    ws.append(["번호", "환자", "약물 (함께 쓰는 약)", "약사 판정", "가장 중요한 문제 (선택)", "약사 메모 (선택)"])
+    ws.append([1, "건강한 성인", "와파린\n아미오다론", "위험 ", "INR 상승", None])
+    ws.append([2, "건강한 성인", "아목시실린", "비교적 안전", None, None])
+    ws.append([3, "건강한 성인", "세티리진", None, None, None])
+    ws.append([4, "건강한 성인", "이부프로펜", "글쎄요", None, None])
+    ws.append([5, "건강한 성인", "타이레놀", "모름", None, "자료 부족"])
+    wb.save(tmp_path / "a.xlsx")
+    (tmp_path / "~$a.xlsx").write_bytes(b"lock")
+    who, ans = sr.read_sheet(tmp_path / "a.xlsx")
+    assert who == "김약사"
+    assert ans == {"1": {"verdict": "위험", "memo": "INR 상승"}, "2": {"verdict": "안전", "memo": ""},
+                   "5": {"verdict": "모름", "memo": "자료 부족"}}
+    assert sr._sheets([str(tmp_path)]) == [tmp_path / "a.xlsx"]
+
+
 def test_review_page_never_receives_the_program_verdict():
     html = (ROOT / "src" / "omnipharm" / "static" / "review.html").read_text(encoding="utf-8")
     assert "/api/v1/review/cases" in html and "프로그램 판정" not in html and "/api/v1/predict" not in html

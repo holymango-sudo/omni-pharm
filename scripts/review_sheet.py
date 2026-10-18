@@ -1,10 +1,12 @@
-"""Pharmacist review sheet: realistic multi-drug cases with the program's verdict, for blinded expert scoring.
+"""Pharmacist review sheet: realistic multi-drug cases for blinded expert scoring.
 
-  python scripts/review_sheet.py            -> docs/validation/약사_검수표.xlsx  (200 cases)
-  (pharmacist fills column '약사 판정' with 위험 / 주의 / 안전, optionally '약사 메모')
-  python scripts/score_review.py <filled.xlsx>   -> agreement, Cohen's kappa, sensitivity for '위험'
+  python scripts/review_sheet.py            -> docs/validation/약사_검수표.xlsx  (200 cases: the case list itself)
+  python scripts/review_sheet.py send       -> docs/validation/약사_검수표_배포용.xlsx  (the file to give a pharmacist)
+  python scripts/score_review.py <filled.xlsx | folder>   -> agreement, Cohen's kappa, sensitivity for '위험'
 
-The program's verdict is on a separate, hidden-by-default sheet so the reviewer can judge blind first.
+The case list (번호, 환자, 약물) is the reference for the /review page and the scoring - regenerating it draws new
+cases, so do it only before any review has started. The workbook for pharmacists is made from that list and never
+contains the program's verdict (not even on a hidden sheet); the scoring recomputes it with the current engine.
 """
 
 from __future__ import annotations
@@ -60,34 +62,161 @@ def main(n: int = 200, seed: int = 7) -> None:
         s = r["summary"]
         rows.append({"번호": len(rows) + 1, "환자": pname, "약물": " + ".join(drugs),
                      "약사 판정 (위험/주의/안전)": "", "약사 메모": "",
-                     "_프로그램 판정": {"비교적 안전": "안전"}.get(s["verdict"], s["verdict"]),
-                     "_주요 근거": " / ".join(x["text"] for x in s["reasons"][:3])})
+                     "_프로그램 판정": {"비교적 안전": "안전"}.get(s["verdict"], s["verdict"])})
     df = pd.DataFrame(rows)
     f = OUT / "약사_검수표.xlsx"
     with pd.ExcelWriter(f, engine="openpyxl") as xw:
         pd.DataFrame({"안내": [
-            "OMNI-PHARM 약사 검수표 — 각 사례를 보고 '약사 판정' 열에 위험 / 주의 / 안전 중 하나를 적어 주세요.",
-            "위험 = 병용·투여를 피하거나 용량 변경이 반드시 필요 / 주의 = 모니터링·간격 조절 등 / 안전 = 의미 있는 문제 없음",
-            "공정한 평가를 위해 먼저 '사례' 시트만 보고 판정한 뒤, 필요하면 '프로그램 결과' 시트를 보세요.",
-            "채점: python scripts/score_review.py 약사_검수표.xlsx",
+            "OMNI-PHARM 검수 사례 목록(원본) — /review 화면과 채점의 기준입니다. 약사에게는 이 파일이 아니라",
+            "`python scripts/review_sheet.py send`로 만든 약사_검수표_배포용.xlsx를 보내세요.",
         ]}).to_excel(xw, sheet_name="안내", index=False)
         df[["번호", "환자", "약물", "약사 판정 (위험/주의/안전)", "약사 메모"]].to_excel(xw, sheet_name="사례", index=False)
-        df[["번호", "_프로그램 판정", "_주요 근거"]].rename(columns=lambda c: c.lstrip("_")).to_excel(
-            xw, sheet_name="프로그램 결과", index=False)
-        from openpyxl.worksheet.datavalidation import DataValidation
-
-        ws = xw.sheets["사례"]
-        dv = DataValidation(type="list", formula1='"위험,주의,안전"', allow_blank=True)
-        ws.add_data_validation(dv)
-        dv.add(f"D2:D{len(df) + 1}")
-        for col, w in zip("ABCDE", (6, 34, 60, 22, 40), strict=True):
-            ws.column_dimensions[col].width = w
-        xw.sheets["프로그램 결과"].column_dimensions["C"].width = 120
-        xw.sheets["프로그램 결과"].sheet_state = "hidden"
+        xw.sheets["사례"].column_dimensions["C"].width = 60
         xw.sheets["안내"].column_dimensions["A"].width = 110
     print(f"{len(df)} cases -> {f}")
     print(df["_프로그램 판정"].value_counts().to_string())
 
 
+# ------------------------------------------------------------------------------------------- the file for pharmacists
+VERDICT_HELP = [
+    ("위험", "함께 쓰지 않아야 하거나(병용금기), 이 환자에게 쓰면 안 되는 약이 있음 — 처방 변경·용량 조절이 꼭 필요"),
+    ("주의", "함께 쓸 수 있지만 관찰(검사·증상), 용량·복용 간격 조절, 환자 설명이 필요"),
+    ("안전", "임상적으로 의미 있는 문제 없음 — 특별한 조치 불필요"),
+    ("모름", "자료가 부족해 판단하기 어려움 (채점에서 제외)"),
+]
+FILL = {"위험": "F8CBAD", "주의": "FFE699", "안전": "C6E0B4", "모름": "D9D9D9"}
+
+
+def _patient_rows() -> list[list]:
+    from omnipharm.clinical import assess
+    from omnipharm.knowledge import DISEASES
+
+    out = []
+    for name, p in PATIENTS.items():
+        a = assess(Patient(**p))
+        k = a.get("kidney") or {}
+        adult = p["age"] >= 18
+        out.append([
+            name, p["age"], "남" if p["sex"] == "M" else "여", p.get("height_cm"), p.get("weight_kg"), p.get("scr"),
+            k.get("crcl") if adult else "소아(성인 공식 해당 없음)", k.get("egfr"),
+            " / ".join(f"{lab} {p[key]}" for lab, key in (("AST", "ast"), ("ALT", "alt"), ("총빌리루빈", "total_bilirubin"))
+                       if key in p) or "정상 범위로 가정",
+            ", ".join({"pregnancy": "임신 중"}.get(c, DISEASES[c]["ko"]) for c in p.get("conditions", [])) or "없음"])
+    return out
+
+
+def _drug_text(eng: Engine, token: str) -> str:
+    """'amlodipine' -> '암로디핀(amlodipine)'; a Korean brand keeps its name: '타이레놀: 아세트아미노펜(acetaminophen)'."""
+    try:
+        names = ", ".join(eng.ko(g) for g in eng.resolve(token))
+    except Exception:
+        return token
+    return names if token.isascii() else f"{token}: {names}"
+
+
+def send() -> Path:
+    """The workbook a pharmacist fills in: guide (with the reviewer's name), patient profiles, cases - no program result."""
+    from openpyxl import Workbook
+    from openpyxl.formatting.rule import FormulaRule
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    from omnipharm.review import raw_cases
+
+    eng = Engine()
+    cases = raw_cases()
+    n = len(cases)
+    bold, head = Font(bold=True), PatternFill("solid", fgColor="DDE7F0")
+    wrap = Alignment(wrap_text=True, vertical="top")
+    thin = Border(*(Side(style="thin", color="BFBFBF"),) * 4)
+    wb = Workbook()
+
+    ws = wb.active
+    ws.title = "안내"
+    lines = [
+        ("OMNI-PHARM 약 조합 검수표", ""),
+        ("", ""),
+        ("검수자 이름", ""),  # B3: the reviewer writes here (score_review.py reads it)
+        ("작성일", ""),
+        ("진행", f'=COUNTA(사례!D2:D{n + 1})&" / {n}건 입력"'),
+        ("", ""),
+        ("목적", "약물 상호작용 분석 프로그램(졸업 연구)의 판정이 약사의 판단과 얼마나 맞는지 확인합니다. 프로그램의 판정은 이 "
+                 "파일에 없습니다 — 평소 업무처럼 판단해 주세요(참고 자료 사용 가능)."),
+        ("하는 법", f"'사례' 시트의 {n}개 사례마다 '환자' 시트의 환자에게 그 약들을 함께 쓴다고 보고, 조합 전체에서 가장 중요한 문제의 "
+                   "수준을 '약사 판정' 칸에서 고릅니다(칸을 누르면 목록이 나옵니다). 약 사이의 상호작용뿐 아니라 이 환자의 질환·임신·"
+                   "나이·신기능·간기능에 맞지 않는 약, 같은 성분·같은 계열 중복도 포함합니다."),
+        ("가정", "용량은 적혀 있지 않으므로 그 환자에게 흔히 쓰는 통상 용량을 쓴다고 가정합니다. 소아는 체중에 맞는 용량으로 봅니다."),
+        ("판정 기준", ""),
+        *VERDICT_HELP,
+        ("", ""),
+        ("메모(선택)", "'가장 중요한 문제'에 판단 이유를 짧게(예: 와파린+아미오다론 INR 상승), '약사 메모'에 그 밖의 의견을 적어 주세요. "
+                     "'위험'이나 '주의'로 고른 사례에 적어 주시면 프로그램을 고치는 데 가장 도움이 됩니다."),
+        ("시간", "사례 하나에 30초~1분, 전체 약 2~3시간입니다. 나눠서 하셔도 되고, 시간이 부족하면 1~50번만 해 주셔도 됩니다."),
+        ("돌려주기", "다 적으면 저장해서 파일 그대로 보내 주세요. 파일 이름은 바꾸셔도 됩니다."),
+        ("개인정보", "사례는 모두 가상의 환자입니다. 검수자 이름 외의 개인정보는 적지 않습니다."),
+    ]
+    for r in lines:
+        ws.append(list(r))
+    ws["A1"].font = Font(bold=True, size=14)
+    ws.column_dimensions["A"].width, ws.column_dimensions["B"].width = 14, 110
+    for row in ws.iter_rows(min_row=3):
+        row[0].font = bold
+        row[1].alignment = wrap
+    for c in ("B3", "B4"):
+        ws[c].fill, ws[c].border = PatternFill("solid", fgColor="FFF2CC"), thin
+    start = next(i for i, r in enumerate(lines, 1) if r[0] == "위험")
+    for i, (v, _) in enumerate(VERDICT_HELP):
+        ws.cell(row=start + i, column=1).fill = PatternFill("solid", fgColor=FILL[v])
+
+    ws = wb.create_sheet("환자")
+    ws.append(["환자(사례 시트의 이름)", "나이", "성별", "키(cm)", "체중(kg)", "혈청 크레아티닌(mg/dL)", "CrCl(Cockcroft-Gault, mL/min)",
+               "eGFR(CKD-EPI 2021)", "간 검사", "질환·상태"])
+    for r in _patient_rows():
+        ws.append(r)
+    for c in ws[1]:
+        c.font, c.fill, c.alignment = bold, head, wrap
+    for col, w in zip("ABCDEFGHIJ", (34, 6, 6, 8, 9, 12, 16, 12, 34, 22), strict=True):
+        ws.column_dimensions[col].width = w
+    for row in ws.iter_rows(min_row=2):
+        for c in row:
+            c.alignment, c.border = wrap, thin
+
+    ws = wb.create_sheet("사례")
+    ws.append(["번호", "환자", "약물 (함께 쓰는 약)", "약사 판정", "가장 중요한 문제 (선택)", "약사 메모 (선택)"])
+    for r in cases.itertuples():
+        drugs = [_drug_text(eng, d) for d in str(r.약물).split(" + ")]
+        ws.append([int(r.번호), r.환자, "\n".join(drugs), None, None, None])
+        ws.row_dimensions[ws.max_row].height = 15 * len(drugs) + 4
+    for c in ws[1]:
+        c.font, c.fill, c.alignment = bold, head, wrap
+    for col, w in zip("ABCDEF", (6, 30, 46, 11, 36, 30), strict=True):
+        ws.column_dimensions[col].width = w
+    for row in ws.iter_rows(min_row=2):
+        for c in row:
+            c.alignment, c.border = wrap, thin
+        row[3].fill = PatternFill("solid", fgColor="FFF2CC")
+        row[3].alignment = Alignment(horizontal="center", vertical="top")
+    dv = DataValidation(type="list", formula1='"' + ",".join(v for v, _ in VERDICT_HELP) + '"', allow_blank=True,
+                        showErrorMessage=True, errorTitle="판정", error="위험 / 주의 / 안전 / 모름 중에서 골라 주세요.",
+                        showInputMessage=True, promptTitle="약사 판정", prompt="위험 / 주의 / 안전 / 모름")
+    ws.add_data_validation(dv)
+    dv.add(f"D2:D{n + 1}")
+    for v, color in FILL.items():  # the chosen verdict colours its cell
+        ws.conditional_formatting.add(f"D2:D{n + 1}", FormulaRule(formula=[f'$D2="{v}"'],
+                                                                   fill=PatternFill("solid", fgColor=color)))
+    ws.freeze_panes = "C2"
+    ws.auto_filter.ref = f"A1:F{n + 1}"
+    for s in wb.worksheets:  # printable on A4 landscape
+        s.page_setup.orientation, s.page_setup.paperSize = "landscape", s.PAPERSIZE_A4
+        s.page_setup.fitToWidth, s.page_setup.fitToHeight = 1, 0
+        s.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.print_title_rows = "1:1"
+    wb.active = wb.worksheets.index(wb["안내"])
+    f = OUT / "약사_검수표_배포용.xlsx"
+    wb.save(f)
+    print(f"{n} cases -> {f}")
+    return f
+
+
 if __name__ == "__main__":
-    main()
+    send() if sys.argv[1:] == ["send"] else main()

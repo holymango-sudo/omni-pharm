@@ -1,7 +1,8 @@
 """Score the pharmacist review against the program's CURRENT verdicts (v2.18).
 
-  python scripts/score_review.py                 answers saved by the /review page (data/review/answers_*.json)
-  python scripts/score_review.py filled.xlsx     a filled copy of docs/validation/약사_검수표.xlsx (column '약사 판정')
+  python scripts/score_review.py                   answers saved by the /review page (data/review/answers_*.json)
+  python scripts/score_review.py 약사A.xlsx 약사B.xlsx   filled copies of 약사_검수표_배포용.xlsx (or the original sheet)
+  python scripts/score_review.py docs/validation/검수결과   every .xlsx in a folder (one per pharmacist)
 
 Per reviewer: exact agreement, Cohen's kappa (unweighted / linear-weighted), sensitivity and positive predictive
 value of '위험', confusion matrix. Between reviewers: Cohen's kappa for each pair and Fleiss' kappa for all of them
@@ -85,12 +86,48 @@ def score(a: list[str], b: list[str]) -> dict:
             .reindex(index=LEVELS, columns=LEVELS, fill_value=0).to_dict()}
 
 
-def main(path: str | None) -> None:
-    if path:  # a filled spreadsheet: one reviewer
-        df = pd.read_excel(path, sheet_name="사례")
-        col = next(c for c in df.columns if c.startswith("약사 판정"))
-        given = {"spreadsheet": {str(int(n)): {"verdict": v, "memo": m}
-                                 for n, v, m in zip(df["번호"], df[col], df.get("약사 메모", [""] * len(df)), strict=False)}}
+def _text(x) -> str:
+    return "" if x is None or (isinstance(x, float) and x != x) else str(x).strip()
+
+
+def read_sheet(path: Path) -> tuple[str, dict[str, dict]]:
+    """A filled workbook -> (reviewer, {case number: {verdict, memo}}). The reviewer is the name written on the guide
+    sheet ('검수자 이름'), else the file name. Verdicts are normalised ('위험 ', '비교적 안전'); anything else is dropped."""
+    who = ""
+    try:
+        guide = pd.read_excel(path, sheet_name="안내", header=None)
+        row = guide[guide[0].astype(str).str.strip() == "검수자 이름"]
+        who = _text(row.iloc[0, 1]) if len(row) and guide.shape[1] > 1 else ""
+    except (ValueError, KeyError):
+        pass
+    df = pd.read_excel(path, sheet_name="사례")
+    col = next(c for c in df.columns if str(c).startswith("약사 판정"))
+    memo_cols = [c for c in df.columns if str(c).startswith(("가장 중요한 문제", "약사 메모"))]
+    ans = {}
+    for _, r in df.iterrows():
+        v = _text(r[col]).replace(" ", "")
+        v = {"비교적안전": "안전"}.get(v, v)
+        if v in review.VERDICTS and _text(r["번호"]):
+            ans[str(int(r["번호"]))] = {"verdict": v, "memo": " / ".join(m for m in (_text(r[c]) for c in memo_cols) if m)}
+    return who or Path(path).stem, ans
+
+
+def _sheets(paths: list[str]) -> list[Path]:
+    out = []
+    for p in map(Path, paths):
+        out += sorted(f for f in p.glob("*.xlsx") if not f.name.startswith("~$")) if p.is_dir() else [p]
+    return out
+
+
+def main(paths: list[str]) -> None:
+    if paths:  # filled spreadsheets, one per pharmacist
+        given = {}
+        for f in _sheets(paths):
+            who, ans = read_sheet(f)
+            while who in given:  # two files with the same name written on them
+                who += "_2"
+            given[who] = ans
+            print(f"{f.name}: {who} - {len(ans)}건 입력")
     else:
         given = review.all_answers()
     given = {k: {c: x for c, x in v.items() if x.get("verdict") in LEVELS} for k, v in given.items()}
@@ -121,4 +158,4 @@ def main(path: str | None) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1] if len(sys.argv) > 1 else None)
+    main(sys.argv[1:])
