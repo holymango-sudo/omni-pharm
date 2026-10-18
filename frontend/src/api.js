@@ -50,8 +50,11 @@ export const api = {
   // drugs: [{name, dose?}] - dose = {amount, unit, per_day, days, prn, weekly}
   predict: (drugs, patient) => req("predict", { method: "POST", body: JSON.stringify({ drugs, patient }) }),
   symptoms: () => req("symptoms"),
+  symptomSearch: (q) => req(`symptoms/search?q=${encodeURIComponent(q)}`),
   rxPhoto: (image) => req("rx-photo", { method: "POST", body: JSON.stringify({ image }) }),
-  recommend: (symptoms, drugs, patient) => req("recommend", { method: "POST", body: JSON.stringify({ symptoms, drugs, patient }) }),
+  // symptoms = condition ids; query = free text that matched none (searched in the approved OTC indications)
+  recommend: (symptoms, drugs, patient, query = null, expert = false) =>
+    req("recommend", { method: "POST", body: JSON.stringify({ symptoms, drugs, patient, query, expert }) }),
   /** AI 복약 상담: POST + streamed server-sent events; returns a function that stops the answer */
   chat(body, onToken, onDone, onChecked, onReview) {
     const ctrl = new AbortController();

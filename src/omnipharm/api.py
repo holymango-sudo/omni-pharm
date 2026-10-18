@@ -431,22 +431,33 @@ def symptoms():
     return recommend.catalog()
 
 
+@app.get("/api/v1/symptoms/search")
+def symptoms_search(q: str = Query("", max_length=60)):
+    """Everyday words ('허리디스크', '무릎 십자인대 파열', '감기') -> matching symptoms / conditions (emergencies first)."""
+    return recommend.search(q)
+
+
 class RecommendRequest(BaseModel):
-    symptoms: list[str] = Field(..., min_length=1, max_length=8)
+    symptoms: list[str] = Field(default_factory=list, max_length=8)
+    query: str | None = Field(None, max_length=60, description="free text that matched no condition")
     drugs: list[str] = Field(default_factory=list, max_length=15)
     patient: Patient = Field(default_factory=Patient)
+    expert: bool = Field(False, description="also list prescription medicines (reference, expert view)")
 
 
 @app.post("/api/v1/recommend")
 async def recommend_drugs(req: RecommendRequest):
-    """'증상으로 약 찾기': OTC options per symptom, screened against this patient and the medicines already entered."""
+    """'증상·질환으로 약 찾기': self-care options per symptom / condition (tablets, creams / patches, OTC products whose
+    approved indication names it), screened against this patient and the medicines already entered."""
+    if not req.symptoms and not (req.query or "").strip():
+        raise HTTPException(422, {"message": "증상을 고르거나 검색어를 입력하세요."})
     eng: Engine = E["engine"]
     current = []
     for name in req.drugs:
         ings, _info, err = await _resolve(name)
         if not err:
             current.append({"input": name, "ingredients": ings})
-    return await asyncio.to_thread(recommend.recommend, eng, req.symptoms, current, req.patient)
+    return await asyncio.to_thread(recommend.recommend, eng, req.symptoms, current, req.patient, req.query, req.expert)
 
 
 # --------------------------------------------------------------------------- blinded pharmacist review (v2.18)

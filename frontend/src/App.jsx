@@ -310,7 +310,7 @@ export default function App() {
           ) : (
             <DrugBar drugs={drugs} onAdd={addDrug} onRemove={removeDrug} onReplace={replaceDrug} onScenario={scenario}
               onDose={(name, dose) => { resetResult(); setDrugs((ds) => ds.map((d) => (d.name === name ? { ...d, dose } : d))); }}
-              onPredict={predict} busy={busy} patientPayload={payload} />
+              onPredict={predict} busy={busy} patientPayload={payload} expert={expert} />
           )}
         </section>
         <ResultPanel res={res} report={report} streaming={streaming} showReport={!!res} expert={expert}

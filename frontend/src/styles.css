@@ -605,6 +605,35 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .sym-disc { font-size: 11px; color: #8fa9b4; line-height: 1.45; }
 .panel-title .sym-open + .sym-open { margin-right: 6px; }
 .sym-panel { clear: both; }  /* never squeezed beside the floating title buttons */
+/* v2.21 search by symptom / condition */
+.sym-search { position: relative; margin: 4px 0 6px; }
+.sym-search .search { width: 100%; box-sizing: border-box; }
+.sym-suggest { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.sym-sugg { text-align: left; background: rgba(0, 229, 255, 0.07); border: 1px solid var(--line); color: #e8f7fb; border-radius: 6px;
+  padding: 5px 9px; font: inherit; font-size: 13px; cursor: pointer; }
+.sym-sugg:hover { background: rgba(0, 229, 255, 0.18); }
+.sym-sugg small { color: var(--amber); font-weight: 700; }
+.sym-sugg.emergency { border-color: var(--red); background: rgba(255, 59, 92, 0.15); }
+.sym-sugg.emergency small { color: #ff9cb0; }
+.sym-picked { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 4px 0; }
+.sym-picked em { font-style: normal; font-size: 11.5px; color: var(--cyan); font-weight: 700; }
+.sym-card.sub { margin-left: 12px; }
+.sym-card.care-emergency { border-color: var(--red); background: rgba(255, 59, 92, 0.1); }
+.sym-card.care-doctor { border-color: rgba(255, 176, 32, 0.6); }
+.sym-title small { font-size: 11px; color: #8fa9b4; font-weight: 400; }
+.sym-care { font-size: 12.5px; font-weight: 800; border-radius: 5px; padding: 4px 8px; margin: 2px 0 4px; }
+.sym-care.care-emergency { background: var(--red); color: #fff; }
+.sym-care.care-doctor { background: rgba(255, 176, 32, 0.18); color: #ffd27a; }
+.sym-tips { font-size: 12px; color: #b9e8d6; margin: 2px 0 4px; line-height: 1.45; }
+.sym-sec { margin-top: 4px; }
+.sym-sec > em { display: block; font-style: normal; font-size: 12px; font-weight: 800; color: var(--cyan); margin: 4px 0 1px; }
+.sym-sec.rx { border-top: 1px solid rgba(255, 176, 32, 0.35); padding-top: 3px; }
+.sym-sec.rx > em { color: var(--amber); }
+.sym-line .rx { font-size: 10.5px; color: var(--amber); border: 1px solid rgba(255, 176, 32, 0.6); border-radius: 3px; padding: 0 4px; }
+.sym-line .chip.drug { font-size: 12px; padding: 1px 8px; margin-left: auto; }
+.sym-line .chip.drug:disabled { opacity: 0.45; }
+.sym-eff { font-size: 11.5px; color: #8fb6c2; line-height: 1.4; }
+.sym-note.emergency { color: #fff; background: var(--red); border-radius: 5px; padding: 5px 8px; font-weight: 800; }
 @media (max-width: 640px) {
   .panel-title .sym-open { float: none; margin: 6px 6px 0 0; }
   .rx-top { flex-direction: column; }

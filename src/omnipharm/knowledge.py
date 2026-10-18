@@ -270,7 +270,8 @@ DRUG_CLASSES: dict[str, tuple[str, frozenset[str]]] = {
     "nsaid": ("소염진통제(NSAID)", frozenset({
         "ibuprofen", "dexibuprofen", "naproxen", "aspirin", "ketoprofen", "dexketoprofen", "loxoprofen", "diclofenac",
         "celecoxib", "meloxicam", "flurbiprofen", "aceclofenac", "etodolac", "piroxicam", "indomethacin",
-        "isopropylantipyrine", "propyphenazone", "nabumetone", "pelubiprofen", "zaltoprofen", "ketorolac"})),
+        "isopropylantipyrine", "propyphenazone", "nabumetone", "pelubiprofen", "zaltoprofen", "ketorolac",
+        "felbinac"})),  # (felbinac: patches only, but the same pregnancy / bleeding cautions apply)
     "sedating_antihistamine": ("1세대(진정성) 항히스타민", frozenset({
         "chlorpheniramine", "dexchlorpheniramine", "diphenhydramine", "doxylamine", "carbinoxamine", "triprolidine",
         "brompheniramine", "clemastine", "promethazine", "hydroxyzine", "cyproheptadine", "pheniramine",

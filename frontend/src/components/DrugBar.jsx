@@ -23,7 +23,7 @@ const NUTR = [["caffeine_mg", "카페인", "mg"], ["vitamin_k_ug", "비타민K",
 const nutrText = (n) => `${n.per}당 ` + NUTR.filter(([k]) => n[k] != null).map(([k, ko, u]) => `${ko} ${n[k]}${u}`).join(", ")
   + (n.n > 1 ? ` (같은 이름 ${n.n}개 제품의 중앙값)` : "") + " — 식약처 식품영양성분DB";
 
-export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario, onPredict, onDose, busy, patientPayload }) {
+export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario, onPredict, onDose, busy, patientPayload, expert }) {
   const [q, setQ] = useState("");
   const [finder, setFinder] = useState(false);
   const [photo, setPhoto] = useState(false);
@@ -55,7 +55,7 @@ export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario,
     <div className="drugbar">
       <div className="panel-title"><span className="idx">02</span> 3D 약물 합성 — 약물 검색
         <button className={`btn mini sym-open ${finder ? "on" : ""}`} onClick={() => { setFinder(!finder); setPhoto(false); }}
-          title="감기·두통 등 증상을 고르면 이 환자에게 맞는 일반의약품을 찾아 줍니다">🤒 증상으로 약 찾기</button>
+          title="허리디스크·감기·무릎 인대처럼 아픈 곳이나 병명으로 검색하면 이 환자에게 맞는 일반의약품을 찾아 줍니다">🤒 증상·질환으로 약 찾기</button>
         <button className={`btn mini sym-open ${photo ? "on" : ""}`} onClick={() => { setPhoto(!photo); setFinder(false); }}
           title="처방전·약봉투 사진을 올리면 이 PC의 AI가 약 이름과 용량을 읽어 입력합니다">📷 처방전·약봉투 사진</button>
       </div>
@@ -65,7 +65,7 @@ export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario,
       )}
       {finder && (
         <SymptomFinder patient={patientPayload} drugs={drugs.filter((d) => d.status === "ok").map((d) => d.name)}
-          onAdd={(n) => onAdd(n)} onClose={() => setFinder(false)} />
+          onAdd={(n) => onAdd(n)} onClose={() => setFinder(false)} expert={expert} />
       )}
       <div className="search-wrap">
         <input ref={input} className="search" value={q} placeholder="국내·해외 제품명(콜대원, NyQuil, Doliprane, ロキソニン…), 성분명(와파린, warfarin), 또는 SMILES"
