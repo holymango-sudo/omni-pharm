@@ -125,9 +125,10 @@ def main(paths: list[str]) -> None:
         given = {}
         for f in _sheets(paths):
             who, ans = read_sheet(f)
-            while who in given:  # two files with the same name written on them
+            # the same pharmacist's files of different rounds are one reviewer; the same cases twice are two
+            while who in given and set(given[who]) & set(ans):
                 who += "_2"
-            given[who] = ans
+            given.setdefault(who, {}).update(ans)
             print(f"{f.name}: {who} - {len(ans)}건 입력")
     else:
         given = review.all_answers()
