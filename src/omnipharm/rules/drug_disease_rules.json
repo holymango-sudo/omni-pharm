@@ -989,36 +989,6 @@
   },
   {
    "disease": "cirrhosis",
-   "group": "hepatic_contra",
-   "level": "금기",
-   "reason": "중대한 간질환에는 쓰지 않습니다 — 치명적인 간 손상 위험",
-   "source": "발프로산·케토코나졸·메토트렉세이트·레플루노마이드·네비라핀·테르비나핀 허가사항(간질환 금기)",
-   "evidence": "병용금기(허가)",
-   "since": "v2.19.0",
-   "review": {
-    "status": "미검토",
-    "reviewer": null,
-    "date": null,
-    "note": null
-   }
-  },
-  {
-   "disease": "cirrhosis",
-   "group": "retinoid_systemic",
-   "level": "금기",
-   "reason": "간장애 환자에게는 쓰지 않습니다",
-   "source": "이소트레티노인·아시트레틴 허가사항 금기(간장애)",
-   "evidence": "병용금기(허가)",
-   "since": "v2.19.0",
-   "review": {
-    "status": "미검토",
-    "reviewer": null,
-    "date": null,
-    "note": null
-   }
-  },
-  {
-   "disease": "cirrhosis",
    "group": "doac",
    "level": "금기",
    "reason": "응고 장애를 동반한 간질환에서는 출혈 위험이 커 쓰지 않습니다",
@@ -1190,6 +1160,156 @@
    "source": "피나스테리드·두타스테리드 허가사항(여성 비적응, 임부·가임 여성 금기)",
    "evidence": "허가사항 경고·주의",
    "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "hepatic",
+   "group": "retinoid_systemic",
+   "level": "금기",
+   "reason": "간장애 환자에게는 쓰지 않습니다",
+   "source": "이소트레티노인·아시트레틴 허가사항 금기(간장애)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.20.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "hepatic",
+   "group": "hepatic_contra",
+   "level": "금기",
+   "reason": "중대한 간질환에는 쓰지 않습니다 — 치명적인 간 손상 위험",
+   "source": "발프로산·케토코나졸·메토트렉세이트·레플루노마이드·테르비나핀 허가사항(간질환·간장애 금기)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.20.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "qt_long",
+   "group": "qt_prolonging",
+   "level": "금기",
+   "reason": "QT 간격이 이미 길어진 환자에게 QT를 더 늘리는 약은 치명적인 부정맥(염전성 심실빈맥) 위험이 있어 쓰지 않습니다",
+   "source": "각 약 허가사항(QT 연장 환자 금기·회피), AHA/ACCF 2010 병원 내 염전성 심실빈맥 예방 성명",
+   "evidence": "병용금기(허가)",
+   "since": "v2.20.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "methotrexate",
+   "level": "금기",
+   "reason": "콩팥으로 빠져나가지 못해 골수억제·점막염 등 치명적인 독성이 생길 수 있습니다",
+   "source": "메토트렉세이트 허가사항 금기(중증 신장애)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.20.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "acitretin",
+   "level": "금기",
+   "reason": "중증 신장애 환자에게는 쓰지 않습니다",
+   "source": "아시트레틴 허가사항 금기(중증 신장·간 장애)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.20.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "hepatic",
+   "group": "duloxetine",
+   "level": "금기",
+   "reason": "간장애가 있으면 혈중 농도가 크게 오르고 간 손상 위험이 있어 쓰지 않습니다",
+   "source": "둘록세틴 허가사항(간장애 환자 투여하지 않음)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.20.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cirrhosis",
+   "group": "nevirapine",
+   "level": "금기",
+   "reason": "중등도 이상 간장애에는 쓰지 않습니다 — 치명적인 간 손상 위험",
+   "source": "네비라핀 허가사항 금기(중등도·중증 간장애, Child-Pugh B·C)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.20.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cirrhosis",
+   "group": "thiazolidinedione",
+   "level": "금기",
+   "reason": "활동성 간질환에는 쓰지 않습니다 — 간 손상과 체액 저류(복수·부종) 악화 위험",
+   "source": "피오글리타존 허가사항(활동성 간질환·ALT 2.5배 초과 시 투여 시작 금지)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.20.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cirrhosis",
+   "group": "rifampin",
+   "level": "금기",
+   "reason": "중증 간장애·황달 환자에게는 간 손상이 크게 악화될 수 있어 쓰지 않습니다",
+   "source": "리팜피신 허가사항 금기(중증 간장애·황달·담도 폐쇄)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.20.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pregnancy",
+   "group": "pregnancy_avoid",
+   "level": "금기",
+   "reason": "임신 중에 태아 기형·유산·태아 갑상선 독성 등이 보고된 약입니다 — 임신 중에는 쓰지 않습니다",
+   "source": "타목시펜·아로마타제 억제제·드로네다론 허가사항(임부 금기), 이트라코나졸 국내 허가사항(임부 금기, 생명을 위협하는 진균 감염 제외), 아미오다론 허가사항(태아 갑상선 독성 — 임신 중 회피)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.20.0",
    "review": {
     "status": "미검토",
     "reviewer": null,

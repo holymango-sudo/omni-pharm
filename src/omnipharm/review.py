@@ -40,8 +40,9 @@ REVIEW_PATIENTS_2 = {
     "건강한 성인 (36세 여, 55kg)": dict(age=36, sex="F", weight_kg=55, height_cm=161, scr=0.7),
     "고령·중등도 신장저하 (78세 남, 62kg, Cr 1.4)": dict(age=78, sex="M", weight_kg=62, height_cm=165, scr=1.4,
                                                  conditions=["hypertension"]),
+    # the reviewers saw this condition as '부정맥·QT연장' (one condition then); since v2.20 that is two conditions
     "고령·중증 신장저하 (86세 여, 42kg, Cr 1.5)": dict(age=86, sex="F", weight_kg=42, height_cm=148, scr=1.5,
-                                                conditions=["arrhythmia"]),
+                                                conditions=["arrhythmia", "qt_long"]),
     "임신 중 (27세 여)": dict(age=27, sex="F", weight_kg=58, height_cm=160, scr=0.6, conditions=["pregnancy"]),
     "지방간·간수치 경도 상승 (52세 남)": dict(age=52, sex="M", weight_kg=82, height_cm=172, scr=0.9, ast=58, alt=72,
                                        total_bilirubin=0.9, conditions=["hepatic"]),

@@ -186,7 +186,7 @@ class ClinicalMixin:
                                     + (" (카페인은 성인 하루 400mg 이하)" if any("caffeine" in d["ingredient"] for d in minor)
                                        else "") + "."})
         for d in class_dups:
-            if d.get("severe"):  # NSAID x2, opioid x2, sedative x2, anticoagulant/antiplatelet x2, PDE5 x2
+            if d.get("severe"):  # NSAID / opioid / sedative / anticoagulant / PDE5 x2, two of one DUR efficacy series
                 reasons.append({"sev": "high", "icon": "🔁",
                                 "text": f"같은 계열 약({d['class']}) 두 가지 이상을 함께 쓰면 효과·부작용이 겹쳐 위험합니다: "
                                         f"{', '.join(d['ingredients'])}."})

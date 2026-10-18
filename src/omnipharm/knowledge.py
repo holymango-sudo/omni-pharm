@@ -353,7 +353,11 @@ DISEASES: dict[str, dict] = {
     "cirrhosis": {"ko": "간경변·활동성 간질환", "kw": ("간경변", "간경화", "cirrhosis", "간부전", "liver failure", "비대상성"),
                   "flag": "hepatic"},
     "heart_failure": {"ko": "심부전", "kw": ("심부전", "heart failure"), "flag": "cardiac"},
-    "arrhythmia": {"ko": "부정맥·QT연장", "kw": ("부정맥", "심방세동", "qt", "arrhythm", "atrial fib"), "flag": "cardiac"},
+    "arrhythmia": {"ko": "부정맥(심방세동 등)", "kw": ("부정맥", "심방세동", "arrhythm", "atrial fib"), "flag": "cardiac"},
+    # v2.20: a prolonged QT interval is its own condition - QT-prolonging drugs are contraindicated there, not in every
+    # arrhythmia (pharmacist review round 2)
+    "qt_long": {"ko": "QT 연장(심전도)", "kw": ("qt 연장", "qt연장", "qt 간격", "qtc", "qt prolong", "long qt", "긴 qt"),
+                "flag": "cardiac"},
     "cardiac": {"ko": "협심증·심근경색", "kw": ("협심증", "심근경색", "관상동맥", "angina", "coronary"), "flag": "cardiac"},
     "hypertension": {"ko": "고혈압", "kw": ("고혈압", "hypertens"), "flag": "hypertension"},
     "diabetes": {"ko": "당뇨", "kw": ("당뇨", "diabet"), "flag": "diabetes"},
@@ -385,7 +389,8 @@ DRUG_DISEASE_RULES: list[tuple[str, str, str, str]] = _rules.drug_disease_rules(
 DISEASE_LABEL_TERMS: dict[str, str] = {
     "peptic_ulcer": r"peptic ulcer|gastrointestinal bleeding|active ulcer", "bleeding": r"bleeding disorder|hemophilia",
     "glaucoma": r"glaucoma", "bph": r"prostatic hypertrophy|urinary retention|bladder[- ]neck obstruction",
-    "asthma": r"asthma|bronchospasm", "heart_failure": r"heart failure", "arrhythmia": r"qt prolongation|arrhythmia",
+    "asthma": r"asthma|bronchospasm", "heart_failure": r"heart failure", "arrhythmia": r"arrhythmia",
+    "qt_long": r"qt prolongation|prolonged qt|long qt|qtc prolongation",
     # renal / hepatic deliberately absent: labels name "severe impairment" thresholds, which the CrCl / liver
     # rules and the patient model handle with the patient's actual values instead of a keyword
     "epilepsy": r"seizure", "pregnancy": r"pregnan", "myasthenia": r"myasthenia", "parkinson": r"parkinson",
@@ -818,8 +823,10 @@ DRUG_GROUPS.update({
     "sglt2": frozenset({"dapagliflozin", "empagliflozin", "ertugliflozin", "canagliflozin", "ipragliflozin",
                         "enavogliflozin"}),
     # contraindicated in significant / active liver disease by their labels
-    "hepatic_contra": frozenset({"valproate", "ketoconazole", "methotrexate", "leflunomide", "nevirapine",
-                                 "terbinafine"}),
+    "hepatic_contra": frozenset({"valproate", "ketoconazole", "methotrexate", "leflunomide", "terbinafine"}),
+    # v2.20 (pharmacist review round 2): labelled contraindications in pregnancy that the DUR lists only as grade 2
+    "pregnancy_avoid": frozenset({"tamoxifen", "letrozole", "anastrozole", "exemestane", "itraconazole", "dronedarone",
+                                  "amiodarone"}),
     "five_alpha_reductase": frozenset({"finasteride", "dutasteride"}),
     "citalopram_class": frozenset({"citalopram", "escitalopram"}),
     # the QT drugs with the highest torsade risk (class Ia / III antiarrhythmics, drugs whose own labels box or

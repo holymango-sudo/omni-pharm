@@ -419,7 +419,12 @@ class Engine(ResolveMixin, EvidenceMixin, ClinicalMixin):
             src = set().union(*(prods_of[g.key] for g in mem))
             names = [self.ko(g) for g in mem]
             if len(mem) >= 2 and len(src) >= 2 and frozenset(names) not in covered:
-                class_dups.append({"class": f"{grp} (식약처 DUR 효능군중복)", "ingredients": names, "products": sorted(src)})
+                # v2.20 (pharmacist review round 2: ARB + ARB, DPP-4 + DPP-4 were '위험' for both pharmacists): two drugs of
+                # the same series are a prescribing duplication to correct - '위험' unless sold together in one product
+                class_dups.append({"class": f"{grp} (식약처 DUR 효능군중복)", "ingredients": names, "products": sorted(src),
+                                   "dur_series": True,
+                                   "intended": all(frozenset((x.bare, y.bare)) in self.combo_pairs
+                                                   for x, y in itertools.combinations(mem, 2))})
                 covered.add(frozenset(names))
         # WHO ATC level 4 (same chemical/therapeutic subgroup) for every approved drug (ChEMBL); vitamins,
         # minerals, topical and 'various' groups are excluded - combining those is usually intended
@@ -638,7 +643,7 @@ class Engine(ResolveMixin, EvidenceMixin, ClinicalMixin):
             overall = "주의"
         severe_classes = {DRUG_CLASSES[c][0] for c in ("nsaid", "opioid", "sedative", "anticoagulant", "pde5")}
         for d in class_dups:
-            d["severe"] = d["class"] in severe_classes and not d.get("intended")
+            d["severe"] = (d["class"] in severe_classes or d.get("dur_series", False)) and not d.get("intended")
         if any(d["severe"] for d in class_dups):
             overall = "높음"
         elif class_dups and overall == "낮음":
