@@ -36,7 +36,13 @@ try {
     if ($Mode -eq "quick") {
         Step "fast tests" { & $py -m pytest tests -q -p no:cacheprovider -m "not slow" }
     } else {
-        Step "all tests" { & $py -m pytest tests -q -p no:cacheprovider }
+        # the tests' own engine on the CPU: with a second engine on the GPU next to the running server, Ollama could not
+        # load the vision model (llama.cpp 'error loading model: vector' while fitting memory) - and results stay the
+        # same on any machine (GitHub's runners have no GPU either)
+        Step "all tests (engine on CPU)" {
+            $env:CUDA_VISIBLE_DEVICES = "-1"
+            try { & $py -m pytest tests -q -p no:cacheprovider } finally { Remove-Item Env:CUDA_VISIBLE_DEVICES }
+        }
         Step "audit: development set" { & $py scripts/audit_combos.py }
         # measurement only: never change rules to fit the holdout set
         Step "audit: holdout set (measurement only)" { & $py scripts/audit_combos.py --holdout }

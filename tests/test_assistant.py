@@ -29,6 +29,11 @@ def test_fallback_answer_uses_the_facts_only():
 def test_symptom_catalog_and_api_validation():
     ids = {s["id"] for s in recommend.catalog()}
     assert {"fever", "cough", "runny_nose", "headache", "heartburn", "diarrhea"} <= ids
+    assert not any(c["popular"] for c in recommend.catalog() if c["care"] == "emergency")  # never a button
+    for c in recommend.CONDITIONS.values():
+        assert c["care"] in ("self", "doctor_first", "emergency") and c["doctor"], c["ko"]
+        assert c["care"] != "emergency" or not (c.get("options") or c.get("topical") or c.get("rx"))
+        assert all(i in recommend.CONDITIONS for i in c.get("includes", []))
     c = TestClient(api.app)
     assert c.post("/api/v1/chat", json={"report_id": "zzzzzzzz", "question": "?"}).status_code in (404, 503)
     assert c.post("/api/v1/chat", json={"report_id": "zzzzzzzz", "question": "x" * 700}).status_code == 422
@@ -71,6 +76,42 @@ def test_suggestions_are_screened_for_the_patient(eng):
     assert o["cetirizine"]["status"] != "avoid"
     o, _ = rec(eng, ["period"], sex="F", conditions=["pregnancy"])
     assert o["ibuprofen"]["status"] == "avoid" and o["acetaminophen"]["status"] == "ok"
+
+
+def test_condition_search_with_everyday_words():
+    """v2.21: what people type ('허리디스크', '무릎 십자인대 파열', '발목을 삐었어요') finds the condition, the most specific
+    first; an emergency is always first; a word with no condition falls back to the OTC indications."""
+    first = lambda q: (recommend.search(q)["matches"] or [{"id": None}])[0]["id"]  # noqa: E731
+    assert first("허리디스크") == "disc" and first("무릎 십자인대 파열") == "knee_ligament"
+    assert first("감기") == "cold" and first("목감기") == "cold" and first("편두통") == "migraine"
+    assert first("발목을 삐었어요") == "sprain" and first("소변 볼 때 아파요") == "cystitis"
+    assert first("통풍 발작") == "gout"  # not the 'seizure' emergency
+    assert first("감기인데 가슴이 답답해요") == "em_chest"
+    assert recommend.search("비듬")["free"] and recommend.search("허")["matches"] == []
+
+
+@needs_models
+@pytest.mark.slow
+def test_condition_suggestions(eng):
+    """Doctor-first conditions say so, emergencies suggest nothing, creams / patches are real OTC products, the OTC
+    products found by their approved indication are screened too, prescription medicines only in the expert view."""
+    r = recommend.recommend(eng, ["knee_ligament"], [], Patient(**ADULT))
+    c = r["symptoms"][0]
+    assert c["care"] == "doctor_first" and "정형외과" in c["doctor"] and "얼음" in c["tips"]
+    assert c["topical"] and all(p["otc"] for o in c["topical"] for p in o["products"]) and c["label_products"]
+    assert c["rx"] == []
+    rx = recommend.recommend(eng, ["disc"], [], Patient(**ADULT), expert=True)["symptoms"][0]["rx"]
+    assert {o["key"] for o in rx} >= {"pregabalin", "celecoxib"}
+    cards = recommend.recommend(eng, ["cold"], [], Patient(**ADULT))["symptoms"]
+    assert [c["id"] for c in cards][:2] == ["cold", "fever"] and cards[1]["parent"] == "cold"
+    em = recommend.recommend(eng, ["em_chest"], [], Patient(**ADULT))
+    assert not (em["symptoms"][0]["options"] or em["symptoms"][0]["label_products"]) and em["notes"][0].startswith("🚑")
+    # warfarin: every NSAID - tablets, patches and OTC products found by their indication - is no longer simply 'ok'
+    cur = [{"input": "warfarin", "ingredients": eng.resolve("warfarin")}]
+    c = recommend.recommend(eng, ["sprain"], cur, Patient(**ADULT))["symptoms"][0]
+    assert all(o["status"] != "ok" for o in c["options"] + c["topical"])
+    free = recommend.recommend(eng, [], [], Patient(**ADULT), query="비듬")["symptoms"][0]
+    assert free["id"] == "free" and any("비듬" in p["snippet"] for p in free["label_products"])
 
 
 def test_fallback_shows_the_quick_checks_first():

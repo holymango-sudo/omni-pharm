@@ -183,6 +183,7 @@ _THINKING: dict[str, bool] = {}
 # for the chat once a regimen had ~7 medicines - the analysis + lookups filled ~8000 tokens and the answer stopped
 # mid-sentence (done_reason 'length'). 16384 fits next to the engine on a 16 GB GPU (gemma4:12b, 100% GPU).
 LLM_CTX = 16384
+VISION_CTX = 8192
 CHAT_PREDICT = 800
 CUT_NOTE = "\n\n(답변이 길이 제한에 걸려 여기서 끊겼습니다 — '이어서 말해 주세요'라고 물어보시면 계속 답합니다.)"
 
@@ -499,7 +500,9 @@ async def vision_json(prompt: str, schema: dict, image_b64: str) -> dict | None:
     """Ask the local multimodal model about one image; the answer is forced into `schema` (Ollama structured output).
     None when the model is not running or cannot read images."""
     body = {"model": settings.llm_model, "stream": False, "keep_alive": "30m", "format": schema,
-            "options": {"temperature": 0, "num_ctx": LLM_CTX},
+            # 8k is plenty for one image + the JSON answer, and the image encoder needs GPU memory of its own: with 16k it
+            # failed (HTTP 500) while another engine was on the GPU. (A different num_ctx reloads the model - a few s.)
+            "options": {"temperature": 0, "num_ctx": VISION_CTX},
             "messages": [{"role": "user", "content": prompt, "images": [image_b64]}]}
     if await _thinks(settings.llm_model):
         body["think"] = False

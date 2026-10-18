@@ -94,10 +94,14 @@ export default function SymptomFinder({ patient, drugs, onAdd, onClose, expert }
     if (hits.matches.length) pick(hits.matches[0].id);
     else { setRes(null); setFree(s); setQ(""); }
   };
+  const results = useRef();
   const run = async () => {
     setBusy(true);
     setErr(null);
-    try { setRes(await api.recommend(picked, drugs, patient(), picked.length ? null : free, !!expert)); } catch (e) { setErr(e.message); }
+    try {
+      setRes(await api.recommend(picked, drugs, patient(), picked.length ? null : free, !!expert));
+      setTimeout(() => results.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    } catch (e) { setErr(e.message); }
     setBusy(false);
   };
   const added = new Set(drugs);
@@ -128,13 +132,15 @@ export default function SymptomFinder({ patient, drugs, onAdd, onClose, expert }
           </div>
         )}
       </div>
-      <div className="sym-group">
-        <em>자주 찾는 증상</em>
-        {popular.map((c) => (
-          <button key={c.id} className={`chip ${picked.includes(c.id) ? "on" : ""}`}
-            onClick={() => (picked.includes(c.id) ? unpick(c.id) : pick(c.id))}>{c.icon} {c.ko}</button>
-        ))}
-      </div>
+      {!res && (  // once there are results the buttons fold away so the results are what you see
+        <div className="sym-group">
+          <em>자주 찾는 증상</em>
+          {popular.map((c) => (
+            <button key={c.id} className={`chip ${picked.includes(c.id) ? "on" : ""}`}
+              onClick={() => (picked.includes(c.id) ? unpick(c.id) : pick(c.id))}>{c.icon} {c.ko}</button>
+          ))}
+        </div>
+      )}
       {(picked.length > 0 || free) && (
         <div className="sym-picked">
           <em>고른 것</em>
@@ -149,7 +155,7 @@ export default function SymptomFinder({ patient, drugs, onAdd, onClose, expert }
       </button>
       {err && <div className="error">⚠ {err}</div>}
       {res && (
-        <div className="sym-results">
+        <div className="sym-results" ref={results}>
           {res.notes.map((n) => <div key={n} className={`sym-note ${n.startsWith("🚑") ? "emergency" : ""}`}>{n.startsWith("🚑") ? "" : "💡 "}{n}</div>)}
           {res.symptoms.map((s) => (
             <div key={s.id} className={`sym-card ${s.parent ? "sub" : ""} ${CARE[s.care]?.[1] || ""}`}>
