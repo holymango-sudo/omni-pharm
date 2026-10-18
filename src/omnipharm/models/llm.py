@@ -179,6 +179,27 @@ def template_report(facts: dict) -> str:
 _THINKING: dict[str, bool] = {}
 
 
+# One context size for every call: Ollama reloads the model when num_ctx changes between requests. 8192 was too small
+# for the chat once a regimen had ~7 medicines - the analysis + lookups filled ~8000 tokens and the answer stopped
+# mid-sentence (done_reason 'length'). 16384 fits next to the engine on a 16 GB GPU (gemma4:12b, 100% GPU).
+LLM_CTX = 16384
+CHAT_PREDICT = 800
+CUT_NOTE = "\n\n(답변이 길이 제한에 걸려 여기서 끊겼습니다 — '이어서 말해 주세요'라고 물어보시면 계속 답합니다.)"
+
+
+def _compact(obj) -> str:
+    """The analysis as JSON for the model: one line, no indentation (whitespace costs context tokens)."""
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
+
+
+def _fit_history(system: str, history: list[dict], user: str, budget_chars: int) -> list[dict]:
+    """Drop the oldest turns until system + history + question fit the context (Korean ~1.9 characters per token)."""
+    keep = list(history)
+    while keep and len(system) + len(user) + sum(len(h["content"]) for h in keep) > budget_chars:
+        keep.pop(0)
+    return keep
+
+
 async def _thinks(model: str) -> bool:
     """Does the Ollama model have a thinking mode (then it must be switched off for the report)?"""
     if model not in _THINKING:
@@ -193,9 +214,9 @@ async def _thinks(model: str) -> bool:
 
 async def stream_report(facts: dict) -> AsyncIterator[str]:
     sections = SECTIONS_SAFE if facts.get("종합등급") == "낮음" else SECTIONS
-    prompt = (f"[분석 근거]\n```json\n{json.dumps(facts, ensure_ascii=False, indent=1)}\n```\n\n{sections}")
+    prompt = (f"[분석 근거]\n```json\n{_compact(facts)}\n```\n\n{sections}")
     body = {"model": settings.llm_model, "stream": True, "keep_alive": "30m",
-            "options": {"temperature": 0.2, "num_ctx": 6144, "num_predict": 900},
+            "options": {"temperature": 0.2, "num_ctx": LLM_CTX, "num_predict": 900},
             "messages": [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]}
     if await _thinks(settings.llm_model):  # reasoning models (qwen3, gemma4 ...): answer directly
         body["think"] = False
@@ -217,6 +238,8 @@ async def stream_report(facts: dict) -> AsyncIterator[str]:
                             sent = True
                             yield tok
                         if msg.get("done"):
+                            if msg.get("done_reason") == "length":
+                                yield "\n\n(소견서가 길이 제한에 걸려 여기서 끊겼습니다 — 근거 표와 상세 근거를 함께 보세요.)"
                             return
         except Exception as e:
             if attempt == 0 and not sent:
@@ -380,7 +403,7 @@ def lookup_block(found: list[dict]) -> str:
     """The quick checks of the medicines / foods named in the question, attached to that question."""
     if not found:
         return ""
-    return "\n\n[방금 확인한 결과]\n```json\n" + json.dumps(_prune(found), ensure_ascii=False, indent=1) + "\n```"
+    return "\n\n[방금 확인한 결과]\n```json\n" + _compact(_prune(found)) + "\n```"
 
 
 def danger_note(ctx: dict, question: str) -> str:
@@ -428,14 +451,15 @@ async def stream_chat(ctx: dict, history: list[dict], question: str,
     if found:  # the evidence kinds of the quick checks may be cited too
         ctx = {**ctx, "근거종류(이것만 출처로 쓸 것)": sorted({*ctx.get("근거종류(이것만 출처로 쓸 것)", []),
                                                          *(s for f in found for s in f.get("근거종류", []))})}
-    system = CHAT_SYSTEM + "\n\n[분석 결과]\n```json\n" + json.dumps(ctx, ensure_ascii=False, indent=1) + "\n```"
-    msgs = [{"role": "system", "content": system}]
-    for h in history[-8:]:
-        if h.get("role") in ("user", "assistant") and h.get("content"):
-            msgs.append({"role": h["role"], "content": str(h["content"])[:2000]})
-    msgs.append({"role": "user", "content": question + danger_note(ctx, question) + lookup_block(found or [])})
+    system = CHAT_SYSTEM + "\n\n[분석 결과]\n```json\n" + _compact(ctx) + "\n```"
+    user = question + danger_note(ctx, question) + lookup_block(found or [])
+    turns = [{"role": h["role"], "content": str(h["content"])[:2000]} for h in history[-8:]
+             if h.get("role") in ("user", "assistant") and h.get("content")]
+    # room for the answer: a long conversation must not push the reply out of the context
+    turns = _fit_history(system, turns, user, int((LLM_CTX - CHAT_PREDICT - 300) * 1.9))
+    msgs = [{"role": "system", "content": system}, *turns, {"role": "user", "content": user}]
     body = {"model": settings.llm_model, "stream": True, "keep_alive": "30m", "messages": msgs,
-            "options": {"temperature": 0.4, "num_ctx": 8192, "num_predict": 800}}
+            "options": {"temperature": 0.4, "num_ctx": LLM_CTX, "num_predict": CHAT_PREDICT}}
     if await _thinks(settings.llm_model):
         body["think"] = False
     import asyncio
@@ -456,6 +480,10 @@ async def stream_chat(ctx: dict, history: list[dict], question: str,
                             sent = True
                             yield tok
                         if msg.get("done"):
+                            if msg.get("done_reason") == "length":  # never leave a sentence hanging without saying so
+                                log.warning(f"chat answer cut at the length limit (prompt {msg.get('prompt_eval_count')} "
+                                            f"tokens, answer {msg.get('eval_count')})")
+                                yield CUT_NOTE
                             return
         except Exception as e:
             if attempt == 0 and not sent:
@@ -471,7 +499,7 @@ async def vision_json(prompt: str, schema: dict, image_b64: str) -> dict | None:
     """Ask the local multimodal model about one image; the answer is forced into `schema` (Ollama structured output).
     None when the model is not running or cannot read images."""
     body = {"model": settings.llm_model, "stream": False, "keep_alive": "30m", "format": schema,
-            "options": {"temperature": 0, "num_ctx": 8192},
+            "options": {"temperature": 0, "num_ctx": LLM_CTX},
             "messages": [{"role": "user", "content": prompt, "images": [image_b64]}]}
     if await _thinks(settings.llm_model):
         body["think"] = False

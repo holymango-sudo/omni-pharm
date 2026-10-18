@@ -20,8 +20,9 @@ $cfg = Join-Path $root ".venv\pyvenv.cfg"
 if ((Test-Path (Join-Path $pyHome "python.exe")) -and (Test-Path $cfg) -and
     -not (Select-String -Path $cfg -Pattern ("^home = " + [regex]::Escape($pyHome) + "$") -Quiet)) {
     # folder moved (other drive letter / PC): point the virtual environment at the bundled Python again
-    @("home = $pyHome", "include-system-site-packages = false", "version = 3.11.9",
-      "executable = $pyHome\python.exe") | Set-Content $cfg -Encoding ascii
+    # (UTF-8 without BOM: Python reads pyvenv.cfg as UTF-8, and the new place may have a Korean user / folder name)
+    [System.IO.File]::WriteAllLines($cfg, [string[]]@("home = $pyHome", "include-system-site-packages = false",
+        "version = 3.11.9", "executable = $pyHome\python.exe"), (New-Object System.Text.UTF8Encoding($false)))
     Write-Host "Python path updated for this location: $pyHome" -ForegroundColor Cyan
 }
 

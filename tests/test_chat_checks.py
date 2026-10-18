@@ -32,6 +32,20 @@ def test_unsupported_clinical_claims_are_found():
     assert C.unsupported_claims("오늘은 날씨가 좋네요.", {}, "날씨?", ["타이레놀"]) == []
 
 
+def test_long_conversation_leaves_room_for_the_answer():
+    """v2.20.1: a 7-medicine analysis filled the 8k context and the answer stopped mid-sentence. The oldest turns go
+    first when system + history + question would not leave room for the reply; the context is sent compact."""
+    hist = [{"role": "user", "content": "가" * 900}, {"role": "assistant", "content": "나" * 900},
+            {"role": "user", "content": "다" * 900}]
+    assert llm._fit_history("s" * 100, hist, "질문", 10_000) == hist
+    kept = llm._fit_history("s" * 100, hist, "질문", 2_000)
+    assert kept == hist[1:] or kept == hist[2:]
+    assert sum(len(h["content"]) for h in kept) + 102 <= 2_000
+    assert llm._fit_history("s" * 5_000, hist, "질문", 2_000) == []
+    assert "\n" not in llm._compact({"a": [1, {"b": "가"}]}) and "가" in llm._compact({"b": "가"})
+    assert llm.LLM_CTX >= 16384 and "끊겼습니다" in llm.CUT_NOTE
+
+
 def test_emergency_words_include_a_swallowed_pack():
     assert llm.EMERGENCY.search("아이가 약을 한 통 다 먹었어요")
     assert llm.EMERGENCY.search("약을 전부 먹어 버렸어요")
