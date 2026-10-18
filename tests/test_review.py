@@ -69,6 +69,18 @@ def test_filled_workbook_is_read_with_the_reviewer_name(tmp_path):
     assert sr._sheets([str(tmp_path)]) == [tmp_path / "a.xlsx"]
 
 
+def test_rounds_have_their_own_case_numbers():
+    """Round 2 (#201-) never reuses a round-1 number or combination, and every patient of a case list has a profile."""
+    assert review.round_of(1) == 1 and review.round_of(200) == 1 and review.round_of(201) == 2
+    if len(review.rounds()) < 2:
+        pytest.skip("round 2 case list not drawn")
+    r1, r2 = review.raw_cases(1), review.raw_cases(2)
+    assert r1["번호"].max() < r2["번호"].min() == review.ROUND_START[2]
+    assert not {frozenset(x.split(" + ")) for x in r1["약물"]} & {frozenset(x.split(" + ")) for x in r2["약물"]}
+    assert set(r1["환자"]) <= set(review.REVIEW_PATIENTS_1) and set(r2["환자"]) <= set(review.REVIEW_PATIENTS_2)
+    assert len(review.raw_cases()) == len(r1) + len(r2)
+
+
 def test_review_page_never_receives_the_program_verdict():
     html = (ROOT / "src" / "omnipharm" / "static" / "review.html").read_text(encoding="utf-8")
     assert "/api/v1/review/cases" in html and "프로그램 판정" not in html and "/api/v1/predict" not in html

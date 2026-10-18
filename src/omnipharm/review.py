@@ -19,9 +19,12 @@ import pandas as pd
 from omnipharm.config import PROJECT_ROOT, settings
 
 SHEET = PROJECT_ROOT / "docs" / "validation" / "약사_검수표.xlsx"
+# review rounds: each round's case list (원본). Case numbers are unique across rounds (round 2 starts at 201), so the
+# answers of every round can live together and the scoring knows a case's round from its number.
+SHEETS = {1: SHEET, 2: PROJECT_ROOT / "docs" / "validation" / "약사_검수표_2차.xlsx"}
 VERDICTS = ("위험", "주의", "안전", "모름")
 # the patient profiles of the review cases (scripts/review_sheet.py writes the sheet with these names)
-REVIEW_PATIENTS = {
+REVIEW_PATIENTS_1 = {
     "건강한 성인 (45세 남, 72kg)": dict(age=45, sex="M", weight_kg=72, height_cm=174, scr=0.9),
     "고령·신장저하 (82세 여, 48kg, Cr 1.6)": dict(age=82, sex="F", weight_kg=48, height_cm=150, scr=1.6),
     "임신 중 (31세 여)": dict(age=31, sex="F", weight_kg=60, height_cm=162, scr=0.7, conditions=["pregnancy"]),
@@ -31,6 +34,33 @@ REVIEW_PATIENTS = {
                             conditions=["heart_failure", "diabetes"]),
     "소아 (9세, 30kg)": dict(age=9, sex="M", weight_kg=30, height_cm=133, scr=0.5),
 }
+# round 2 (v2.19, after the rules were changed on round 1): other people of the same kinds - and two milder ones, so
+# that a rule tuned on round 1 that fires too widely shows up as an over-call
+REVIEW_PATIENTS_2 = {
+    "건강한 성인 (36세 여, 55kg)": dict(age=36, sex="F", weight_kg=55, height_cm=161, scr=0.7),
+    "고령·중등도 신장저하 (78세 남, 62kg, Cr 1.4)": dict(age=78, sex="M", weight_kg=62, height_cm=165, scr=1.4,
+                                                 conditions=["hypertension"]),
+    "고령·중증 신장저하 (86세 여, 42kg, Cr 1.5)": dict(age=86, sex="F", weight_kg=42, height_cm=148, scr=1.5,
+                                                conditions=["arrhythmia"]),
+    "임신 중 (27세 여)": dict(age=27, sex="F", weight_kg=58, height_cm=160, scr=0.6, conditions=["pregnancy"]),
+    "지방간·간수치 경도 상승 (52세 남)": dict(age=52, sex="M", weight_kg=82, height_cm=172, scr=0.9, ast=58, alt=72,
+                                       total_bilirubin=0.9, conditions=["hepatic"]),
+    "간경변 (58세 여)": dict(age=58, sex="F", weight_kg=55, height_cm=158, scr=0.8, ast=95, alt=64, total_bilirubin=2.4,
+                         conditions=["hepatic"]),
+    "소아 (6세, 21kg)": dict(age=6, sex="F", weight_kg=21, height_cm=116, scr=0.4),
+}
+REVIEW_PATIENTS = {**REVIEW_PATIENTS_1, **REVIEW_PATIENTS_2}
+ROUND_PATIENTS = {1: REVIEW_PATIENTS_1, 2: REVIEW_PATIENTS_2}
+ROUND_START = {1: 1, 2: 201}  # the first case number of each round
+
+
+def rounds() -> list[int]:
+    """Rounds whose case list exists."""
+    return [r for r, f in SHEETS.items() if f.exists()]
+
+
+def round_of(case_id: int) -> int:
+    return max(r for r, s in ROUND_START.items() if case_id >= s)
 _lock = threading.Lock()
 
 
@@ -48,14 +78,17 @@ def reviewer_id(name: str) -> str:
     return rid
 
 
-def raw_cases() -> pd.DataFrame:
-    return pd.read_excel(SHEET, sheet_name="사례")[["번호", "환자", "약물"]]
+def raw_cases(round_no: int | None = None) -> pd.DataFrame:
+    """The case list of one round, or of every round that exists (case numbers do not overlap)."""
+    picked = [round_no] if round_no else rounds()
+    return pd.concat([pd.read_excel(SHEETS[r], sheet_name="사례")[["번호", "환자", "약물"]] for r in picked],
+                     ignore_index=True)
 
 
-def cases(eng) -> list[dict]:
+def cases(eng, round_no: int | None = None) -> list[dict]:
     """Cases for the review page: patient and medicines with Korean names - no program verdict."""
     out = []
-    for r in raw_cases().itertuples():
+    for r in raw_cases(round_no).itertuples():
         names = []
         for d in str(r.약물).split(" + "):
             try:

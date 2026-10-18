@@ -20,7 +20,7 @@ from collections import OrderedDict
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
@@ -223,7 +223,7 @@ def assess_patient(p: Patient):
 
 @app.get("/api/v1/diseases")
 def diseases():
-    return [{"id": k, "ko": v["ko"]} for k, v in DISEASES.items()]
+    return [{"id": k, "ko": v["ko"]} for k, v in DISEASES.items() if not v.get("derived")]  # (age / sex groups)
 
 
 @app.get("/api/v1/search")
@@ -458,13 +458,17 @@ class ReviewAnswer(BaseModel):
 
 
 @app.get("/api/v1/review/cases")
-async def review_cases():
-    """The review cases (patient + medicines) - never the program's verdict (the review is blinded)."""
-    if not review.SHEET.exists():
+async def review_cases(round_no: int | None = Query(None, alias="round")):
+    """The review cases (patient + medicines) of one round (default: the latest) - never the program's verdict
+    (the review is blinded)."""
+    rounds = review.rounds()
+    if not rounds:
         raise HTTPException(404, {"message": "검수표가 없습니다 (python scripts/review_sheet.py)."})
-    if "review_cases" not in E:
-        E["review_cases"] = await asyncio.to_thread(review.cases, E["engine"])
-    return {"cases": E["review_cases"], "verdicts": list(review.VERDICTS)}
+    rno = round_no if round_no in rounds else rounds[-1]
+    key = f"review_cases_{rno}"
+    if key not in E:
+        E[key] = await asyncio.to_thread(review.cases, E["engine"], rno)
+    return {"cases": E[key], "round": rno, "verdicts": list(review.VERDICTS)}
 
 
 @app.get("/api/v1/review/answers")

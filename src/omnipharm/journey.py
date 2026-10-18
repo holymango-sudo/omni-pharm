@@ -157,7 +157,8 @@ CLASS_TOX = {"nsaid": ("stomach", "위장 출혈·신장 손상"), "sedating_ant
              "antitussive": ("brain", "진정·호흡 억제"), "sedative": ("brain", "과도한 진정·호흡 억제"),
              "opioid": ("lung", "호흡 억제"), "pde5": ("vessel", "심한 저혈압"), "anticoagulant": ("vessel", "출혈"),
              "glp1": ("pancreas", "저혈당·위장 장애")}
-DISEASE_SITE = {"renal": "kidney", "hepatic": "liver", "heart_failure": "heart", "arrhythmia": "heart", "cardiac": "heart",
+DISEASE_SITE = {"renal": "kidney", "renal_severe": "kidney", "hepatic": "liver", "cirrhosis": "liver",
+                "heart_failure": "heart", "arrhythmia": "heart", "cardiac": "heart",
                 "hypertension": "vessel", "diabetes": "pancreas", "peptic_ulcer": "stomach", "bleeding": "vessel",
                 "asthma": "lung", "glaucoma": "eye", "bph": "bladder", "epilepsy": "brain", "dementia": "brain",
                 "parkinson": "brain", "pregnancy": "reproductive", "hyperthyroid": "thyroid", "gout": "joint",

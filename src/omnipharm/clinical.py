@@ -132,10 +132,22 @@ def assess(p: Patient) -> dict:
 
     # ---- diseases -> model flags
     dis = disease_ids(p.conditions, p.diagnosis)
+    liver_disease = "hepatic" in dis  # ticked / named by the user (not only a lab value)
     if kidney and kidney["impaired"]:
         dis.add("renal")
+    if kidney and kidney["clearance"] < 30:  # labels' 'severe renal impairment' threshold
+        dis.add("renal_severe")
     if liver and liver["impaired"]:
         dis.add("hepatic")
+    # 'active liver disease' of the statin / metformin / NSAID ... contraindications: a known liver disease with
+    # bilirubin >= 2 mg/dL (Child-Pugh 2+ points) or transaminases >= 3x ULN, or values that are severe on their own
+    if liver and (liver["severity"] >= 2 or (liver_disease and (
+            (p.total_bilirubin or 0) >= 2.0 or max(liver["uln_multiples"].get(k, 0) for k in ("AST", "ALT")) >= 3))):
+        dis.add("cirrhosis")
+    if "cirrhosis" in dis:  # (ticked as 간경변 / dialysis): the milder group's rules apply too
+        dis.add("hepatic")
+    if "renal_severe" in dis:
+        dis.add("renal")
     flags = dict.fromkeys(COMORBIDITIES, False)
     for d in dis:
         f = DISEASES[d]["flag"]

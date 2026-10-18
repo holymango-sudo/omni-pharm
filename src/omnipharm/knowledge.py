@@ -344,8 +344,14 @@ DRUG_GROUPS: dict[str, frozenset[str]] = {
 # Conditions the user can tick or type. model_flag = the comorbidity feature of the patient model (if any).
 DISEASES: dict[str, dict] = {
     "renal": {"ko": "신장질환(CKD)", "kw": ("신부전", "신장", "콩팥", "투석", "ckd", "renal", "kidney"), "flag": "renal"},
+    # v2.19 (pharmacist review): contraindications that depend on HOW impaired - also set from the patient's values
+    # (clinical.assess: clearance < 30 mL/min; liver disease with bilirubin >= 2 mg/dL or transaminases >= 3x ULN)
+    "renal_severe": {"ko": "중증 신장질환(CrCl<30·투석)", "kw": ("투석", "dialysis", "말기 신부전", "말기신부전", "esrd",
+                                                          "중증 신부전"), "flag": "renal"},
     "hepatic": {"ko": "간질환", "kw": ("간경변", "간경화", "간염", "간부전", "지방간", "간질환", "cirrhosis", "hepat",
                                     "liver"), "flag": "hepatic"},
+    "cirrhosis": {"ko": "간경변·활동성 간질환", "kw": ("간경변", "간경화", "cirrhosis", "간부전", "liver failure", "비대상성"),
+                  "flag": "hepatic"},
     "heart_failure": {"ko": "심부전", "kw": ("심부전", "heart failure"), "flag": "cardiac"},
     "arrhythmia": {"ko": "부정맥·QT연장", "kw": ("부정맥", "심방세동", "qt", "arrhythm", "atrial fib"), "flag": "cardiac"},
     "cardiac": {"ko": "협심증·심근경색", "kw": ("협심증", "심근경색", "관상동맥", "angina", "coronary"), "flag": "cardiac"},
@@ -366,6 +372,9 @@ DISEASES: dict[str, dict] = {
     "hyperthyroid": {"ko": "갑상선기능항진", "kw": ("갑상선기능항진", "그레이브스", "hyperthyroid", "graves"), "flag": None},
     "gout": {"ko": "통풍", "kw": ("통풍", "gout"), "flag": None},
     "myasthenia": {"ko": "중증근무력증", "kw": ("근무력", "myasthenia"), "flag": None},
+    # patient groups (from age / sex, never ticked): only for the drug-disease rules, not shown as a disease
+    "child": {"ko": "소아(12세 미만)", "kw": (), "flag": None, "derived": True},
+    "female": {"ko": "여성", "kw": (), "flag": None, "derived": True},
 }
 
 # (disease, drug group, '금기' = avoid | '주의', plain-language reason) - data with sources and review records:
@@ -802,6 +811,28 @@ DRUG_GROUPS.update({
                                  "digoxin", "pilsicainide"}),
 })
 DRUG_GROUPS["qt_prolonging"] = DRUG_GROUPS["qt_prolonging"] | {"ibogaine"}
+# v2.19 (pharmacist review round 1): groups of the organ-function / pregnancy / conditional rules (rules/*.json)
+DRUG_GROUPS.update({
+    # low-dose aspirin is not what the heart-failure / kidney / blood-pressure / pregnancy NSAID warnings are about
+    "nsaid_nonaspirin": DRUG_CLASSES["nsaid"][1] - {"aspirin"},
+    "sglt2": frozenset({"dapagliflozin", "empagliflozin", "ertugliflozin", "canagliflozin", "ipragliflozin",
+                        "enavogliflozin"}),
+    # contraindicated in significant / active liver disease by their labels
+    "hepatic_contra": frozenset({"valproate", "ketoconazole", "methotrexate", "leflunomide", "nevirapine",
+                                 "terbinafine"}),
+    "five_alpha_reductase": frozenset({"finasteride", "dutasteride"}),
+    "citalopram_class": frozenset({"citalopram", "escitalopram"}),
+    # the QT drugs with the highest torsade risk (class Ia / III antiarrhythmics, drugs whose own labels box or
+    # contraindicate QT combinations, macrolides): with (es)citalopram these are 'avoid'; other QT drugs stay '주의'
+    "qt_high_risk": frozenset({"amiodarone", "dronedarone", "sotalol", "dofetilide", "ibutilide", "quinidine",
+                               "procainamide", "disopyramide", "pimozide", "thioridazine", "mesoridazine", "methadone",
+                               "levomethadyl", "arsenic trioxide", "vandetanib", "nilotinib", "clarithromycin",
+                               "erythromycin"}),
+    "factor_xa": frozenset({"rivaroxaban", "apixaban", "edoxaban"}),
+    "pgp_or_strong_cyp3a": PGP_INHIBITORS | CYP_FDA["CYP3A"]["strong_inh"],
+    # combined P-gp + moderate CYP3A inhibitors (rivaroxaban label: avoid with them when CrCl is reduced)
+    "pgp_moderate_cyp3a": PGP_INHIBITORS & CYP_FDA["CYP3A"]["moderate_inh"],
+})
 DISEASES.update({
     "thyroid_cancer": {"ko": "갑상선수질암·MEN2", "kw": ("갑상선수질암", "수질암", "men2", "medullary thyroid"),
                        "flag": None},
@@ -821,6 +852,10 @@ PAIR_NOTES: list[tuple[str, str, str]] = _rules.pair_notes()
 RULE_PROVENANCE: dict[tuple[str, str], dict] = {(r["a"], r["b"]): r for r in _rules.rules("pair_rules")}
 DISEASE_RULE_SOURCE: dict[tuple[str, str], str] = {(r["disease"], r["group"]): r["source"]
                                                    for r in _rules.rules("drug_disease_rules")}
+# two drugs that are dangerous together only in a patient group (rules/conditional_rules.json)
+CONDITIONAL_RULES: list[tuple[str, str, str, str, str]] = _rules.conditional_rules()
+CONDITIONAL_RULE_SOURCE: dict[tuple[str, str, str], str] = {(r["a"], r["b"], r["when"]): r["source"]
+                                                            for r in _rules.rules("conditional_rules")}
 
 
 # Korean OTC labels (식약처 허가사항, stage "kr-labels"): '이 약을 복용하는 동안 다음의 약을 복용하지 말 것' items ->

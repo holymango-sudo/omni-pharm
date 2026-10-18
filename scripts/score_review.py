@@ -136,21 +136,26 @@ def main(paths: list[str]) -> None:
     if not given:
         sys.exit("약사 판정이 입력된 사례가 없습니다 (/review 페이지 또는 검수표 엑셀).")
     prog = program_verdicts()
-    res, rows = {"reviewers": {}, "between_reviewers": {}}, []
-    for who, ans in given.items():
-        ids = sorted(int(c) for c in ans)
-        a, b = [ans[str(i)]["verdict"] for i in ids], [prog[i] for i in ids]
-        res["reviewers"][who] = score(a, b)
-        rows += [{"검수자": who, "번호": i, "약사": x, "프로그램": y, "메모": ans[str(i)].get("memo", "")}
-                 for i, x, y in zip(ids, a, b, strict=True) if x != y]
-    for x, y in itertools.combinations(given, 2):
-        common = sorted(set(given[x]) & set(given[y]), key=int)
-        if len(common) >= 5:
-            a, b = [given[x][c]["verdict"] for c in common], [given[y][c]["verdict"] for c in common]
-            res["between_reviewers"][f"{x} vs {y}"] = {"n": len(common), "kappa": round(kappa(a, b, False), 3)}
-    if len(given) >= 2:
-        table = [[g[c]["verdict"] for g in given.values() if c in g] for c in {c for g in given.values() for c in g}]
-        res["between_reviewers"]["fleiss_kappa(all)"] = round(fleiss(table), 3)
+    res, rows = {}, []
+    # each review round separately: a round reviewed before the rules were changed on it is a development set
+    for rno in sorted({review.round_of(int(c)) for v in given.values() for c in v}):
+        part = {who: {c: x for c, x in ans.items() if review.round_of(int(c)) == rno} for who, ans in given.items()}
+        part = {k: v for k, v in part.items() if v}
+        out_r = res[f"{rno}차"] = {"reviewers": {}, "between_reviewers": {}}
+        for who, ans in part.items():
+            ids = sorted(int(c) for c in ans)
+            a, b = [ans[str(i)]["verdict"] for i in ids], [prog[i] for i in ids]
+            out_r["reviewers"][who] = score(a, b)
+            rows += [{"회차": rno, "검수자": who, "번호": i, "약사": x, "프로그램": y, "메모": ans[str(i)].get("memo", "")}
+                     for i, x, y in zip(ids, a, b, strict=True) if x != y]
+        for x, y in itertools.combinations(part, 2):
+            common = sorted(set(part[x]) & set(part[y]), key=int)
+            if len(common) >= 5:
+                a, b = [part[x][c]["verdict"] for c in common], [part[y][c]["verdict"] for c in common]
+                out_r["between_reviewers"][f"{x} vs {y}"] = {"n": len(common), "kappa": round(kappa(a, b, False), 3)}
+        if len(part) >= 2:
+            table = [[g[c]["verdict"] for g in part.values() if c in g] for c in {c for g in part.values() for c in g}]
+            out_r["between_reviewers"]["fleiss_kappa(all)"] = round(fleiss(table), 3)
     out = ROOT / "logs" / "validation"
     out.mkdir(parents=True, exist_ok=True)
     (out / "review_score.json").write_text(json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")

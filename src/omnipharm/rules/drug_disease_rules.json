@@ -209,7 +209,7 @@
   },
   {
    "disease": "heart_failure",
-   "group": "nsaid",
+   "group": "nsaid_nonaspirin",
    "level": "금기",
    "reason": "몸에 물이 차게 해 심부전을 악화시킵니다",
    "source": "AGS Beers Criteria 2023 질환별 회피 약물 표, NSAID 허가사항",
@@ -284,7 +284,7 @@
   },
   {
    "disease": "hypertension",
-   "group": "nsaid",
+   "group": "nsaid_nonaspirin",
    "level": "주의",
    "reason": "혈압을 올리고 혈압약 효과를 떨어뜨립니다",
    "source": "NSAID 허가사항(고혈압 악화·혈압약 효과 감소)",
@@ -329,7 +329,7 @@
   },
   {
    "disease": "cardiac",
-   "group": "nsaid",
+   "group": "nsaid_nonaspirin",
    "level": "주의",
    "reason": "심근경색·뇌졸중 위험이 커질 수 있습니다",
    "source": "NSAID 박스경고(심혈관 혈전 사건)",
@@ -359,12 +359,12 @@
   },
   {
    "disease": "renal",
-   "group": "nsaid",
-   "level": "금기",
-   "reason": "신장 혈류를 줄여 신기능을 더 떨어뜨립니다",
-   "source": "AGS Beers Criteria 2023 질환별 회피 약물 표(CrCl<30 회피), NSAID 허가사항",
+   "group": "nsaid_nonaspirin",
+   "level": "주의",
+   "reason": "신장 혈류를 줄여 신기능을 더 떨어뜨릴 수 있습니다 — 오래 먹지 마세요",
+   "source": "AGS Beers Criteria 2023(CrCl 30 미만 회피, 그 이상은 주의), NSAID 허가사항",
    "evidence": "규제기관 권고",
-   "since": "v2.8.0 이전",
+   "since": "v2.19.0",
    "review": {
     "status": "미검토",
     "reviewer": null,
@@ -524,12 +524,12 @@
   },
   {
    "disease": "pregnancy",
-   "group": "nsaid",
-   "level": "주의",
-   "reason": "임신 20주 이후 태아 신장·심장에 해로울 수 있습니다",
-   "source": "FDA 의약품 안전성 서한(2020-10, 임신 20주 이후 NSAID)",
+   "group": "nsaid_nonaspirin",
+   "level": "금기",
+   "reason": "임신 20주 이후 태아 신장 손상·동맥관 조기 폐쇄 위험이 있습니다 — 임신 주수를 모르면 피하고, 해열·진통에는 아세트아미노펜",
+   "source": "FDA 의약품 안전성 서한(2020-10, 임신 20주 이후 NSAID), NSAID 허가사항(임신 말기 금기)",
    "evidence": "규제기관 권고",
-   "since": "v2.8.0 이전",
+   "since": "v2.19.0",
    "review": {
     "status": "미검토",
     "reviewer": null,
@@ -875,6 +875,321 @@
    "source": "ACOG 위원회 의견(2017)·미국 공중보건국장 권고(2019)",
    "evidence": "규제기관 권고",
    "since": "v2.14.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pregnancy",
+   "group": "sulfonylurea",
+   "level": "금기",
+   "reason": "태반을 통과해 신생아에게 오래가는 저혈당을 일으킬 수 있습니다 — 임신 중 혈당 조절은 인슐린",
+   "source": "설포닐우레아(글리메피리드 등) 국내 허가사항(임부 금기)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pregnancy",
+   "group": "fluoroquinolone",
+   "level": "금기",
+   "reason": "태아의 연골·관절 발달에 해로울 수 있습니다 — 임신 중에는 다른 항생제를 씁니다",
+   "source": "퀴놀론계 항생제 국내 허가사항(임부 금기)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pregnancy",
+   "group": "doac",
+   "level": "금기",
+   "reason": "태반을 통과하고 임신 중 안전성이 확립되지 않았습니다 — 임신 중 항응고는 저분자량 헤파린",
+   "source": "리바록사반 허가사항(임부 금기), 아픽사반·에독사반·다비가트란 허가사항(임신 중 비권장), ASH 2018 임신 중 정맥혈전색전증 지침",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "pregnancy",
+   "group": "sglt2",
+   "level": "금기",
+   "reason": "임신 2·3기에 태아 신장 발달에 해로울 수 있습니다 — 임신 중 혈당 조절은 인슐린",
+   "source": "SGLT2 억제제 허가사항(임신 2·3기 사용 비권장)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cirrhosis",
+   "group": "statin",
+   "level": "금기",
+   "reason": "활동성 간질환에는 쓰지 않습니다 — 간 손상이 악화될 수 있습니다",
+   "source": "스타틴 국내 허가사항 금기(활동성 간질환·원인불명의 지속적 혈청 아미노전이효소 상승)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cirrhosis",
+   "group": "metformin",
+   "level": "금기",
+   "reason": "간 기능이 떨어지면 젖산을 없애지 못해 젖산산증 위험이 큽니다",
+   "source": "메트포르민 허가사항(간장애 환자 투여 금기·회피 — 젖산산증)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cirrhosis",
+   "group": "nsaid",
+   "level": "금기",
+   "reason": "간경변에서는 신부전(간신증후군)과 위장관·정맥류 출혈 위험이 커 소염진통제를 피합니다",
+   "source": "NSAID 허가사항 금기(중증 간장애), AASLD 간경변 진료지침(NSAID 회피)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cirrhosis",
+   "group": "hepatic_contra",
+   "level": "금기",
+   "reason": "중대한 간질환에는 쓰지 않습니다 — 치명적인 간 손상 위험",
+   "source": "발프로산·케토코나졸·메토트렉세이트·레플루노마이드·네비라핀·테르비나핀 허가사항(간질환 금기)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cirrhosis",
+   "group": "retinoid_systemic",
+   "level": "금기",
+   "reason": "간장애 환자에게는 쓰지 않습니다",
+   "source": "이소트레티노인·아시트레틴 허가사항 금기(간장애)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "cirrhosis",
+   "group": "doac",
+   "level": "금기",
+   "reason": "응고 장애를 동반한 간질환에서는 출혈 위험이 커 쓰지 않습니다",
+   "source": "리바록사반·아픽사반·에독사반·다비가트란 허가사항 금기(출혈 위험을 동반한 간질환, Child-Pugh B·C)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "nsaid_nonaspirin",
+   "level": "금기",
+   "reason": "신장 혈류를 줄여 남은 신기능을 더 떨어뜨립니다",
+   "source": "AGS Beers Criteria 2023(CrCl 30 미만 회피), NSAID 허가사항(중증 신장애 금기)",
+   "evidence": "규제기관 권고",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "lithium",
+   "level": "금기",
+   "reason": "리튬은 콩팥으로만 빠져나가 중증 신장 기능 저하에서는 리튬 중독 위험이 큽니다",
+   "source": "리튬 허가사항 금기(중증 신장애)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "k_sparing",
+   "level": "금기",
+   "reason": "칼륨이 위험하게 올라갈 수 있습니다(고칼륨혈증)",
+   "source": "스피로노락톤·에플레레논·아밀로라이드·트리암테렌 허가사항 금기(중증 신장애·무뇨)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "duloxetine",
+   "level": "금기",
+   "reason": "중증 신장 기능 저하에서는 혈중 농도가 크게 올라 쓰지 않습니다",
+   "source": "둘록세틴 허가사항(CrCl 30 미만 투여하지 않음)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "dabigatran",
+   "level": "금기",
+   "reason": "콩팥으로 주로 빠져나가 약이 쌓여 출혈 위험이 큽니다",
+   "source": "다비가트란 허가사항 금기(CrCl 30 미만)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "factor_xa",
+   "level": "주의",
+   "reason": "CrCl 15~29는 감량·신중 투여, 15 미만에는 쓰지 않습니다 — 출혈 위험",
+   "source": "리바록사반·아픽사반·에독사반 허가사항(중증 신장애)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "sulfonylurea",
+   "level": "금기",
+   "reason": "약이 쌓여 오래가는 심한 저혈당이 생길 수 있습니다",
+   "source": "설포닐우레아 허가사항 금기(중증 신장애)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "potassium_supplement",
+   "level": "금기",
+   "reason": "콩팥이 칼륨을 내보내지 못해 고칼륨혈증 위험이 큽니다",
+   "source": "염화칼륨 허가사항 금기(중증 신장애·고칼륨혈증)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "renal_severe",
+   "group": "nitrofurantoin",
+   "level": "금기",
+   "reason": "효과가 떨어지고 독성(말초신경병증)이 쌓입니다",
+   "source": "AGS Beers Criteria 2023(CrCl 30 미만 회피), 니트로푸란토인 허가사항",
+   "evidence": "규제기관 권고",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "child",
+   "group": "isotretinoin",
+   "level": "금기",
+   "reason": "12세 미만 소아에게는 쓰지 않습니다(성장판 조기 폐쇄 등)",
+   "source": "이소트레티노인 국내 허가사항 금기(12세 미만)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "disease": "female",
+   "group": "five_alpha_reductase",
+   "level": "주의",
+   "reason": "여성에게는 허가되지 않은 약입니다 — 처방 의도를 확인하세요(가임기 여성·임부에게는 남자 태아 생식기 이상 위험으로 금기)",
+   "source": "피나스테리드·두타스테리드 허가사항(여성 비적응, 임부·가임 여성 금기)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.19.0",
    "review": {
     "status": "미검토",
     "reviewer": null,

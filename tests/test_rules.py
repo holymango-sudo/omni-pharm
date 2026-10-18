@@ -85,6 +85,15 @@ def test_disease_rules():
         seen.add((r["disease"], r["group"]))
 
 
+def test_conditional_rules():
+    for r in rules.rules("conditional_rules"):
+        assert r["level"] in rules.LEVELS["conditional_rules"], r
+        assert r["when"] in K.DISEASES and r["a"] in KNOWN and r["b"] in KNOWN, r
+        assert r["reason"].count("{b}") == 1 and r["reason"].format(b="X"), r["reason"]
+        assert not STOP.search(r["reason"]), r["reason"]
+    assert len(K.CONDITIONAL_RULES) == len(rules.rules("conditional_rules"))
+
+
 def test_details_belong_to_rules_and_never_say_stop():
     pairs = {(r["a"], r["b"]) for r in rules.rules("pair_rules")}
     shared = rules.load("rule_details")["shared"]

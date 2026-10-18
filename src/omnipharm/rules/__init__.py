@@ -6,6 +6,7 @@ review record. knowledge.py loads them into the shapes the engine has always use
     rule_details.json           plain-language explanations attached to pair rules
     pair_notes.json             documented NON-interactions people often ask about
     intended_combinations.json  combinations used on purpose (boosters, standard regimens)
+    conditional_rules.json      two drugs that are dangerous together only in a patient group (renal impairment ...)
 
 Edit the JSON, not code. tests/test_rules.py checks every file (sources, levels, known groups, review status);
 scripts/rules_review_sheet.py writes the pharmacist review workbook and reads the decisions back.
@@ -18,8 +19,8 @@ from functools import cache
 from pathlib import Path
 
 DIR = Path(__file__).resolve().parent
-FILES = ("pair_rules", "drug_disease_rules", "rule_details", "pair_notes", "intended_combinations")
-LEVELS = {"pair_rules": ("높음", "주의"), "drug_disease_rules": ("금기", "주의")}
+FILES = ("pair_rules", "drug_disease_rules", "rule_details", "pair_notes", "intended_combinations", "conditional_rules")
+LEVELS = {"pair_rules": ("높음", "주의"), "drug_disease_rules": ("금기", "주의"), "conditional_rules": ("금기", "주의")}
 EVIDENCE = ("병용금기(허가)", "박스경고", "허가사항 경고·주의", "규제기관 권고", "표시사항(일반약·건강기능식품)", "임상 연구",
             "증례·문헌", "위해 감소 문헌", "약리 원칙", "출처 확인 필요")
 REVIEW_STATUS = ("미검토", "동의", "수정 필요", "삭제 필요")
@@ -59,6 +60,11 @@ def pair_notes() -> list[tuple[str, str, str]]:
 
 def intended_combinations() -> list[tuple[str, str, str]]:
     return [(r["a"], r["b"], r["why"]) for r in rules("intended_combinations")]
+
+
+def conditional_rules() -> list[tuple[str, str, str, str, str]]:
+    """(drug group a, partner group b, patient group 'when', '금기'|'주의', reason with {b} = the partner's name)."""
+    return [(r["a"], r["b"], r["when"], r["level"], r["reason"]) for r in rules("conditional_rules")]
 
 
 def provenance(name: str, a: str, b: str) -> dict | None:

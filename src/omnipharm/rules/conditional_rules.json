@@ -1,0 +1,64 @@
+{
+ "_about": "환자 상태가 있을 때만 위험해지는 두 약의 조합(예: 신장 기능 저하 + 콜히친 + 베라파밀). when = 그 환자 상태(질환 id), 결과는 그 환자의 질환 경고로 표시. reason의 {b}는 상대 약 이름.",
+ "_fields": {
+  "a, b": "약 그룹 id 또는 성분 이름 (a가 경고 대상 약, b가 상대 약)",
+  "when": "knowledge.DISEASES의 id",
+  "level": "금기 / 주의",
+  "reason": "화면 이유({b} = 상대 약)",
+  "source": "근거 문서",
+  "evidence": "근거 종류",
+  "since": "추가 버전",
+  "review": "약사·의사 검토 기록"
+ },
+ "_status": "개발 측 작성 — 출처 원문 대조·약사 검토 전",
+ "rules": [
+  {
+   "a": "colchicine",
+   "b": "pgp_or_strong_cyp3a",
+   "when": "renal",
+   "level": "금기",
+   "reason": "신장 기능이 떨어진 환자는 콜히친을 {b}와(과) 함께 쓰면 안 됩니다 — 콜히친이 쌓여 골수억제·근육병증·사망 위험",
+   "source": "콜히친 허가사항 금기(신장·간장애 환자에서 P-당단백 또는 강한 CYP3A4 억제제 병용)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "colchicine",
+   "b": "pgp_or_strong_cyp3a",
+   "when": "hepatic",
+   "level": "금기",
+   "reason": "간 기능이 떨어진 환자는 콜히친을 {b}와(과) 함께 쓰면 안 됩니다 — 콜히친이 쌓여 골수억제·근육병증·사망 위험",
+   "source": "콜히친 허가사항 금기(신장·간장애 환자에서 P-당단백 또는 강한 CYP3A4 억제제 병용)",
+   "evidence": "병용금기(허가)",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  },
+  {
+   "a": "rivaroxaban",
+   "b": "pgp_moderate_cyp3a",
+   "when": "renal",
+   "level": "금기",
+   "reason": "신장 기능이 떨어진 환자는 리바록사반을 {b}와(과) 함께 쓰지 않습니다 — 리바록사반 농도가 올라 출혈 위험",
+   "source": "리바록사반 미국 허가사항(CrCl 15~80에서 P-당단백 + 중등도 CYP3A 억제제 병용 회피)",
+   "evidence": "허가사항 경고·주의",
+   "since": "v2.19.0",
+   "review": {
+    "status": "미검토",
+    "reviewer": null,
+    "date": null,
+    "note": null
+   }
+  }
+ ]
+}

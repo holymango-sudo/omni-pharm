@@ -20,6 +20,8 @@ from omnipharm.engine_labels import (
     _own,
 )
 from omnipharm.knowledge import (
+    CONDITIONAL_RULE_SOURCE,
+    CONDITIONAL_RULES,
     DISEASE_LABEL_TERMS,
     DISEASE_RULE_SOURCE,
     DISEASES,
@@ -28,6 +30,24 @@ from omnipharm.knowledge import (
     ORGANS,
     drug_groups,
 )
+
+# DUR age rules name the dosage forms they cover. When only the ingredient was entered (no product, so no form), a
+# rule that covers ordinary tablets / capsules applies (that is what an ingredient name usually means); one that
+# covers only other routes (nasal spray, injection, cream) does not concern a medicine taken by mouth; the rest
+# (extended-release forms, syrups) stays a caution to check the form.
+_PLAIN_ORAL = re.compile(r"^(정제|정|캡슐|캡슐제|경질캡슐|연질캡슐|필름코팅정|당의정|나정|저작정|구강붕해정|발포정)$")
+_NOT_ORAL = re.compile(r"주사|분무|크림|연고|겔|로션|외용|점안|점이|점비|질|좌제|좌약|패취|패치|흡입|피부|직장|이식|세정|틴크|"
+                       r"카타플라스마|플라스타")
+
+
+def _age_form_unknown(form: str) -> str:
+    """-> 'applies' | 'skip' | 'check' for a DUR age rule limited to `form` when the product's form is unknown."""
+    toks = [t.strip() for t in re.split(r"[/,]", form) if t.strip()]
+    if any(_PLAIN_ORAL.match(t) for t in toks):
+        return "applies"
+    if toks and all(_NOT_ORAL.search(t) for t in toks):
+        return "skip"
+    return "check"
 
 
 class ClinicalMixin:
@@ -39,6 +59,11 @@ class ClinicalMixin:
         forms = ingredient key -> [(product name or None, release form)] of the products in this analysis."""
         forms = forms or {}
         dis = set(pa["diseases"])
+        # patient groups some labels contraindicate (not diseases: never shown as one)
+        if patient.age is not None and patient.age < 12:
+            dis.add("child")
+        if (patient.sex or "").upper().startswith("F"):
+            dis.add("female")
         kid = pa.get("kidney") or {}
         found: dict[tuple[str, str], dict] = {}
         rank = {"금기": 2, "주의": 1}
@@ -61,6 +86,12 @@ class ClinicalMixin:
             for dkey, grp, sev, reason in DRUG_DISEASE_RULES:
                 if dkey in dis and grp in groups:
                     add(dkey, g, sev, reason, DISEASE_RULE_SOURCE[(dkey, grp)])
+            # a partner drug that makes this one dangerous only in this patient (colchicine + verapamil, kidneys)
+            for a_grp, b_grp, when, sev, reason in CONDITIONAL_RULES:
+                if when in dis and a_grp in groups:
+                    partners = [self.ko(h) for h in U if h.key != g.key and b_grp in drug_groups(h.key)]
+                    if partners:
+                        add(when, g, sev, reason.format(b=", ".join(partners)), CONDITIONAL_RULE_SOURCE[(a_grp, b_grp, when)])
             if "metformin" in groups and kid.get("clearance") is not None and kid["clearance"] < 30:
                 add("renal", g, "금기", "콩팥 기능이 크게 떨어져 젖산산증 위험이 있습니다", "허가사항(eGFR<30 금기)")
             if patient.age is not None and patient.age >= 65:
@@ -103,9 +134,13 @@ class ClinicalMixin:
                     if not hit:
                         if mine and all(n for n, _ in mine):  # known products, none of that form: not concerned
                             continue
-                        add(f"연령({r['age_base']})", g, "주의", f"{why} ({form}에만 해당 — 제품의 제형을 확인하세요)",
-                            "식약처 DUR")
-                        continue
+                        unknown = _age_form_unknown(form)  # ingredient only: which form is meant is not known
+                        if unknown == "skip":
+                            continue
+                        if unknown == "check":
+                            add(f"연령({r['age_base']})", g, "주의", f"{why} ({form}에만 해당 — 제품의 제형을 확인하세요)",
+                                "식약처 DUR")
+                            continue
                 add(f"연령({r['age_base']})", g, "금기", why, "식약처 DUR")
             if "pregnancy" in dis:
                 for r in self.dur_by.get("pregnancy", {}).get(b, [])[:1]:

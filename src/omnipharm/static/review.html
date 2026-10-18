@@ -86,7 +86,7 @@ function show() {
   const a = answers[String(c.id)] || {};
   choice = a.verdict || null;
   $("num").textContent = `사례 ${c.id}`;
-  const done = Object.keys(answers).length;
+  const done = cases.filter((x) => answers[String(x.id)]).length;  // (answers of another round do not count)
   $("prog").textContent = `${done} / ${cases.length} 완료`;
   $("barv").style.width = `${(done / cases.length) * 100}%`;
   $("patient").textContent = c.patient;
@@ -100,7 +100,7 @@ $("start").onclick = async () => {
   who = $("who").value.trim();
   if (!who) { $("msg").textContent = "검수자 이름을 입력하세요."; return; }
   try {
-    const c = await call("/api/v1/review/cases");
+    const c = await call("/api/v1/review/cases" + location.search);  // /review?round=1 = an earlier round
     cases = c.cases;
     $("vbtns").innerHTML = c.verdicts.map((v) => `<button class="v" data-v="${v}">${v}</button>`).join("");
     document.querySelectorAll(".v").forEach((b) => b.onclick = () => {
@@ -124,7 +124,7 @@ $("save").onclick = async () => {
     answers[String(c.id)] = { verdict: choice, memo: $("memo").value, at: "방금" };
     if (i < cases.length - 1) i += 1;
     show();
-    if (Object.keys(answers).length === cases.length) $("saved").textContent = "모든 사례를 마쳤습니다. 감사합니다!";
+    if (cases.every((x) => answers[String(x.id)])) $("saved").textContent = "모든 사례를 마쳤습니다. 감사합니다!";
   } catch (e) { $("saved").textContent = e.message; }
 };
 </script>

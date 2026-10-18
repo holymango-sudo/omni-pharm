@@ -36,10 +36,12 @@ SHEETS = {  # file -> (sheet title, key fields, shown fields)
     "rule_details": ("쉬운 설명", ("a", "b"), ("short", "why", "do", "signs", "since")),
     "pair_notes": ("상호작용 없음 메모", ("a", "b"), ("text", "source", "evidence", "since")),
     "intended_combinations": ("의도된 병용", ("a", "b"), ("why", "source", "since")),
+    "conditional_rules": ("조건부 규칙", ("a", "b", "when"), ("level", "reason", "source", "evidence", "since")),
 }
+NOT_DRUGS = ("disease", "when")  # key fields that name a patient group, not medicines
 HEAD_KO = {"a": "A", "b": "B", "disease": "질환", "group": "약 그룹", "level": "등급", "reason": "화면 이유", "source": "출처",
            "evidence": "근거 종류", "since": "추가 버전", "short": "한 줄 요약", "why": "왜", "do": "할 일", "signs": "바로 진료할 신호",
-           "text": "화면 문구"}
+           "text": "화면 문구", "when": "환자 상태"}
 
 
 def members(name: str, limit: int = 12) -> str:
@@ -91,14 +93,14 @@ def export() -> Path:
     danger_fill = PatternFill("solid", fgColor="FBE3E3")
     for fname, (title, keys, shown) in SHEETS.items():
         ws = wb.create_sheet(title)
-        cols = ["키", *(HEAD_KO[k] for k in keys), *(f"{HEAD_KO[k]} 포함 약" for k in keys if k != "disease"),
+        cols = ["키", *(HEAD_KO[k] for k in keys), *(f"{HEAD_KO[k]} 포함 약" for k in keys if k not in NOT_DRUGS),
                 *(HEAD_KO[k] for k in shown), "현재 검토 상태", "판정", "의견"]
         ws.append(cols)
         for c in ws[1]:
             c.font, c.fill = Font(bold=True), head_fill
         for r in rules.rules(fname):
             kv = [r[k] for k in keys]
-            row = ["|".join(kv), *kv, *(members(r[k]) for k in keys if k != "disease"), *(_text(r.get(k)) for k in shown),
+            row = ["|".join(kv), *kv, *(members(r[k]) for k in keys if k not in NOT_DRUGS), *(_text(r.get(k)) for k in shown),
                    r["review"]["status"] + (f" ({r['review']['reviewer']}, {r['review']['date']})" if r["review"]["reviewer"] else ""),
                    "", ""]
             ws.append(row)

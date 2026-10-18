@@ -1,6 +1,6 @@
 # 외부 기준 검증 (개발 측이 만들지 않은 기준)
 
-측정: 2026-10-17 05:54
+측정: 2026-10-18 18:08
 
 ## (a) 식약처 DUR 병용금기 — DUR 끈 상태, 시험(test) 절반
 
@@ -12,7 +12,7 @@ DUR 쌍을 중심 약물 단위로 개발/시험 절반으로 나누고, 규칙 
 
 출처: American Geriatrics Society Beers Criteria Update Expert Panel. American Geriatrics Society 2023 updated AGS Beers Criteria for potentially inappropriate medication use in older adults. J Am Geriatr Soc. 2023;71(7):2052-2081. Table 5: Potentially clinically important drug-drug interactions that should be avoided in older adults (most entries unchanged since the 2019 update).
 
-**주의 이상 24/24 = 100% (95% CI 86%–100%), 위험 10/24 = 42% (95% CI 24%–61%)**
+**주의 이상 24/24 = 100% (95% CI 86%–100%), 위험 8/24 = 33% (95% CI 18%–53%)**
 
 > Entered by the developers from the published table (one or two representative drugs per class). CHECK EVERY ROW AGAINST THE ORIGINAL TABLE before citing these numbers; the list was not used to write or tune any rule before it was measured.
 
@@ -29,8 +29,8 @@ DUR 쌍을 중심 약물 단위로 개발/시험 절반으로 나누고, 규칙 
 | amitriptyline + oxybutynin | 항콜린제 + 항콜린제 | 인지 저하 | 주의 | 고령(65세 이상) 환자에게 아미트립틸린(amitriptyline): 혼돈·변비·소변 장애·낙상을 일으키기 쉽습니다. |
 | sertraline + zolpidem + tramadol | 중추신경계 작용 약 3개 이상 | 낙상·골절 | 위험 | 졸피뎀(zolpidem)과(와) 트라마돌(tramadol)은(는) 허가 문서에 '피하거나 용량을 줄여야 하는' 중대한 상호작용으로 적혀 있습니다. |
 | quetiapine + lorazepam + gabapentin | 중추신경계 작용 약 3개 이상 | 낙상·골절 | 주의 | 고령(65세 이상) 환자에게 로라제팜(lorazepam): 낙상·골절과 인지 저하 위험이 큽니다. |
-| prednisone + naproxen | 전신 코르티코스테로이드 + NSAID | 위장관 출혈·궤양 | 위험 | 신장질환(CKD) 환자에게 나프록센(naproxen): 신장 혈류를 줄여 신기능을 더 떨어뜨립니다. (피해야 함) |
-| prednisolone + ibuprofen | 전신 코르티코스테로이드 + NSAID | 위장관 출혈·궤양 | 위험 | 신장질환(CKD) 환자에게 이부프로펜(ibuprofen): 신장 혈류를 줄여 신기능을 더 떨어뜨립니다. (피해야 함) |
+| prednisone + naproxen | 전신 코르티코스테로이드 + NSAID | 위장관 출혈·궤양 | 주의 | 신장질환(CKD) 환자에게 나프록센(naproxen): 신장 혈류를 줄여 신기능을 더 떨어뜨릴 수 있습니다 — 오래 먹지 마세요. |
+| prednisolone + ibuprofen | 전신 코르티코스테로이드 + NSAID | 위장관 출혈·궤양 | 주의 | 신장질환(CKD) 환자에게 이부프로펜(ibuprofen): 신장 혈류를 줄여 신기능을 더 떨어뜨릴 수 있습니다 — 오래 먹지 마세요. |
 | lithium + lisinopril | 리튬 + ACE 억제제 | 리튬 독성 | 주의 | 리튬(lithium)과(와) 리시노프릴(lisinopril)은(는) 서로 영향을 주는 조합으로 허가 문서에 기재돼 있습니다 (규칙적으로 함께 먹을 때 관찰 필요) |
 | lithium + losartan | 리튬 + ARB | 리튬 독성 | 주의 | 리튬(lithium)과(와) 로사르탄(losartan)은(는) 서로 영향을 주는 조합으로 허가 문서에 기재돼 있습니다 (규칙적으로 함께 먹을 때 관찰 필요). |
 | lithium + furosemide | 리튬 + 루프 이뇨제 | 리튬 독성 | 위험 | 리튬(lithium)과(와) 푸로세미드(furosemide)은(는) 허가 문서에 '피하거나 용량을 줄여야 하는' 중대한 상호작용으로 적혀 있습니다. |
@@ -57,4 +57,4 @@ DUR 쌍을 중심 약물 단위로 개발/시험 절반으로 나누고, 규칙 
 
 - (b)는 개발 측이 논문 표를 옮겨 적은 것이라 원문 대조가 필요합니다. 대표 약 1~2개씩만 넣었습니다.
 - 약사 검수 1차 결과(약사 2명 × 200건)는 docs/validation/약사검수_결과.md. 상용 상호작용 DB 대조는 아직 하지 않았습니다.
-- 소요 95초.
+- 소요 87초.
