@@ -35,6 +35,8 @@ def test_agreement_statistics():
     assert sr.kappa(a, list(reversed(a)), False) < 0.5
     s = sr.score(a, ["위험", "위험", "안전", "주의", "주의", "안전"])
     assert s["danger_sensitivity"] == 0.5 and s["danger_ppv"] == 0.5 and s["agreement"] == round(4 / 6, 3)
+    # rows = the pharmacist's verdict: of the 2 '위험' answers, the program said 위험 once and 주의 once
+    assert s["confusion(pharmacist->program)"]["위험"] == {"안전": 0, "주의": 1, "위험": 1}
     # Fleiss: three raters who always agree -> 1; random-looking disagreement -> low
     assert sr.fleiss([["위험"] * 3, ["안전"] * 3, ["주의"] * 3]) == 1.0
     assert sr.fleiss([["위험", "안전", "주의"], ["안전", "주의", "위험"], ["주의", "위험", "안전"]]) < 0

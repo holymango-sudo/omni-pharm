@@ -54,7 +54,7 @@ try {
 # 3. optional: everything needed to run without rebuilding (hours of downloads / training)
 if ($Full) {
     $fullDir = Join-Path $Target "full"
-    foreach ($d in @("data\processed", "data\cache", "artifacts", "config", "docs\validation")) {
+    foreach ($d in @("data\processed", "data\cache", "data\review", "artifacts", "config", "docs\validation")) {
         $src = Join-Path $root $d
         if (Test-Path $src) {
             robocopy $src (Join-Path $fullDir $d) /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS /NP | Out-Null

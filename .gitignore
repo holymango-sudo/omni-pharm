@@ -25,6 +25,9 @@ logs/
 config/users.json
 runtime/
 data/cache/
+# pharmacists' review answers carry their names: kept out of git, included in backup.ps1 -Full
+data/review/
+docs/validation/검수결과/*.xlsx
 
 # Node
 node_modules/

@@ -94,7 +94,7 @@ def main() -> None:
     lines += [*b_lines, "", *n_lines, "",
               "## 한계", "",
               "- (b)는 개발 측이 논문 표를 옮겨 적은 것이라 원문 대조가 필요합니다. 대표 약 1~2개씩만 넣었습니다.",
-              "- 진짜 외부 검증은 약사 검수(docs/validation/약사검수_안내.md)와 상용 상호작용 DB 대조이며, 아직 하지 않았습니다.",
+              "- 약사 검수 1차 결과(약사 2명 × 200건)는 docs/validation/약사검수_결과.md. 상용 상호작용 DB 대조는 아직 하지 않았습니다.",
               f"- 소요 {time.time() - t0:.0f}초."]
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps({"beers": b, "negative": neg, "dur_test": t}, ensure_ascii=False))

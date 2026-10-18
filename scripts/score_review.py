@@ -82,8 +82,9 @@ def score(a: list[str], b: list[str]) -> dict:
             "kappa": round(kappa(a, b, False), 3), "kappa_linear_weighted": round(kappa(a, b, True), 3),
             "danger_sensitivity": round(tp / max(a.count("위험"), 1), 3),
             "danger_ppv": round(tp / max(b.count("위험"), 1), 3),
+            # {pharmacist's verdict: {program's verdict: cases}} (to_dict() alone would key by the program's verdict)
             "confusion(pharmacist->program)": pd.crosstab(pd.Series(a, name="약사"), pd.Series(b, name="프로그램"))
-            .reindex(index=LEVELS, columns=LEVELS, fill_value=0).to_dict()}
+            .reindex(index=LEVELS, columns=LEVELS, fill_value=0).to_dict(orient="index")}
 
 
 def _text(x) -> str:
