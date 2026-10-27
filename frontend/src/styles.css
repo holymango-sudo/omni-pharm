@@ -224,11 +224,18 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .ev-lift.mid { color: var(--amber); } .ev-lift.hi { color: #ff6b85; font-weight: 700; }
 .legend-line { font-size: 10px; margin-top: 2px; }
 
-.report { border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; min-height: 180px; flex: 1; }
-.report-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); font-weight: 700; color: #fff; }
-.report-head .actions { display: flex; gap: 4px; }
-.report-body { padding: 8px 12px; overflow: auto; font-size: 13px; line-height: 1.65; }
-.md h4 { color: var(--cyan); margin: 10px 0 4px; font-size: 13px; }
+/* grows with its text and never shrinks: 'flex: 1' (shrink 1) squeezed it to 180px under a long result, the opinion then
+   scrolled inside a small box of its own; the result panel scrolls instead */
+.report { border: 1px solid var(--line); border-radius: 8px; display: flex; flex-direction: column; min-height: 180px; flex: 1 0 auto;
+  background: rgba(0, 12, 18, 0.55); }
+.report-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px;
+  border-bottom: 1px solid var(--line); font-weight: 700; color: #fff; font-size: 14px; }
+.report-head .actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.report-body { padding: 10px 14px 14px; font-size: 14px; line-height: 1.75; color: #e6f4f8; }
+.panel.result { padding-bottom: 76px; } /* the last lines stay readable above the floating 'AI 복약 상담' button */
+.md h4 { color: var(--cyan); margin: 14px 0 6px; font-size: 15px; }
+.md h4:first-child { margin-top: 2px; }
+.md li { margin: 3px 0; }
 .md ul { margin: 2px 0; padding-left: 18px; }
 .md p { margin: 3px 0; }
 .md b { color: #fff; }
