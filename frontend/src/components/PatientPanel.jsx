@@ -1,15 +1,20 @@
 import React from "react";
 
+// Child-Pugh inputs (used only when a liver disease is selected): albumin g/dL, INR, ascites, encephalopathy, or the class
+const LIVER0 = { albumin: 4.0, inr: 1.0, ascites: "none", encephalopathy: "none", child_pugh: null };
 export const PRESETS = {
   "간경변 고령": { age: 74, sex: "M", weight_kg: 61, height_cm: 168, labMode: "scr", scr: 1.1, egfr: 70, ast: 128, alt: 96,
-    total_bilirubin: 3.4, conditions: ["hepatic", "arrhythmia"], diagnosis: "", symptoms: "무릎 관절통" },
+    total_bilirubin: 3.4, ...LIVER0, albumin: 2.9, inr: 1.6, ascites: "mild",
+    conditions: ["hepatic", "arrhythmia"], diagnosis: "", symptoms: "무릎 관절통" },
   "녹내장·전립선 노인": { age: 78, sex: "M", weight_kg: 58, height_cm: 163, labMode: "scr", scr: 1.3, egfr: 55, ast: 24,
-    alt: 20, total_bilirubin: 0.8, conditions: ["glaucoma", "bph", "hypertension"], diagnosis: "", symptoms: "감기·콧물" },
+    alt: 20, total_bilirubin: 0.8, ...LIVER0, conditions: ["glaucoma", "bph", "hypertension"], diagnosis: "", symptoms: "감기·콧물" },
   "만성콩팥병": { age: 68, sex: "F", weight_kg: 52, height_cm: 155, labMode: "scr", scr: 2.3, egfr: 30, ast: 24, alt: 20,
-    total_bilirubin: 0.7, conditions: ["renal", "hypertension", "diabetes"], diagnosis: "", symptoms: "부종" },
+    total_bilirubin: 0.7, ...LIVER0, conditions: ["renal", "hypertension", "diabetes"], diagnosis: "", symptoms: "부종" },
   "건강한 성인": { age: 35, sex: "M", weight_kg: 72, height_cm: 176, labMode: "scr", scr: 0.9, egfr: 100, ast: 22, alt: 19,
-    total_bilirubin: 0.6, conditions: [], diagnosis: "", symptoms: "두통" },
+    total_bilirubin: 0.6, ...LIVER0, conditions: [], diagnosis: "", symptoms: "두통" },
 };
+export const hasLiverDisease = (p) => (p.conditions || []).some((c) => c === "hepatic" || c === "cirrhosis");
+const GRADES = [["none", "없음"], ["mild", "경도"], ["severe", "중등도 이상"]];
 
 const LV_COLOR = { 좋음: "#00e5a0", 보통: "#00e5ff", 저하: "#ffb020", "매우 저하": "#ff2d55" };
 
@@ -105,8 +110,30 @@ export default function PatientPanel({ p, set, assessment: a, diseases, expert }
         <Slider label="ALT" value={p.alt} min={5} max={600} step={1} color={p.alt >= 120 ? "#ff2d55" : undefined} onChange={(v) => up({ alt: v })} />
         <Slider label="빌리루빈" value={p.total_bilirubin} min={0.1} max={12} step={0.1} color={p.total_bilirubin >= 1.8 ? "#ffb020" : undefined} onChange={(v) => up({ total_bilirubin: v })} />
       </div>
+      {hasLiverDisease(p) && (<>
+        <div className="subhead">간경변 등급 (Child-Pugh)
+          <div className="seg mini">
+            {[[null, "검사로 계산"], ["A", "A"], ["B", "B"], ["C", "C"]].map(([v, lab]) => (
+              <button key={lab} className={(p.child_pugh || null) === v ? "on" : ""} onClick={() => up({ child_pugh: v })}>{lab}</button>
+            ))}
+          </div>
+        </div>
+        <div className="row3">
+          <Slider label="알부민" unit="g/dL" value={p.albumin ?? 4} min={1.5} max={5.5} step={0.1} color={p.albumin < 2.8 ? "#ff2d55" : p.albumin <= 3.5 ? "#ffb020" : undefined} onChange={(v) => up({ albumin: v })} />
+          <Slider label="INR" value={p.inr ?? 1} min={0.8} max={5} step={0.1} color={p.inr > 2.3 ? "#ff2d55" : p.inr >= 1.7 ? "#ffb020" : undefined} onChange={(v) => up({ inr: v })} />
+        </div>
+        {[["ascites", "복수"], ["encephalopathy", "간성뇌증"]].map(([f, lab]) => (
+          <div className="row-inline" key={f}>
+            <span className="small muted">{lab}</span>
+            <div className="seg mini">
+              {GRADES.map(([v, g]) => <button key={v} className={(p[f] || "none") === v ? "on" : ""} onClick={() => up({ [f]: v })}>{f === "encephalopathy" && v !== "none" ? (v === "mild" ? "1–2단계" : "3–4단계") : g}</button>)}
+            </div>
+          </div>
+        ))}
+      </>)}
       <Meter title="간 상태" value={l ? l.desc : "—"} ratio={((l?.severity ?? 0) + 0.3) / 3.3} color={lColor}
-        expert={expert && l ? `정상 상한 대비: ${Object.entries(l.uln_multiples).map(([x, v]) => `${x} ×${v}`).join(", ")}` : null} />
+        expert={expert && l ? [Object.keys(l.uln_multiples).length ? `정상 상한 대비: ${Object.entries(l.uln_multiples).map(([x, v]) => `${x} ×${v}`).join(", ")}` : null,
+          l.child_pugh ? `Child-Pugh ${l.child_pugh.class}` + (l.child_pugh.points ? `(${l.child_pugh.score}점: ${Object.entries(l.child_pugh.points).map(([x, v]) => `${x} ${v}`).join(" · ")})` : "(입력값)") : null].filter(Boolean).join(" / ") || null : null} />
 
       <div className="subhead">앓고 있는 병 <small className="muted">(해당하는 것 모두 선택)</small></div>
       <div className="conds">

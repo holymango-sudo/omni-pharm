@@ -66,6 +66,38 @@ def test_hys_law_range_is_severe_liver():
     assert a["liver"]["severity"] == 3 and a["flags"]["hepatic"]
 
 
+def test_child_pugh_score_and_class():
+    # bilirubin 2.5 (2) + albumin 3.0 (2) + INR 1.8 (2) + mild ascites (2) + no encephalopathy (1) = 9 -> B
+    a = assess(Patient(total_bilirubin=2.5, albumin=3.0, inr=1.8, ascites="mild", encephalopathy="none",
+                       conditions=["hepatic"]))
+    cp = a["liver"]["child_pugh"]
+    assert (cp["score"], cp["class"], cp["assumed"]) == (9, "B", [])
+    assert a["liver"]["severity"] == 2 and "cirrhosis" in a["diseases"]  # Child-Pugh B = moderate impairment
+    c = assess(Patient(total_bilirubin=4, albumin=2.5, inr=2.5, ascites="severe", conditions=["hepatic"]))
+    assert c["liver"]["child_pugh"]["class"] == "C" and c["liver"]["child_pugh"]["assumed"] == ["간성뇌증"]
+
+
+def test_child_pugh_a_does_not_mean_cirrhosis_contraindications():
+    a = assess(Patient(total_bilirubin=0.8, albumin=4.0, inr=1.1, conditions=["hepatic"]))
+    assert a["liver"]["child_pugh"]["class"] == "A" and "cirrhosis" not in a["diseases"]
+    assert any("복수·간성뇌증을 입력하지 않아" in x for x in a["alerts"])  # the unknown parts are named
+
+
+def test_child_pugh_needs_a_liver_disease():
+    """A low albumin (nephrotic) or a high INR (warfarin) is not cirrhosis: no Child-Pugh without a liver disease."""
+    a = assess(Patient(total_bilirubin=0.5, albumin=2.0, inr=3.2))
+    assert not (a["liver"] or {}).get("child_pugh") and "hepatic" not in a["diseases"]
+    assert any("간질환" in x for x in a["alerts"])
+
+
+def test_child_pugh_class_given_directly():
+    a = assess(Patient(child_pugh="c"))
+    assert a["liver"]["child_pugh"]["class"] == "C" and {"cirrhosis", "hepatic"} <= set(a["diseases"])
+    # a given class never lowers a computed one
+    b = assess(Patient(total_bilirubin=4, albumin=2.5, inr=2.5, ascites="severe", child_pugh="A", conditions=["hepatic"]))
+    assert b["liver"]["child_pugh"]["class"] == "C"
+
+
 def test_normal_patient_has_no_flags():
     a = assess(Patient(age=35, sex="M", scr=0.9, ast=20, alt=20, total_bilirubin=0.6))
     assert not any(a["flags"].values()) and not a["alerts"]
@@ -74,6 +106,38 @@ def test_normal_patient_has_no_flags():
 def test_korean_diagnosis_keywords():
     ids = disease_ids([], "간경변, 심방세동, 당뇨")
     assert {"hepatic", "arrhythmia", "diabetes"} <= ids and "renal" not in ids
+
+
+@pytest.mark.parametrize("raw", ["F", "f", "female", "Female", "여", "여성"])
+def test_sex_is_normalised(raw):
+    """'female' used to miss the Cockcroft-Gault 0.85 factor (the formula compared against 'F' only)."""
+    assert Patient(sex=raw).sex == "F"
+    a = assess(Patient(age=70, sex=raw, weight_kg=60, height_cm=160, scr=1.0))
+    b = assess(Patient(age=70, sex="F", weight_kg=60, height_cm=160, scr=1.0))
+    assert a["kidney"]["crcl"] == b["kidney"]["crcl"]
+    assert Patient(sex="unknown").sex is None and Patient(sex="남").sex == "M"
+
+
+def test_children_use_schwartz_not_adult_formulas():
+    """A toddler's Devine 'ideal weight' is negative: Cockcroft-Gault gave a negative clearance and 'kidney failure'."""
+    a = assess(Patient(age=2, sex="M", weight_kg=12, height_cm=86, scr=0.3))
+    k = a["kidney"]
+    assert k["source"] == "Schwartz(소아)" and k["crcl"] is None
+    assert k["egfr"] == pytest.approx(0.413 * 86 / 0.3, abs=0.1) and k["stage"] == "G1"
+    assert not a["flags"]["renal"] and "renal_severe" not in a["diseases"]
+    assert a["body"]["dosing_weight"] == 12
+
+
+def test_child_without_height_asks_for_it():
+    a = assess(Patient(age=6, sex="F", weight_kg=21, scr=0.4))
+    assert a["kidney"] is None and any("Schwartz" in x for x in a["alerts"])
+
+
+def test_stage_follows_egfr_while_doses_follow_clearance():
+    """KDIGO stages are defined on eGFR; a small elderly woman's lower CrCl must not relabel her CKD stage."""
+    a = assess(Patient(age=86, sex="F", weight_kg=42, height_cm=148, scr=1.0))
+    k = a["kidney"]
+    assert k["stage"] == kdigo_stage(k["egfr"])[0] and k["clearance"] == k["crcl"] < k["egfr"]
 
 
 def test_patient_vector_layout():

@@ -1,4 +1,4 @@
-# OMNI-PHARM v2.21 — 개인화 다중 약물 상호작용 분석 시스템
+# OMNI-PHARM v2.21.2 — 개인화 다중 약물 상호작용 분석 시스템
 
 함께 복용하는 약들이 **이 환자에게** 얼마나 위험한지를 환자 상태(나이·키·몸무게·신장/간 기능·기저질환·임신)와
 약물의 **분자 구조**를 함께 분석해 판정합니다. 근거(식약처 DUR·허가 문서·임상 규칙·실제 부작용 보고·AI 예측)를 구분해 보여주는
@@ -134,6 +134,7 @@ ollama pull gemma4:12b                                        # 선택: AI 소�
  │                         FDA CYP 지표 약물표, 성분·계열 중복, 질환 규칙 41개    │
  │   D. 약리 기전          ChEMBL CYP 억제·hERG·작용기전 (시험관 → '주의'까지)   │
  │ clinical.py  CKD-EPI 2021, Cockcroft-Gault(보정체중), BMI, ULN → 약물 처리 능력 │
+ │              소아 Schwartz, 간경변 Child-Pugh 등급                          │
  │ models/llm.py 근거 JSON → 로컬 LLM 소견서 (용량·약명 날조 금지 규칙)          │
  └───────────────────────────────────────────────────────────────────────────┘
 ```
@@ -365,7 +366,7 @@ Morgan 지문 0.652 [0.617–0.695], 차이 +0.061 [0.023–0.094](p<0.001, 신�
 부작용처럼 말함, 제품 함량을 지어냄)를 찾아 고치고 채점 항목에 추가했습니다. v2.18부터 검사 결과에 없는 효과를 말한 문장을 자동으로 찾아
 화면에 경고합니다(51문항 중 4~5문항, 대부분 맞는 일반 지식이지만 '카페인이 와파린 농도를 바꾼다' 같은 근거 약한 주장도 잡힘).
 
-**약사 검수** (실제 처방형 200건, 판정 숨김) — 휴대폰 화면 `http://<서버>:8000/review`(v2.18, 검수자별 저장·이어하기) 또는 엑셀
+**약사 검수** (실제 처방형 200건, 판정 숨김) — 휴대폰 화면 `http://<서버>:8000/review`(v2.18, 검수자별 저장·이어하기; 계정을 쓰면 검수자 = 로그인 계정) 또는 엑셀
 (`docs/validation/약사_검수표_배포용.xlsx` — 프로그램 판정 없음, 돌려받은 파일은 `docs/validation/검수결과/`에)로 판정을 받은 뒤
 `python scripts/score_review.py [docs/validation/검수결과]`가 **현재 엔진의 판정**과 비교해 검수자별 일치율·
 카파·위험 민감도, 검수자 간 일치도(Cohen·Fleiss 카파)를 계산합니다. 절차: [약사검수_안내.md](docs/validation/약사검수_안내.md).
@@ -397,7 +398,7 @@ $py = ".\.venv\Scripts\python.exe"
 & $py scripts\pipeline.py labelsearch       # openFDA 라벨 전체 8.4만 건 전문 검색 DB (labels.db, 1분)
 & $py scripts\pipeline.py pk                # 라벨의 약동학 항목 → 성분별 Tmax·반감기 (pk.json, 1분)
 #   또는 한 번에:  & $py scripts\pipeline.py all   (위 순서 그대로)
-& $py -m pytest                             # 테스트 267개
+& $py -m pytest                             # 테스트 441개 (-m "not slow": 데이터 없이 도는 것만)
 & $py scripts\audit_combos.py [--holdout|--patients|--foods]   # 임상 조합 감사
 & $py scripts\sweep_random.py 3000          # 무작위 대량 점검
 & $py scripts\validate_external.py          # 식약처 DUR 외부 검증
@@ -413,7 +414,7 @@ src/omnipharm/   api.py, engine.py, clinical.py, knowledge.py, journey.py (몸�
 frontend/        React + R3F 화면 (dist/ = 빌드 결과, 서버가 제공)
 scripts/         pipeline.py (데이터·학습), users.py (계정), audit_combos.py · sweep_random.py · validate_external.py ·
                  review_sheet.py · score_review.py (검증), bench_engine.py · bench_llm.py (성능), coverage_audit.py
-tests/           단위·API·보안·견고성·엔진·임상 시나리오·조합 감사·몸속 이동·서방형·상담 테스트 (267개)
+tests/           단위·API·보안·견고성·엔진·임상 시나리오·조합 감사·몸속 이동·서방형·상담 테스트 (441개)
 runtime/         Python·Ollama·Node 실행 파일과 AI 모델 (폴더째 이동 가능)
 config/          users.json (사용자 계정, 비밀번호 해시)
 data/            raw / interim / processed / cache

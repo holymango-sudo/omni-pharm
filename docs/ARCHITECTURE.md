@@ -57,7 +57,7 @@ api.py (FastAPI :8000) ── security.py(계정·감사 로그) ── fhir.py(
 | `static/review.html` | 약사 블라인드 검수 화면 |
 | `frontend/` | 화면(React). `npm run build` → `frontend/dist`를 api.py가 서빙 |
 | `scripts/` | 평가·검증·운영 스크립트(아래 4절) |
-| `tests/` | pytest. `-m "not slow"`는 데이터 없이 돎(GitHub CI), 나머지는 로컬 데이터 필요 |
+| `tests/` | pytest. `-m "not slow"`는 데이터 없이 돎(`.github/workflows/ci.yml` — GitHub 원격 저장소에 올렸을 때만 실행. 지금은 원격이 없어 `scripts/ci.ps1`과 커밋 전 훅이 검증), 나머지는 로컬 데이터 필요 |
 
 ## 4. 검증 도구 (무엇이 무엇을 지키는가)
 

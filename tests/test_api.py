@@ -19,6 +19,17 @@ def test_health_is_open(client):
     assert r.status_code == 200 and r.json()["version"]
 
 
+def test_one_version_everywhere():
+    """The package, the API and pyproject.toml must name the same release (the package said 0.1.0 until v2.21.1)."""
+    import tomllib
+
+    import omnipharm
+    from omnipharm.config import PROJECT_ROOT, VERSION
+
+    project = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    assert omnipharm.__version__ == VERSION == project["version"]
+
+
 def test_pin_required_when_configured(client, monkeypatch):
     monkeypatch.setattr(settings, "access_pin", "4321")
     assert client.get("/api/v1/diseases").status_code == 401

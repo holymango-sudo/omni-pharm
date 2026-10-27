@@ -34,7 +34,7 @@ import torch
 from omnipharm.chem.featurize import smiles_to_graph
 from omnipharm.clinical import Patient, assess
 from omnipharm.config import settings
-from omnipharm.dosing import check_doses
+from omnipharm.dosing import check_doses, patient_ctx
 from omnipharm.engine_base import (
     ACTIONS,
     COMBO_X,
@@ -674,10 +674,7 @@ class Engine(ResolveMixin, EvidenceMixin, ClinicalMixin):
             overall = "주의"
 
         # dose & duration (only for products the user gave a dose for)
-        kid = pa.get("kidney") or {}
-        ctx = {"crcl": kid.get("clearance"), "age": patient.age, "sex": (patient.sex or "").upper()[:1] or None,
-               "weight": patient.weight_kg, "scr": patient.scr, "hepatic": bool(pa["flags"].get("hepatic")),
-               "all_keys": [g.key for g in U]}
+        ctx = {**patient_ctx(pa, patient.age, patient.sex, patient.weight_kg, patient.scr), "all_keys": [g.key for g in U]}
         dose_items = [{"input": p["input"], "keys": [g.key for g in p["ingredients"]], "dose": p.get("dose"),
                        "strength": p.get("strength"), "release": p["release"]} for p in products]
         dosing = check_doses(dose_items, ctx, drug_groups, lambda k: self.ko(self._ext_ingredient(k))

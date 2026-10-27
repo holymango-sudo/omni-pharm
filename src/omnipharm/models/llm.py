@@ -74,7 +74,7 @@ def ratio(x: float) -> str:
 def patient_facts(p: dict, patient: dict) -> dict:
     """The patient part of the fact sheet. p = clinical.assess() of the patient, patient = the raw input."""
     pt = {k: patient.get(k) for k in ("age", "sex", "weight_kg", "height_cm", "ast", "alt", "total_bilirubin",
-                                      "diagnosis", "symptoms") if patient.get(k) not in (None, "")}
+                                      "albumin", "inr", "diagnosis", "symptoms") if patient.get(k) not in (None, "")}
     if p.get("body") and p["body"].get("bmi"):
         pt["체형"] = f"BMI {p['body']['bmi']} ({p['body']['bmi_cat']})"
     if p.get("kidney"):
@@ -344,20 +344,19 @@ def chat_context(res: dict, patient: dict) -> dict:
                           + (f" → 이 조합에서 {c.get('t_half_eff_h')}시간" if abs((c.get('fold') or 1) - 1) > 0.15 else ""))
     facts["복용제품"] = [f"{p['input']} = {', '.join(p['ingredients'])}" for p in res.get("products", [])]
     # labelled daily maximum for THIS patient (kidney / liver / age adjusted), so 'how many a day?' has a grounded answer
-    from omnipharm.dosing import effective_limit, limit_text
+    from omnipharm.dosing import effective_limit, limit_text, patient_ctx
 
     pa = res.get("patient") or {}
-    ctx = {"crcl": (pa.get("kidney") or {}).get("clearance"), "age": patient.get("age"),
-           "sex": (patient.get("sex") or "").upper()[:1] or None, "weight": patient.get("weight_kg"),
-           "hepatic": bool((pa.get("flags") or {}).get("hepatic"))}
+    ctx = patient_ctx(pa, patient.get("age"), patient.get("sex"), patient.get("weight_kg"), patient.get("scr"))
     form = {d["key"]: d.get("release") for d in j.get("drugs", [])}
     limits = []
     for ing in res.get("ingredients", []):
         if ing["key"] in ctl:
             continue
-        lim = effective_limit(ing["key"], ctx, er=form.get(ing["key"]) == "ER")
+        er = form.get(ing["key"]) == "ER"
+        lim = effective_limit(ing["key"], ctx, er=er)
         if lim:
-            limits.append(limit_text(ing["display"], lim))
+            limits.append(limit_text(ing["display"], lim, ing["key"], er))
     facts[LIMIT_KEY] = limits
     # official Korean usage (박카스 '1일 1회 1병', 일반의약품 용법). With a patient limit above, the label's general maximum
     # ('1일 최대 4그램(8정)') must not be the answer for an elderly patient on warfarin: the key says so

@@ -3,7 +3,7 @@ import { api, handleLoginRequired, handlePinRequired, setPin, setToken } from ".
 import { HelpModal, LoginModal, PinModal } from "./components/Help.jsx";
 import MoleculeScene from "./components/MoleculeScene.jsx";
 import BodyScene, { JourneyClock, JourneyHud, useJourney } from "./components/BodyJourney.jsx";
-import PatientPanel, { PRESETS } from "./components/PatientPanel.jsx";
+import PatientPanel, { PRESETS, hasLiverDisease } from "./components/PatientPanel.jsx";
 import DrugBar from "./components/DrugBar.jsx";
 import ResultPanel from "./components/ResultPanel.jsx";
 import DetailDrawer from "./components/DetailDrawer.jsx";
@@ -198,6 +198,10 @@ export default function App() {
       total_bilirubin: patient.total_bilirubin, conditions: patient.conditions, diagnosis: patient.diagnosis || null,
       symptoms: patient.symptoms || null };
     if (patient.labMode === "scr") p.scr = patient.scr; else p.egfr = patient.egfr;
+    if (hasLiverDisease(patient)) {  // Child-Pugh is graded only for a known liver disease (see PatientPanel)
+      Object.assign(p, { albumin: patient.albumin, inr: patient.inr, ascites: patient.ascites,
+        encephalopathy: patient.encephalopathy, child_pugh: patient.child_pugh || null });
+    }
     return p;
   };
 

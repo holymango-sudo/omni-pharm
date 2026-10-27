@@ -11,7 +11,7 @@ import logging
 import re
 
 from omnipharm.clinical import Patient
-from omnipharm.dosing import effective_limit, fmt_mg, limit_text
+from omnipharm.dosing import effective_limit, fmt_mg, limit_text, patient_ctx
 from omnipharm.engine import ResolveError
 from omnipharm.knowledge import FOOD_ALIAS, mech_source
 from omnipharm.models.llm import (
@@ -176,9 +176,7 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
     # so a count of tablets rests on real products, not on an invented '500 mg'
     brands = brand_contents(eng, name, ings) if not content and not ctl else []
     pa = r.get("patient") or {}
-    lctx = {"crcl": (pa.get("kidney") or {}).get("clearance"), "age": patient.age,
-            "sex": (patient.sex or "").upper()[:1] or None, "weight": patient.weight_kg,
-            "hepatic": bool((pa.get("flags") or {}).get("hepatic"))}
+    lctx = patient_ctx(pa, patient.age, patient.sex, patient.weight_kg, patient.scr)
     # a pregnancy alert or a contraindication for this person's disease: no maximum dose (it reads as permission) -
     # the answer is 'ask the doctor / pharmacist first'
     own_alert = any(d.get("drug") in names and (d.get("severity") == "금기" or d.get("key") == "pregnancy"
@@ -186,10 +184,11 @@ def quick_check(eng, base: list[dict], name: str, patient: Patient, base_verdict
                     for d in r.get("disease_alerts", []))
     limits = []
     for g in [] if ctl or own_alert else ings:
-        lim = effective_limit(g.key, lctx, er=info.get("release") == "ER")
+        er = info.get("release") == "ER"
+        lim = effective_limit(g.key, lctx, er=er)
         if lim:
             # no content per unit (의약외품 박카스): the mg limit cannot be turned into bottles - the label usage answers
-            limits.append(limit_text(eng.ko(g), lim) + " (다른 약·음료의 같은 성분과 합쳐서"
+            limits.append(limit_text(eng.ko(g), lim, g.key, er) + " (다른 약·음료의 같은 성분과 합쳐서"
                           + (")" if content else
                              " — 개수는 '같은 이름 시판 제품의 1개당 함량'의 제품별로 계산)" if brands else
                              " — 1개당 함량 자료가 없어 개수로 바꿀 수 없음: 개수는 제품 설명서 용법)"))

@@ -28,12 +28,21 @@ ITERATIONS = 310_000
 _lock = threading.Lock()
 _sessions: dict[str, dict] = {}  # token -> {"user", "role", "expires"}
 _fails: dict[str, list[float]] = {}  # client address -> recent failed login times
+_cache: dict = {"key": None, "users": {}}  # users.json, re-read only when the file changes (checked on every API call)
+# a login for an unknown name still spends one PBKDF2 run, so the answer time does not tell which names exist
+_DUMMY_SALT = secrets.token_bytes(16)
 
 
 def _load() -> dict:
-    if not USERS_FILE.exists():
+    try:
+        st = USERS_FILE.stat()
+    except FileNotFoundError:
         return {}
-    return json.loads(USERS_FILE.read_text(encoding="utf-8")).get("users", {})
+    key = (str(USERS_FILE), st.st_mtime_ns, st.st_size)
+    if _cache["key"] != key:
+        _cache["users"] = json.loads(USERS_FILE.read_text(encoding="utf-8")).get("users", {})
+        _cache["key"] = key
+    return dict(_cache["users"])  # a copy: set_user / remove_user change it before saving
 
 
 def _save(users: dict) -> None:
@@ -85,12 +94,20 @@ def login(name: str, password: str, client: str) -> dict | None:
     """-> {"token", "user", "role", "expires"} or None. At most 5 failures per client address per 5 minutes."""
     now = time.time()
     with _lock:
+        for c in [c for c, ts in _fails.items() if c != client and not any(now - t < 300 for t in ts)]:
+            del _fails[c]  # forget old failures of other addresses (the table must not grow forever)
+        for t in [t for t, s in _sessions.items() if s["expires"] <= now]:
+            del _sessions[t]
         recent = [t for t in _fails.get(client, []) if now - t < 300]
         _fails[client] = recent
         if len(recent) >= 5:
             raise PermissionError("로그인 실패가 많아 5분간 잠겼습니다.")
     u = _load().get(name)
-    ok = bool(u) and hmac.compare_digest(_hash(password, bytes.fromhex(u["salt"])), u["hash"])
+    if u:
+        ok = hmac.compare_digest(_hash(password, bytes.fromhex(u["salt"])), u["hash"])
+    else:
+        _hash(password, _DUMMY_SALT)  # same work as a real check
+        ok = False
     with _lock:
         if not ok:
             _fails.setdefault(client, []).append(now)

@@ -3,7 +3,7 @@
 POST /api/v1/fhir/assess with a FHIR Bundle (or a plain list of resources) containing:
   Patient                    birthDate, gender
   Observation (LOINC)        29463-7 body weight, 8302-2 body height, 2160-0 creatinine, 33914-3 / 62238-1 / 98979-8
-                             eGFR, 1920-8 AST, 1742-6 ALT, 1975-2 total bilirubin
+                             eGFR, 1920-8 AST, 1742-6 ALT, 1975-2 total bilirubin, 1751-7 albumin, 6301-6 / 34714-6 INR
   Condition                  ICD-10 / KCD codes (or text) -> OMNI-PHARM disease ids
   MedicationRequest /        medicationCodeableConcept (text / coding display) or a contained Medication;
   MedicationStatement        dosageInstruction / dosage: doseQuantity (value + unit), timing.repeat frequency/period,
@@ -18,10 +18,13 @@ from datetime import date
 
 LOINC = {"29463-7": "weight_kg", "3141-9": "weight_kg", "8302-2": "height_cm", "2160-0": "scr", "38483-4": "scr",
          "33914-3": "egfr", "62238-1": "egfr", "98979-8": "egfr", "48642-3": "egfr", "48643-1": "egfr",
-         "1920-8": "ast", "1742-6": "alt", "1975-2": "total_bilirubin"}
+         "1920-8": "ast", "1742-6": "alt", "1975-2": "total_bilirubin", "1751-7": "albumin", "6301-6": "inr",
+         "34714-6": "inr"}
 # ICD-10 / KCD prefixes -> disease ids of knowledge.DISEASES
 ICD = [("N18", "renal"), ("N19", "renal"), ("K70", "hepatic"), ("K71", "hepatic"), ("K72", "hepatic"),
        ("K73", "hepatic"), ("K74", "hepatic"), ("K75", "hepatic"), ("K76", "hepatic"), ("B18", "hepatic"),
+       # cirrhosis / hepatic failure: the same disease id as '간경변' typed as text
+       ("K70.3", "cirrhosis"), ("K74.6", "cirrhosis"), ("K72", "cirrhosis"),
        ("I50", "heart_failure"), ("I47", "arrhythmia"), ("I48", "arrhythmia"), ("I49", "arrhythmia"),
        ("I45.8", "arrhythmia"), ("I20", "cardiac"), ("I21", "cardiac"), ("I22", "cardiac"), ("I24", "cardiac"),
        ("I25", "cardiac"), ("I10", "hypertension"), ("I11", "hypertension"), ("I12", "hypertension"),
@@ -113,12 +116,21 @@ def parse(data: dict | list) -> tuple[list[dict], dict, list[str]]:
             v = (r.get("valueQuantity") or {})
             if field and v.get("value") is not None:
                 val, unit = float(v["value"]), (v.get("unit") or v.get("code") or "").lower()
+                unit = unit.replace("µ", "u").replace("μ", "u")  # micro sign / Greek mu
                 if field == "weight_kg" and unit in ("lb", "[lb_av]"):
                     val *= 0.45359237
+                if field == "weight_kg" and unit == "g":
+                    val /= 1000
                 if field == "height_cm" and unit in ("m",):
                     val *= 100
-                if field == "scr" and unit in ("umol/l", "µmol/l"):
+                if field == "height_cm" and unit in ("in", "[in_i]", "[in_us]"):
+                    val *= 2.54
+                if field == "scr" and unit in ("umol/l",):
                     val /= 88.42
+                if field == "total_bilirubin" and unit in ("umol/l",):  # SI unit outside the US: 1 mg/dL = 17.1 umol/L
+                    val /= 17.1
+                if field == "albumin" and unit == "g/l":  # Europe / Korea SI: 35 g/L = 3.5 g/dL
+                    val /= 10
                 patient[field] = round(val, 3)
         elif t == "Condition":
             cs = (r.get("clinicalStatus") or {}).get("coding", [{}])

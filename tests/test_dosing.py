@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from omnipharm.dosing import Dose, check_doses, effective_limit
+import pytest
+
+from omnipharm.dosing import Dose, check_doses, effective_limit, limit_text
 from omnipharm.knowledge import drug_groups
 
 TYLENOL = {"unit": "정", "per": "unit", "mg": {"acetaminophen": 500}}
@@ -84,6 +86,79 @@ def test_apixaban_dose_reduction_criteria():
     r = run([{"input": "apixaban", "keys": ["apixaban"], "dose": Dose(amount=5, unit="mg", per_day=2, days=30),
               "strength": None}], age=82, weight=55)
     assert any("2.5mg" in a["text"] for a in r["alerts"])
+
+
+def mg(name, amount, per_day, days=30):
+    return {"input": name, "keys": [name], "dose": Dose(amount=amount, unit="mg", per_day=per_day, days=days), "strength": None}
+
+
+def test_rivaroxaban_vte_loading_is_not_an_overdose():
+    """15 mg twice a day for the first 21 days of VTE treatment is the labelled regimen, not '1일 최대 초과(금기)'."""
+    first = run([mg("rivaroxaban", 15, 2, days=21)])
+    assert first["ingredients"][0]["status"] == "주의" and not any(a["sev"] == "금기" for a in first["alerts"])
+    assert any("21일" in a["text"] for a in first["alerts"])
+    late = run([mg("rivaroxaban", 15, 2, days=60)])
+    assert late["ingredients"][0]["status"] == "초과" and any(a["sev"] == "금기" for a in late["alerts"])
+    other = run([mg("rivaroxaban", 20, 2, days=7)])  # not the loading pattern: still an overdose
+    assert other["ingredients"][0]["status"] == "초과"
+
+
+def test_apixaban_vte_loading_skips_the_af_reduction_rule():
+    r = run([mg("apixaban", 10, 2, days=7)], age=82, weight=55)
+    assert r["ingredients"][0]["status"] == "주의" and not any("2.5mg" in a["text"] for a in r["alerts"])
+
+
+def test_prescription_ceiling_is_not_called_otc():
+    """alprazolam / rosuvastatin are prescription medicines: '일반약 기준' was the wrong reason."""
+    for name, amount in (("alprazolam", 2.5), ("rosuvastatin", 40)):
+        r = run([mg(name, amount, 2 if name == "alprazolam" else 1)])
+        texts = " ".join(a["text"] for a in r["alerts"])
+        assert r["ingredients"][0]["status"] == "주의" and "일반약" not in texts
+    otc = run([mg("ibuprofen", 400, 4, days=3)])  # 1,600 mg: above the OTC ceiling
+    assert any("일반약 기준" in a["text"] for a in otc["alerts"])
+    assert "일반약" not in limit_text("로수바스타틴", effective_limit("rosuvastatin", CTX), "rosuvastatin")
+
+
+@pytest.mark.parametrize(("key", "ctx", "er", "expected"), [
+    ("famotidine", {"crcl": 45}, False, 20),   # label renal table: CrCl 30-60 at most 20 mg/day
+    ("famotidine", {"crcl": 20}, False, 10),
+    ("levocetirizine", {"crcl": 20}, False, 0.72),  # 2.5 mg twice a week
+    ("paroxetine", {}, False, 60),             # OCD / panic disorder
+    ("paroxetine", {}, True, 75),              # CR, panic disorder
+    ("paroxetine", {"crcl": 20}, True, 50),
+    ("gabapentin", {"crcl": 45}, True, 1800),  # once-daily form: 600-1800 mg at CrCl 30-60
+])
+def test_label_limits(key, ctx, er, expected):
+    assert effective_limit(key, {**CTX, **ctx}, er=er)[0] == expected
+
+
+def test_gabapentin_er_not_used_below_crcl_30():
+    assert effective_limit("gabapentin", {**CTX, "crcl": 25}, er=True)[0] < 0.01
+
+
+@pytest.mark.parametrize(("key", "child", "er", "expected"), [
+    ("venlafaxine", "A", False, 187.5),   # label: hepatic impairment 50% of the dose
+    ("venlafaxine", "B", True, 112.5),
+    ("bupropion", "B", True, 75),         # XL/SR: Child-Pugh 7-15 at most 150 mg every other day
+    ("bupropion", "B", False, 450),       # IR: only severe cirrhosis
+    ("bupropion", "C", False, 75),
+    ("paroxetine", "C", False, 40),
+    ("tramadol", "A", False, 100),        # cirrhosis: 50 mg every 12 h
+    ("tadalafil", "B", False, 10),
+    ("metoclopramide", "B", False, 20),
+    ("venlafaxine", None, False, 375),    # class unknown: no hepatic step
+])
+def test_child_pugh_dose_steps(key, child, er, expected):
+    assert effective_limit(key, {**CTX, "child": child}, er=er)[0] == expected
+
+
+def test_not_recommended_in_child_pugh_c_is_not_a_dose():
+    r = run([mg("tadalafil", 5, 1, days=7)], child="C", hepatic=True)
+    texts = " ".join(a["text"] for a in r["alerts"])
+    assert r["ingredients"][0]["status"] == "초과" and "권장되지 않는" in texts and "0.001" not in texts
+    assert "서방형" not in texts  # an ordinary tablet: not the 'use the ordinary form instead' message
+    line = limit_text("타다라필", effective_limit("tadalafil", {**CTX, "child": "C"}), "tadalafil")
+    assert "0.001" not in line and "권장되지 않습니다" in line
 
 
 def test_syrup_dosed_in_ml():

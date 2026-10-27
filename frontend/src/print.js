@@ -2,6 +2,9 @@ import { mdToHtml } from "./components/Markdown.jsx";
 import { fx, pct } from "./api.js";
 
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;");
+// only the values that were entered: an empty age / sex / weight must not print as "undefined세 남성"
+const who = (p, sep) => [p.age != null && p.age !== "" ? `${esc(p.age)}세` : "",
+  p.sex === "F" ? "여성" : p.sex === "M" ? "남성" : "", p.weight_kg ? `${esc(p.weight_kg)}kg` : ""].filter(Boolean).join(sep) || "환자 정보 미입력";
 
 function open(html) {
   const w = window.open("", "_blank");
@@ -24,7 +27,7 @@ function patientHandout(res, patient) {
     li{margin:6px 0}.sub{color:#666;font-size:14px}.box{background:#f5f7f8;border-radius:8px;padding:10px 16px}
     .foot{margin-top:28px;font-size:13px;color:#666}
   </style></head><body>
-  <h1>복용하시는 약의 안전 안내</h1><div>${new Date().toLocaleDateString("ko-KR")} · ${patient.age}세 ${patient.sex === "F" ? "여성" : "남성"}</div>
+  <h1>복용하시는 약의 안전 안내</h1><div>${new Date().toLocaleDateString("ko-KR")} · ${who(patient, " ")}</div>
   <div class="v">${esc(s.verdict)}${s.action ? ` · ${esc(s.action.level)}` : ""}</div><div><b>${esc(s.headline)}</b></div>
   ${s.action && s.verdict !== "비교적 안전" ? `<div>${esc(s.action.text)}</div>` : ""}
   <h2>함께 확인한 약</h2><ul>${drugs}</ul>
@@ -35,7 +38,8 @@ function patientHandout(res, patient) {
     `<li><b>${esc(c.input)}</b> — 한국: ${esc(c.law)}<br><span class="sub">위험 신호: ${esc(c.signs)}</span></li>`).join("")}
     <li>혼자 쓰지 말고 여러 물질을 섞지 마세요. 응급 시 <b>119</b>, 마약류 24시간 익명 상담 <b>1342</b></li></ul>` : ""}
   <h2>이렇게 하세요</h2><div class="box"><ul>${s.advice.map((a) => `<li>${esc(a)}</li>`).join("")}
-    <li>숨이 차거나, 검은 변·피가 섞인 변, 심한 어지러움, 가슴 두근거림, 피부 발진이 생기면 즉시 복용을 멈추고 병원에 연락하세요.</li></ul></div>
+    <li>숨이 차거나, 검은 변·피가 섞인 변, 심한 어지러움, 가슴 두근거림, 피부 발진이 생기면 곧바로 병원이나 약국에 연락하세요(심하면 119).
+    어떤 약을 멈출지는 의사·약사가 정합니다 — 혈전·경련·심장 약은 갑자기 끊으면 더 위험할 수 있습니다.</li></ul></div>
   <div class="foot">이 안내문은 컴퓨터 분석 결과를 쉽게 정리한 참고 자료입니다. 약을 끊거나 바꾸기 전에 반드시 의사·약사와 상의하세요.</div>
   <script>setTimeout(()=>print(),300)</script></body></html>`;
 }
@@ -63,8 +67,8 @@ export function printReport(res, patient, report, mode = "pro") {
     .pair{margin:6px 0;padding:6px;border-left:3px solid #999}.disc{color:#666;font-size:11px;margin-top:20px}
   </style></head><body>
   <h1>OMNI-PHARM 다약제 상호작용 분석 리포트</h1><div>${new Date().toLocaleString("ko-KR")}</div>
-  <h2>환자</h2><div>${patient.age}세 · ${patient.sex === "F" ? "여성" : "남성"} · ${patient.weight_kg}kg
-  ${k ? ` · eGFR ${k.egfr} (${k.stage} ${k.desc})` : ""}${l ? ` · 간기능: ${l.desc}` : ""}
+  <h2>환자</h2><div>${who(patient, " · ")}
+  ${k ? ` · eGFR ${esc(k.egfr)} (${esc(k.stage)} ${esc(k.desc)})${k.crcl != null ? ` · CrCl ${esc(k.crcl)} mL/min` : ""}` : ""}${l ? ` · 간기능: ${esc(l.desc)}` : ""}
   ${patient.diagnosis ? ` · 진단: ${esc(patient.diagnosis)}` : ""}</div>
   <div>복용 약물: ${res.products.map((p) => `${esc(p.input)} [${p.ingredients.map(esc).join(", ")}]`).join(" / ")}</div>
   <h2>종합 판정</h2><div class="lv">${esc(res.summary?.verdict || res.overall_level)}</div>

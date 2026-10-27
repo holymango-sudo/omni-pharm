@@ -43,7 +43,9 @@ E: dict = {}
 REPORTS: OrderedDict[str, dict] = OrderedDict()  # report_id -> fact sheet (bounded LRU)
 CHATS: OrderedDict[str, dict] = OrderedDict()  # report_id -> what the AI 상담 may rely on (memory only, never saved)
 FIELD_KO = {"age": "나이", "weight_kg": "몸무게", "height_cm": "키", "scr": "크레아티닌", "egfr": "eGFR",
-            "ast": "AST", "alt": "ALT", "total_bilirubin": "빌리루빈", "drugs": "약물 목록", "name": "약물명"}
+            "ast": "AST", "alt": "ALT", "total_bilirubin": "빌리루빈", "albumin": "알부민", "inr": "INR",
+            "ascites": "복수", "encephalopathy": "간성뇌증", "child_pugh": "Child-Pugh 등급",
+            "drugs": "약물 목록", "name": "약물명"}
 
 
 @asynccontextmanager
@@ -64,28 +66,16 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http
 OPEN_PATHS = {"/api/v1/health", "/api/v1/login", "/api/v1/auth-mode"}
 MAX_BODY = 2_000_000  # bytes; a FHIR bundle of a real patient is far smaller
 MAX_PHOTO = 15_000_000  # /rx-photo: a phone photo as base64 (the browser shrinks it first; this is the ceiling)
-
-
-@app.middleware("http")
-async def limits_and_headers(request: Request, call_next):
-    """Reject oversized bodies (memory exhaustion) and add basic browser security headers."""
-    size = request.headers.get("content-length")
-    limit = MAX_PHOTO if request.url.path == "/api/v1/rx-photo" else MAX_BODY
-    if size and size.isdigit() and int(size) > limit:
-        return JSONResponse({"detail": {"message": "요청이 너무 큽니다."}}, status_code=413)
-    resp = await call_next(request)
-    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
-    resp.headers.setdefault("X-Frame-Options", "DENY")  # no embedding in other sites (clickjacking)
-    resp.headers.setdefault("Referrer-Policy", "no-referrer")
-    if request.url.path.startswith("/api/"):
-        resp.headers.setdefault("Cache-Control", "no-store")  # results may contain clinical data
-    return resp
+# EventSource cannot send headers, so only the streamed report may carry the login token / PIN in the URL
+QUERY_AUTH_PREFIX = "/api/v1/report/"
 
 
 def _client(request: Request) -> str:
     return request.client.host if request.client else "-"
 
 
+# Middleware order: the one defined LAST runs first (outermost). access_control is defined first so that its own
+# 401 answers also pass through limits_and_headers and get the security headers.
 @app.middleware("http")
 async def access_control(request: Request, call_next):
     """User accounts (config/users.json, see scripts/users.py) or, without accounts, the optional shared PIN
@@ -93,19 +83,45 @@ async def access_control(request: Request, call_next):
     path = request.url.path
     request.state.user = None
     if path.startswith("/api/") and path not in OPEN_PATHS:
+        in_url = path.startswith(QUERY_AUTH_PREFIX)  # secrets in URLs end up in histories and proxies: SSE only
         if security.accounts_enabled():
             auth = request.headers.get("authorization", "")
-            token = auth[7:] if auth.lower().startswith("bearer ") else request.query_params.get("token")
+            token = (auth[7:] if auth.lower().startswith("bearer ") else
+                     request.query_params.get("token") if in_url else None)
             s = security.session(token)
             if not s:
                 return JSONResponse({"detail": {"message": "로그인이 필요합니다.", "login_required": True}}, status_code=401)
             request.state.user = s
         elif settings.access_pin:
-            given = request.headers.get("x-access-pin") or request.query_params.get("pin") or ""
+            given = request.headers.get("x-access-pin") or (request.query_params.get("pin") if in_url else None) or ""
             if not hmac.compare_digest(given.encode(), settings.access_pin.encode()):
                 return JSONResponse({"detail": {"message": "접근 PIN이 필요합니다.", "pin_required": True}},
                                     status_code=401)
     return await call_next(request)
+
+
+def _secure(resp, path: str):
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "DENY")  # no embedding in other sites (clickjacking)
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    if path.startswith("/api/"):
+        resp.headers.setdefault("Cache-Control", "no-store")  # results may contain clinical data
+    return resp
+
+
+@app.middleware("http")
+async def limits_and_headers(request: Request, call_next):
+    """Reject oversized bodies (memory exhaustion) and add basic browser security headers to every answer."""
+    path = request.url.path
+    size = request.headers.get("content-length")
+    limit = MAX_PHOTO if path == "/api/v1/rx-photo" else MAX_BODY
+    if size and size.isdigit() and int(size) > limit:
+        return _secure(JSONResponse({"detail": {"message": "요청이 너무 큽니다."}}, status_code=413), path)
+    if size is None and "chunked" in request.headers.get("transfer-encoding", "").lower():
+        # a chunked body has no length to check up front and would be read whole into memory before validation;
+        # browsers and FHIR clients send Content-Length for these small JSON bodies (no body = no header: fine)
+        return _secure(JSONResponse({"detail": {"message": "요청 길이(Content-Length)가 필요합니다."}}, status_code=411), path)
+    return _secure(await call_next(request), path)
 
 
 def _who(request: Request) -> str | None:
@@ -462,7 +478,7 @@ async def recommend_drugs(req: RecommendRequest):
 
 # --------------------------------------------------------------------------- blinded pharmacist review (v2.18)
 class ReviewAnswer(BaseModel):
-    reviewer: str = Field(..., min_length=1, max_length=40)
+    reviewer: str = Field("", max_length=40)  # ignored when logged in (the account is the reviewer)
     case: int = Field(..., ge=1, le=100000)
     verdict: str = Field(..., max_length=4)
     memo: str = Field("", max_length=500)
@@ -482,10 +498,16 @@ async def review_cases(round_no: int | None = Query(None, alias="round")):
     return {"cases": E[key], "round": rno, "verdicts": list(review.VERDICTS)}
 
 
+def _reviewer(request: Request, name: str) -> str:
+    """With user accounts the reviewer IS the logged-in account: a typed name could file answers under someone else's
+    name (or read their answers). Without accounts (PIN / open) the typed name is all there is."""
+    return _who(request) or name
+
+
 @app.get("/api/v1/review/answers")
-async def review_answers(reviewer: str):
+async def review_answers(request: Request, reviewer: str = ""):
     try:
-        return {"answers": review.answers(reviewer)}
+        return {"answers": review.answers(_reviewer(request, reviewer)), "reviewer": _who(request)}
     except ValueError as e:
         raise HTTPException(422, {"message": str(e)}) from None
 
@@ -493,7 +515,7 @@ async def review_answers(reviewer: str):
 @app.post("/api/v1/review/answer")
 async def review_answer(a: ReviewAnswer, request: Request):
     try:
-        res = review.save_answer(a.reviewer, a.case, a.verdict, a.memo)
+        res = review.save_answer(_reviewer(request, a.reviewer), a.case, a.verdict, a.memo)
     except ValueError as e:
         raise HTTPException(422, {"message": str(e)}) from None
     security.audit("review", _who(request), _client(request), reviewer=res["reviewer"], case=a.case)
