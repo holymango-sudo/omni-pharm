@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { api } from "../api.js";
+import { DEMO, api } from "../api.js";
 import DoseEditor, { doseLabel } from "./DoseEditor.jsx";
 import RxPhoto from "./RxPhoto.jsx";
 import SymptomFinder from "./SymptomFinder.jsx";
@@ -57,7 +57,9 @@ export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario,
           onAdd={(n) => onAdd(n)} onClose={() => setFinder(false)} expert={expert} />
       )}
       <div className="search-wrap">
-        <input ref={input} className="search" value={q} placeholder="국내·해외 제품명(콜대원, NyQuil, Doliprane, ロキソニン…), 성분명(와파린, warfarin), 또는 SMILES"
+        <input ref={input} className="search" value={q} placeholder={DEMO
+          ? "데모: 아래 시나리오의 약·음식만 검색됩니다 (와파린, 타이레놀, 술…) — 다른 약은 설치형 프로그램에서"
+          : "국내·해외 제품명(콜대원, NyQuil, Doliprane, ロキソニン…), 성분명(와파린, warfarin), 또는 SMILES"}
           onChange={(e) => { setQ(e.target.value); setSel(0); }}
           onFocus={() => setFocus(true)} onBlur={() => setTimeout(() => setFocus(false), 150)}
           onKeyDown={(e) => {
@@ -99,7 +101,9 @@ export default function DrugBar({ drugs, onAdd, onRemove, onReplace, onScenario,
             <b onClick={() => onRemove(d.name)}>×</b>
           </span>
         ))}
-        {!drugs.length && <span className="muted small">약물을 2개 이상 추가하세요. 데모 시나리오:</span>}
+        {!drugs.length && <span className="muted small">{DEMO
+          ? "👉 공개 데모: 아래 시나리오 중 하나를 누르고 ▶ 예측 시작을 누르세요."
+          : "약물을 2개 이상 추가하세요. 데모 시나리오:"}</span>}
         {!drugs.length && SCENARIOS.map((s) => (
           <button key={s.name} className="chip ghost" onClick={() => onScenario(s.drugs)}>{s.name}</button>
         ))}

@@ -295,6 +295,15 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .modal h3 { margin: 0 0 10px; color: #fff; font-size: 20px; }
 .modal h4 { color: var(--cyan); margin: 14px 0 6px; }
 .steps li, .tips li { margin: 6px 0; line-height: 1.6; }
+.demo-guide { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.demo-lead { margin: 0 0 6px; line-height: 1.6; }
+.demo-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.demo-col { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+.demo-col.ok { border-color: rgba(0, 229, 160, 0.5); }
+.demo-col.no { border-color: rgba(255, 176, 32, 0.5); }
+.demo-col ul { margin: 6px 0 0; padding-left: 18px; }
+.demo-col li { margin: 3px 0; line-height: 1.5; }
+@media (max-width: 640px) { .demo-cols { grid-template-columns: 1fr; } }
 .legend3 { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; font-size: 13px; }
 .lg { padding: 1px 10px; border-radius: 6px; font-weight: 700; text-align: center; color: #000; }
 .lg.high { background: var(--red); } .lg.caution { background: var(--amber); } .lg.normal { background: var(--cyan); }

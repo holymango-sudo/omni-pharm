@@ -239,8 +239,9 @@ export default function App() {
           <div className="tag">초정밀 개인화 다중 약물 상호작용 예측 시스템</div>
         </div>
         <div className="sys">
-          {DEMO && <span className="pill warn" title="서버 없이 돌아가는 공개 데모입니다. 데모 시나리오 × 환자 예시 4개를 실제 프로그램으로 미리 분석해 둔 결과를 그대로 보여 줍니다.">
-            DEMO · 미리 분석한 실제 결과</span>}
+          {DEMO && <button className="pill btnlike warn" onClick={() => setHelp(true)}
+            title="서버 없이 돌아가는 공개 데모입니다. 눌러서 데모에서 되는 것·안 되는 것을 확인하세요.">
+            DEMO · 되는 것 보기</button>}
           {status === false && <span className="pill bad">서버 연결 실패 — start_servers 실행 확인</span>}
           <button className="pill btnlike" onClick={() => setHelp(true)}>❔ 사용법</button>
           {status && <>
@@ -313,7 +314,7 @@ export default function App() {
           onDetail={() => setDrawer("pairs")} onPrint={(mode) => printReport(res, patient, report, mode)} />
       </main>
       <footer className="foot">
-        {DEMO && <b>공개 데모 — 예시 조합만 미리 분석해 둔 결과입니다. 전체 기능은 설치형 프로그램에서 동작합니다 · </b>}
+        {DEMO && <b>공개 데모 — 데모 시나리오 7개 × 환자 예시 4명만 미리 분석해 둔 결과입니다(위 ‘DEMO · 되는 것 보기’). 전체 기능은 설치형 프로그램에서 동작합니다 · </b>}
         연구·교육용 의사결정 보조 시스템 · 결과는 FDA 라벨 / 실제 보고(FAERS·TWOSIDES) / AI 예측으로 구분 표기 · 의사·약사의 임상 판단을 대체하지 않습니다
         {res && <span className="mono"> · 추론 {res.elapsed_ms}ms</span>}
       </footer>

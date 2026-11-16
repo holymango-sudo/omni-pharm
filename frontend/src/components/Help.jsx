@@ -1,17 +1,57 @@
 import React, { useState } from "react";
+import { DEMO } from "../api.js";
+
+/** 공개 데모 사이트에서 되는 것 / 설치형 프로그램에서만 되는 것 (src/demo/replay.js가 녹화에서 찾는 범위와 같아야 함) */
+function DemoGuide() {
+  return (
+    <div className="demo-guide">
+      <p className="demo-lead">
+        이 사이트는 <b>공개 데모</b>입니다. 서버 없이, 실제 프로그램(로컬 AI 켜짐)으로 <b>미리 분석해 둔 결과</b>를 그대로 보여 줍니다.
+      </p>
+      <ol className="steps">
+        <li>왼쪽 <b>환자 예시 4명</b>(간경변 고령 · 녹내장·전립선 노인 · 만성콩팥병 · 건강한 성인) 중 한 명을 누르세요.
+          값을 직접 바꾸면 분석되지 않습니다.</li>
+        <li>가운데 <b>데모 시나리오</b> 버튼 7개 중 하나를 누르세요. ‘건강한 성인’이면 술·자몽주스 같은 <b>함께 확인</b> 1가지를 더할 수 있습니다.</li>
+        <li><b>▶ 예측 시작</b> → 판정·근거·3D 인체 여정·AI 전문가 소견이 나옵니다. <b>💬 AI 복약 상담</b>에서는 추천 질문 버튼을 눌러 보세요.</li>
+      </ol>
+      <div className="demo-cols">
+        <div className="demo-col ok">
+          <b>✅ 데모에서 되는 것</b>
+          <ul>
+            <li>데모 시나리오 7개 × 환자 예시 4명 분석 (판정·근거·3D 분자·인체 여정·AI 소견·인쇄)</li>
+            <li>건강한 성인 + 시나리오 + 음식·술 1가지 (술·자몽주스·우유·커피·녹색채소·흡연)</li>
+            <li>AI 복약 상담의 <b>추천 질문 버튼</b> (분석 결과 상담, 분석 전 일반 상담)</li>
+            <li>증상·질환으로 약 찾기: 약을 넣기 전, 증상 51개 중 <b>1개</b></li>
+            <li>전문가 보기, 모델 검증 화면</li>
+          </ul>
+        </div>
+        <div className="demo-col no">
+          <b>🖥 설치형 프로그램에서만 되는 것</b>
+          <ul>
+            <li>그 밖의 약 검색·추가 (국내외 제품 16.9만 개, 성분, SMILES)</li>
+            <li>복용량 입력, 나이·검사값·질환 직접 수정</li>
+            <li>AI에게 직접 쓴 질문, 증상 여러 개·자유 검색</li>
+            <li>처방전·약봉투 사진 읽기</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function HelpModal({ onClose }) {
   return (
     <div className="modal-bg" onClick={() => onClose()}>
       <div className="modal help" onClick={(e) => e.stopPropagation()}>
-        <h3>OMNI-PHARM 사용법</h3>
-        <ol className="steps">
+        <h3>OMNI-PHARM {DEMO ? "공개 데모 안내" : "사용법"}</h3>
+        {DEMO && <DemoGuide />}
+        {!DEMO && <ol className="steps">
           <li><b>환자 정보</b> (왼쪽) — 나이·키·몸무게·성별을 맞추고, 검사값(크레아티닌, 간수치)이 있으면 입력하세요.
             앓고 있는 병을 모두 눌러 주세요. 모르는 값은 기본값 그대로 두어도 됩니다.</li>
           <li><b>약 추가</b> (가운데 아래) — 약 이름을 입력하고 목록에서 고르세요. 한국 제품(콜대원), 해외 제품(Tylenol, Doliprane),
             일본 약(ロキソニン), 성분명(와파린), 화학 구조식(SMILES) 모두 됩니다. 2개 이상 넣으세요.</li>
           <li><b>예측 시작</b>을 누르면 오른쪽에 결과가 나옵니다.</li>
-        </ol>
+        </ol>}
         <h4>결과 읽는 법</h4>
         <div className="legend3">
           <span className="lg high">위험</span> 함께 먹지 않는 것이 좋거나, 이 환자에게 특히 해로운 조합
