@@ -43,3 +43,6 @@ backups/
 Thumbs.db
 .vscode/
 .idea/
+
+# demo site build output (data lives in frontend/demo-public)
+frontend/dist-demo/

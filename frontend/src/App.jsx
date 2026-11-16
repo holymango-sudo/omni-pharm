@@ -1,9 +1,10 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { api, handleLoginRequired, handlePinRequired, setPin, setToken } from "./api.js";
+import { DEMO, api, handleLoginRequired, handlePinRequired, setPin, setToken } from "./api.js";
 import { HelpModal, LoginModal, PinModal } from "./components/Help.jsx";
 import MoleculeScene from "./components/MoleculeScene.jsx";
 import BodyScene, { JourneyClock, JourneyHud, useJourney } from "./components/BodyJourney.jsx";
-import PatientPanel, { PRESETS, hasLiverDisease } from "./components/PatientPanel.jsx";
+import PatientPanel from "./components/PatientPanel.jsx";
+import { DEFAULT_PRESET, PRESETS, patientPayload } from "./patient.js";
 import DrugBar from "./components/DrugBar.jsx";
 import ResultPanel from "./components/ResultPanel.jsx";
 import DetailDrawer from "./components/DetailDrawer.jsx";
@@ -53,7 +54,7 @@ function useWide() {
 
 export default function App() {
   const [status, setStatus] = useState(null);
-  const [patient, setPatient] = useState({ ...PRESETS["건강한 성인"] });
+  const [patient, setPatient] = useState({ ...PRESETS[DEFAULT_PRESET] });
   const [drugs, setDrugs] = useState([]);
   const [res, setRes] = useState(null);
   const [report, setReport] = useState("");
@@ -192,18 +193,7 @@ export default function App() {
     return out;
   }, [res]);
 
-  const payload = () => {
-    const p = { age: patient.age, sex: patient.sex, weight_kg: patient.weight_kg, height_cm: patient.height_cm,
-      ast: patient.ast, alt: patient.alt,
-      total_bilirubin: patient.total_bilirubin, conditions: patient.conditions, diagnosis: patient.diagnosis || null,
-      symptoms: patient.symptoms || null };
-    if (patient.labMode === "scr") p.scr = patient.scr; else p.egfr = patient.egfr;
-    if (hasLiverDisease(patient)) {  // Child-Pugh is graded only for a known liver disease (see PatientPanel)
-      Object.assign(p, { albumin: patient.albumin, inr: patient.inr, ascites: patient.ascites,
-        encephalopathy: patient.encephalopathy, child_pugh: patient.child_pugh || null });
-    }
-    return p;
-  };
+  const payload = () => patientPayload(patient);
 
   const predict = async () => {
     resetResult();
@@ -249,6 +239,8 @@ export default function App() {
           <div className="tag">초정밀 개인화 다중 약물 상호작용 예측 시스템</div>
         </div>
         <div className="sys">
+          {DEMO && <span className="pill warn" title="서버 없이 돌아가는 공개 데모입니다. 데모 시나리오 × 환자 예시 4개를 실제 프로그램으로 미리 분석해 둔 결과를 그대로 보여 줍니다.">
+            DEMO · 미리 분석한 실제 결과</span>}
           {status === false && <span className="pill bad">서버 연결 실패 — start_servers 실행 확인</span>}
           <button className="pill btnlike" onClick={() => setHelp(true)}>❔ 사용법</button>
           {status && <>
@@ -321,6 +313,7 @@ export default function App() {
           onDetail={() => setDrawer("pairs")} onPrint={(mode) => printReport(res, patient, report, mode)} />
       </main>
       <footer className="foot">
+        {DEMO && <b>공개 데모 — 예시 조합만 미리 분석해 둔 결과입니다. 전체 기능은 설치형 프로그램에서 동작합니다 · </b>}
         연구·교육용 의사결정 보조 시스템 · 결과는 FDA 라벨 / 실제 보고(FAERS·TWOSIDES) / AI 예측으로 구분 표기 · 의사·약사의 임상 판단을 대체하지 않습니다
         {res && <span className="mono"> · 추론 {res.elapsed_ms}ms</span>}
       </footer>

@@ -1,3 +1,7 @@
+import { demoChat, demoReport, demoReq } from "./demo/replay.js";
+
+// demo site build (vite --mode demo): no server, recorded answers only
+export const DEMO = import.meta.env.VITE_DEMO === "1";
 const PIN_KEY = "omnipharm.pin";
 const getPin = () => { try { return localStorage.getItem(PIN_KEY) || ""; } catch { return ""; } };
 export const setPin = (p) => { try { localStorage.setItem(PIN_KEY, p); } catch { /* storage blocked */ } };
@@ -10,6 +14,7 @@ let onLoginRequired = () => {};
 export const handleLoginRequired = (fn) => { onLoginRequired = fn; };
 
 async function req(path, opts = {}) {
+  if (DEMO) return demoReq(path, opts);
   let r;
   const token = getToken();
   try {
@@ -57,6 +62,7 @@ export const api = {
     req("recommend", { method: "POST", body: JSON.stringify({ symptoms, drugs, patient, query, expert }) }),
   /** AI 복약 상담: POST + streamed server-sent events; returns a function that stops the answer */
   chat(body, onToken, onDone, onChecked, onReview) {
+    if (DEMO) return demoChat(body, onToken, onDone, onChecked, onReview);
     const ctrl = new AbortController();
     const token = getToken();
     (async () => {
@@ -98,6 +104,7 @@ export const api = {
     return () => ctrl.abort();
   },
   streamReport(id, onToken, onDone) {
+    if (DEMO) return demoReport(id, onToken, onDone);
     const pin = getPin();
     const token = getToken();
     const q = token ? `?token=${encodeURIComponent(token)}` : pin ? `?pin=${encodeURIComponent(pin)}` : "";

@@ -3,19 +3,8 @@ import { api } from "../api.js";
 import DoseEditor, { doseLabel } from "./DoseEditor.jsx";
 import RxPhoto from "./RxPhoto.jsx";
 import SymptomFinder from "./SymptomFinder.jsx";
+import { LIFESTYLE, SCENARIOS } from "../scenarios.js";
 
-export const SCENARIOS = [
-  { name: "타이레놀 + 와파린", drugs: ["타이레놀", "와파린"] },
-  { name: "와파린 + 코다론 + 부루펜", drugs: ["쿠마딘", "코다론", "부루펜"] },
-  { name: "감기약 2종 + 진통제", drugs: ["콜대원코프에스시럽", "판콜에이내복액", "타이레놀"] },
-  { name: "팍스로비드 + 심바스타틴", drugs: ["팍스로비드", "심바스타틴"] },
-  { name: "해외약: Doliprane + Advil + 와파린", drugs: ["Doliprane", "Advil", "와파린"] },
-  { name: "일본약: ロキソニン + ワーファリン", drugs: ["ロキソニン", "ワーファリン"] },
-  { name: "SSRI + 트라마돌", drugs: ["프로작", "트라마돌"] },
-];
-
-// food, drink and smoking: checked against labels and rules like any medicine
-const LIFESTYLE = [["🍺", "술"], ["🍊", "자몽주스"], ["🥛", "우유"], ["☕", "커피"], ["🥬", "녹색채소"], ["🚬", "흡연"]];
 const isFood = (d) => d.molecules?.length > 0 && d.molecules.every((m) => m.category === "음식·생활");
 // what a food contains per 100 g / 100 mL (식약처 식품영양성분DB): only the nutrients that change a medicine's effect
 const NUTR = [["caffeine_mg", "카페인", "mg"], ["vitamin_k_ug", "비타민K", "μg"], ["potassium_mg", "칼륨", "mg"],
