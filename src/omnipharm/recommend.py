@@ -337,7 +337,6 @@ CONDITIONS: dict[str, dict] = {
                     "aliases": ["과다복용", "많이먹었", "한통다", "삼켰"],
                     "doctor": "지금 바로 119 — 먹은 약 상자를 챙겨 가세요. 억지로 토하게 하지 마세요"},
 }
-SYMPTOMS = CONDITIONS  # (name used before v2.21)
 POPULAR = ["cold", "fever", "sore_throat", "runny_nose", "cough", "headache", "low_back", "disc", "knee_ligament",
            "sprain", "muscle", "period", "heartburn", "indigestion", "diarrhea", "constipation", "allergy",
            "allergic_rhinitis", "athletes_foot", "insomnia", "nausea"]

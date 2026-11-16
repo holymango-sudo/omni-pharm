@@ -318,9 +318,6 @@ def _fr(mapper: Mapper) -> list[dict]:
     return out
 
 
-JP_UNIT = {"錠": "錠", "カプセル": "カプセル", "包": "包", "管": "管", "瓶": "瓶", "袋": "袋", "個": "個", "枚": "枚"}
-
-
 def _jp(products: pd.DataFrame, mapper: Mapper) -> list[dict]:
     """規格 is only parseable for single-ingredient products: '60mg1錠', '20%1g', '500mg1g', '2mg1mL'."""
     import openpyxl

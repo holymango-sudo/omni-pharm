@@ -76,7 +76,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .chip:hover { border-color: var(--cyan); }
 .chip.on { background: rgba(0, 229, 255, 0.22); color: #fff; border-color: var(--cyan); box-shadow: 0 0 10px rgba(0, 229, 255, 0.35); }
 .chip.ghost { border-style: dashed; }
-.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .slider { display: block; margin: 6px 0; }
 .slider-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
@@ -134,10 +133,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   box-shadow: 0 0 22px rgba(0, 229, 255, 0.35), inset 0 0 18px rgba(0, 229, 255, 0.2); }
 .btn.predict.busy { animation: busy 0.6s linear infinite; }
 @keyframes busy { 50% { box-shadow: 0 0 34px rgba(255, 45, 85, 0.7); } }
-.props { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-.prop { background: rgba(0, 10, 16, 0.7); border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; font-size: 11px; display: flex; flex-direction: column; }
-.prop.novel { border-color: #a78bfa; }
-.prop b { color: #fff; font-size: 12px; }
 .mol-label { color: #fff; font-size: 13px; white-space: nowrap; padding: 3px 12px; border: 1px solid var(--line2); border-radius: 8px;
   background: rgba(0, 10, 16, 0.72); pointer-events: none; display: flex; flex-direction: column; align-items: center; }
 .mol-label b { text-shadow: 0 0 6px var(--cyan); }
@@ -222,7 +217,6 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .ev-val { text-align: right; }
 .ev-lift { text-align: right; color: var(--muted); }
 .ev-lift.mid { color: var(--amber); } .ev-lift.hi { color: #ff6b85; font-weight: 700; }
-.legend-line { font-size: 10px; margin-top: 2px; }
 
 /* grows with its text and never shrinks: 'flex: 1' (shrink 1) squeezed it to 180px under a long result, the opinion then
    scrolled inside a small box of its own; the result panel scrolls instead */

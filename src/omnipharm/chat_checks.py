@@ -142,7 +142,6 @@ EFFECT_TERMS: list[tuple[str, re.Pattern]] = [(k, re.compile(p)) for k, p in [
     ("칼륨", r"칼륨"), ("근육", r"근육|횡문근"), ("경련", r"경련|발작"), ("위장", r"위궤양|속쓰림|위\s*점막|위장\s*출혈"),
     ("흡수", r"흡수"), ("혈중 농도", r"혈중\s*농도|농도가\s*(올라|높아|떨어|낮아)")]]
 _BOILERPLATE = re.compile(r"응급 신호일 수 있습니다|새로운 증상|근거\s*[:：]|119|의사|약사")
-GENERAL_MARK = "(일반 상식)"  # what CHAT_SYSTEM asks for; the variants the model writes ('(일반 복약 상식)') count too
 _GENERAL = re.compile(r"\(일반[^()]{0,8}(?:상식|지식|정보)\)")
 _PARTICLE = re.compile(r"(은|는|이|가|을|를|과|와|도|의|에|로|으로|만|이나|랑|이랑)$")
 

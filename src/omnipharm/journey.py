@@ -972,12 +972,6 @@ def default_regimen(form: str, t_half: float, route: str, kind: str) -> dict:
     return {"per_day": n, "days": None, "prn": False, "weekly": False, "source": "추정(반감기 기준 일반적 복용 간격)"}
 
 
-def _where(b: dict) -> str:
-    """'간 HMG-CoA 환원효소' but not '간 간 포도당 생성'."""
-    site = SITES[b["site"]].split("·")[0]
-    return b["label"] if b["label"].startswith(site) else f"{SITES[b['site']]}의 {b['label']}"
-
-
 def _rank(sev: str) -> int:
     return {"normal": 0, "low": 1, "mid": 2, "high": 3}.get(sev, 0)
 

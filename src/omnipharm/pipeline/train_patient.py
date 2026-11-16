@@ -49,7 +49,7 @@ class _Data:
         return ((self.lab[b, None] >> bits) & 1).float()
 
 
-def _predict(model, G, d: _Data, C: int, x_override: torch.Tensor | None = None) -> np.ndarray:
+def _predict(model, G, d: _Data, x_override: torch.Tensor | None = None) -> np.ndarray:
     model.eval()
     out = []
     with torch.no_grad():
@@ -77,18 +77,18 @@ def _sensitivity(model, G, d: _Data, C: int, organs: list[str], cap: int = 200_0
     base_x = sub.x.clone()
     for k in COMORBIDITIES:
         base_x[:, FEATURES.index(k)] = 0
-    base = organ_mean(_predict(model, G, sub, C, base_x))
+    base = organ_mean(_predict(model, G, sub, base_x))
     out = {}
     for k in COMORBIDITIES:
         x = base_x.clone()
         x[:, FEATURES.index(k)] = 1
-        on = organ_mean(_predict(model, G, sub, C, x))
+        on = organ_mean(_predict(model, G, sub, x))
         out[k] = {o: round(on[o] / max(base[o], 1e-9), 3) for o in base}
     for label, age in (("age_30", 30.0), ("age_80", 80.0)):
         x = base_x.clone()
         x[:, FEATURES.index("age")] = age / 100.0
         x[:, FEATURES.index("age_missing")] = 0
-        out[label] = organ_mean(_predict(model, G, sub, C, x))
+        out[label] = organ_mean(_predict(model, G, sub, x))
     out["age_80_vs_30"] = {o: round(out["age_80"][o] / max(out["age_30"][o], 1e-9), 3) for o in base}
     del out["age_30"], out["age_80"]
     return out
@@ -166,7 +166,7 @@ def train(epochs: int | None = None, no_patient: bool = False) -> dict:
             opt.step()
             sched.step()
             tot += loss.item() * len(b)
-        m = evaluate(yv, _predict(model, G, D["val"], C), names)
+        m = evaluate(yv, _predict(model, G, D["val"]), names)
         log.info(f"ep {ep:02d} loss {tot / tr.n:.4f} val {summary(m)} ({time.time() - t0:.0f}s)")
         if m["macro_auprc"] > best + 1e-4:
             best, bad = m["macro_auprc"], 0
@@ -177,11 +177,11 @@ def train(epochs: int | None = None, no_patient: bool = False) -> dict:
                 break
     model.load_state_dict(best_state)
 
-    thr = f1_thresholds(yv, _predict(model, G, D["val"], C))
+    thr = f1_thresholds(yv, _predict(model, G, D["val"]))
     res = {}
     for k in [k for k in ("test_time", "test_unseen", "test_canada") if k in D]:
         d = D[k]
-        p, y = _predict(model, G, d, C), _labels_np(d, C)
+        p, y = _predict(model, G, d), _labels_np(d, C)
         res[k] = evaluate(y, p, names)
         multi = (d.drugs >= 0).sum(1).cpu().numpy() >= 2
         res[k + "_multi_drug"] = evaluate(y[multi], p[multi], names)

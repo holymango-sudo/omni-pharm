@@ -52,7 +52,6 @@ markers = [
 [tool.ruff]
 line-length = 145
 target-version = "py311"
-extend-exclude = ["legacy"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
